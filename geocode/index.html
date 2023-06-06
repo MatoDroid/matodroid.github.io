@@ -80,6 +80,7 @@
   <script>
     var gpxData = '';
     var map = L.map('map').setView([0, 0], 2);
+    var markers = L.featureGroup().addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
@@ -112,11 +113,13 @@
           
           gpxData += generateGPXWaypoint(address, latitude, longitude);
           
-          var marker = L.marker([latitude, longitude]).addTo(map);
+          var marker = L.marker([latitude, longitude]).addTo(markers);
           marker.bindPopup(address).openPopup();
         } else {
           $('#results').append('<p>Nepodarilo sa geokódovať adresu: ' + address + '</p>');
         }
+        
+        map.fitBounds(markers.getBounds());
       });
     }
     
