@@ -1,11 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Geokódovánie adries</title>
+  <title>Geokódovanie adries</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    form {
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100px;
+      resize: vertical;
+      padding: 5px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #333;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #555;
+    }
+
+    #results {
+      background-color: #fff;
+      padding: 10px;
+    }
+
+    #results p {
+      margin: 0;
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+
+    #results p:last-child {
+      border-bottom: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Geokódovánie adries</h1>
+  <h1>Geokódování adres</h1>
   
   <form id="geocodeForm">
     <label for="addresses">Adresy:</label>
@@ -16,6 +67,7 @@
   
   <h2>Výsledky:</h2>
   <div id="results"></div>
+  
   
   <script>
     var gpxData = '';
