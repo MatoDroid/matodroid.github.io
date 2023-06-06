@@ -12,7 +12,9 @@
     <br>
     <button type="button" onclick="convertGeoJSONtoCSV()">Konvertovať</button>
   </form>
-
+  
+  <script src="./node_modules/json2csv/dist/json2csv.min.js"></script>
+  
   <script>
     function convertGeoJSONtoCSV() {
       var fileInput = document.getElementById('geojsonFile');
