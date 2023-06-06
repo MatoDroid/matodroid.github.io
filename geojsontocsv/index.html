@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Konverzia GeoJSON na CSV</title>
+</head>
+<body>
+  <h1>Konverzia GeoJSON na CSV</h1>
+
+  <form>
+    <label for="geojsonFile">Vyberte súbor GeoJSON:</label>
+    <input type="file" id="geojsonFile" accept=".geojson">
+    <br>
+    <button type="button" onclick="convertGeoJSONtoCSV()">Konvertovať</button>
+  </form>
+
+  <script>
+    function convertGeoJSONtoCSV() {
+      var fileInput = document.getElementById('geojsonFile');
+      var file = fileInput.files[0];
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var geojson = JSON.parse(e.target.result);
+        var csvContent = '';
+
+        // Váš konverzný kód tu
+        // Môžete použiť knižnicu json2csv alebo implementovať vlastnú logiku konverzie
+
+        var csvBlob = new Blob([csvContent], { type: 'text/csv' });
+        var csvURL = URL.createObjectURL(csvBlob);
+        var downloadLink = document.createElement('a');
+        downloadLink.href = csvURL;
+        downloadLink.download = 'konvertovane_data.csv';
+        downloadLink.click();
+      };
+
+      reader.readAsText(file);
+    }
+  </script>
+</body>
+</html>
