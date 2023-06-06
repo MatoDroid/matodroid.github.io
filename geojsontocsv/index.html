@@ -1,43 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Konverzia GeoJSON na CSV</title>
+  <meta charset="utf-8">
+  <title>Porovnanie GeoJSON</title>
+  <style>
+    #map {
+      height: 400px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Konverzia GeoJSON na CSV</h1>
+  <label for="file1">Odkaz na prvý GeoJSON súbor:</label>
+  <input type="text" id="file1" placeholder="Odkaz na prvý súbor">
 
-  <form>
-    <label for="geojsonFile">Vyberte súbor GeoJSON:</label>
-    <input type="file" id="geojsonFile" accept=".geojson">
-    <br>
-    <button type="button" onclick="convertGeoJSONtoCSV()">Konvertovať</button>
-  </form>
-  
-  <script src="./node_modules/json2csv/dist/json2csv.min.js"></script>
-  
+  <label for="file2">Odkaz na druhý GeoJSON súbor:</label>
+  <input type="text" id="file2" placeholder="Odkaz na druhý súbor">
+
+  <button onclick="compareGeoJSON()">Porovnať</button>
+
+  <div id="map"></div>
+
   <script>
-    function convertGeoJSONtoCSV() {
-      var fileInput = document.getElementById('geojsonFile');
-      var file = fileInput.files[0];
+    function compareGeoJSON() {
+      const file1 = document.getElementById('file1').value;
+      const file2 = document.getElementById('file2').value;
 
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        var geojson = JSON.parse(e.target.result);
-        var csvContent = '';
+      Promise.all([
+        fetch(file1).then(response => response.json()),
+        fetch(file2).then(response => response.json())
+      ]).then(([data1, data2]) => {
+        // Porovnanie geometrie
+        const changedGeom = data1.features.map((feature, index) => {
+          return feature.geometry.coordinates.toString() !== data2.features[index].geometry.coordinates.toString();
+        });
 
-        // Váš konverzný kód tu
-        // Môžete použiť knižnicu json2csv alebo implementovať vlastnú logiku konverzie
+        // Porovnanie hodnôt atribútu
+        const changedAttr = data1.features.map((feature, index) => {
+          return feature.properties.nazov_stlpca !== data2.features[index].properties.nazov_stlpca;
+        });
 
-        var csvBlob = new Blob([csvContent], { type: 'text/csv' });
-        var csvURL = URL.createObjectURL(csvBlob);
-        var downloadLink = document.createElement('a');
-        downloadLink.href = csvURL;
-        downloadLink.download = 'konvertovane_data.csv';
-        downloadLink.click();
-      };
+        // Vytvorenie nového GeoJSON objektu pre zmenené prvky
+        const changedFeatures = {
+          type: 'FeatureCollection',
+          features: data1.features.filter((feature, index) => changedGeom[index] || changedAttr[index])
+        };
 
-      reader.readAsText(file);
+        // Vytvorenie mapy s Leaflet
+        const map = L.map('map').setView([latitude, longitude], zoomLevel);
+
+        // Pridanie dlaždíc (mapových podkladov)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: 'OpenStreetMap',
+          maxZoom: 18
+        }).addTo(map);
+
+        // Vykreslenie zmenených prvkov
+        L.geoJSON(changedFeatures).addTo(map);
+      });
     }
   </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
 </body>
 </html>
