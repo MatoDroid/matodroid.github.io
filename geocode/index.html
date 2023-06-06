@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Geokódování adres</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <h1>Geokódování adres</h1>
+  
+  <form id="geocodeForm">
+    <label for="addresses">Adresy:</label>
+    <textarea id="addresses" placeholder="Zadejte adresy, každou na nový řádek"></textarea>
+    <button type="submit">Geokódovat</button>
+    <button type="button" onclick="exportToGPX()">Exportovat GPX</button>
+  </form>
+  
+  <h2>Výsledky:</h2>
+  <div id="results"></div>
+  
+  <script>
+    var gpxData = '';
+    
+    $(document).ready(function() {
+      $('#geocodeForm').on('submit', function(event) {
+        event.preventDefault();
+        
+        var addressesText = $('#addresses').val();
+        var addresses = addressesText.split('\n');
+        
+        addresses.forEach(function(address) {
+          if (address.trim() !== '') {
+            geocodeAddress(address.trim());
+          }
+        });
+      });
+    });
+    
+    function geocodeAddress(address) {
+      var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
+      
+      $.getJSON(geocodeUrl, function(data) {
+        if (data.length > 0) {
+          var latitude = data[0].lat;
+          var longitude = data[0].lon;
+          
+          var result = '<p>' + address + ': ' + latitude + ', ' + longitude + '</p>';
+          $('#results').append(result);
+          
+          gpxData += generateGPXWaypoint(address, latitude, longitude);
+        } else {
+          $('#results').append('<p>Nepodařilo se geokódovat adresu: ' + address + '</p>');
+        }
+      });
+    }
+    
+    function generateGPXWaypoint(name, latitude, longitude) {
+      var waypoint = '<wpt lat="' + latitude + '" lon="' + longitude + '">\n';
+      waypoint += '  <name>' + name + '</name>\n';
+      waypoint += '</wpt>\n';
+      
+      return waypoint;
+    }
+    
+    function exportToGPX() {
+      var gpxContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
+      gpxContent += '<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">\n';
+      gpxContent += '<metadata>\n';
+      gpxContent += '  <name>Geocoded Addresses</name>\n';
+      gpxContent += '</metadata>\n';
+      gpxContent += '<wpt>\n';
+      gpxContent += gpxData;
+      gpxContent += '</wpt>\n';
+      gpxContent += '</gpx>\n';
+      
+      var element = document.createElement('a');
+      element.setAttribute('href', 'data:text/xml;charset=utf-8,' + encodeURIComponent(gpxContent));
+      element.setAttribute('download', 'geocoded_addresses.gpx');
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
+  </script>
+</body>
+</html>
