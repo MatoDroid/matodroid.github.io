@@ -1,163 +1,59 @@
 <!DOCTYPE html>
-
 <html>
-
 <head>
-
-  <meta charset="UTF-8">
-
-  <title>OCR Demo</title>
-
-</head>
-
-<body>
-
-  <h1>OCR Demo</h1>
-
-  <p>Vyberte obrázok alebo vložte odkaz na obrázok a nakreslite obdĺžnik okolo textu, ktorý chcete prečítať.</p>
-
-  <input type="file" id="image-selector">
-
-  <br>
-
-  <input type="text" id="url-input" placeholder="Vložte URL obrázka">
-
-  <br>
-
-  <canvas id="canvas"></canvas>
-
-  <br>
-
-  <button id="recognize-button">Rozpoznať text</button>
-
-  <p id="text-output"></p>
-
-  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@2.1.1'></script>
-
-  <script>
-
-    const canvas = document.getElementById('canvas');
-
-    const ctx = canvas.getContext('2d');
-
-    let img;
-
-    function loadImage(src) {
-
-      img = new Image();
-
-      img.onload = function () {
-
-        canvas.width = img.width;
-
-        canvas.height = img.height;
-
-        ctx.drawImage(img, 0, 0);
-
-      };
-
-      img.src = src;
-
+  <title>MatoDroid</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
     }
 
-    document.getElementById('image-selector').addEventListener('change', e => {
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
 
-      const file = e.target.files[0];
+    h1 {
+      color: #333;
+    }
 
-      const reader = new FileReader();
+    p {
+      color: #666;
+    }
 
-      reader.readAsDataURL(file);
+    .button-container {
+      margin-top: 20px;
+    }
 
-      reader.onload = () => loadImage(reader.result);
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 4px;
+      background-color: #4caf50;
+      color: #fff;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
 
-    });
-
-    document.getElementById('url-input').addEventListener('change', e => {
-
-      const url = e.target.value;
-
-      loadImage(url);
-
-    });
-
-    let isDrawing = false;
-
-    let startX, startY;
-
-    canvas.addEventListener('mousedown', e => {
-
-      startX = e.offsetX;
-
-      startY = e.offsetY;
-
-      isDrawing = true;
-
-    });
-
-    canvas.addEventListener('mousemove', e => {
-
-      if (!isDrawing) return;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.drawImage(img, 0, 0);
-
-      const x = Math.min(startX, e.offsetX);
-
-      const y = Math.min(startY, e.offsetY);
-
-      const width = Math.abs(startX - e.offsetX);
-
-      const height = Math.abs(startY - e.offsetY);
-
-      ctx.strokeRect(x, y, width, height);
-
-    });
-
-    canvas.addEventListener('mouseup', e => {
-
-      isDrawing = false;
-
-    });
-
-    document.getElementById('recognize-button').addEventListener('click', (e) => {
-
-      const rect = canvas.getBoundingClientRect();
-
-      const left = startX - rect.left;
-
-      const top = startY - rect.top;
-
-      const right = e.clientX - rect.left;
-
-      const bottom = e.clientY - rect.top;
-
-      const width = right - left;
-
-      const height = bottom - top;
-
-      const imageData = ctx.getImageData(left, top, width, height);
-
-      const options = {
-
-        lang: 'slk',
-
-      };
-
-      Tesseract.recognize(imageData, options)
-
-        .then(({data: {text}}) => {
-
-          const textOutput = document.getElementById('text-output');
-
-          textOutput.innerText = text;
-
-        });
-
-    });
-
-  </script>
-
+    .button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MatoDroid Github</h1>
+    <p>Prosím, vyberte jednu z možností:</p>
+    <div class="button-container">
+      <a class="button" href="https://matodroid github.io/geocode/">Geokódovanie adries</a>
+      <a class="button" href="https://matodroid github.io/imagetotext/">OCR</a>
+      <a class="button" href="podstranka3.html">Podstránka 3</a>
+    </div>
+  </div>
 </body>
-
 </html>
