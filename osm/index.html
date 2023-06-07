@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Porovnanie GeoJSON súborov</title>
+</head>
+<body>
+  <h1>Porovnanie GeoJSON súborov</h1>
+  <button onclick="runComparison()">Spustiť porovnanie</button>
+
+  <script>
+    function runComparison() {
+      fetch('differences.geojson', {
+        method: 'POST'
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.text();
+        } else {
+          throw new Error('Chyba pri vytváraní GeoJSON súboru s rozdielmi.');
+        }
+      })
+      .then(data => {
+        console.log('GeoJSON súbor s rozdielmi bol úspešne vytvorený.');
+        
+        // Nahrať nový súbor ako old.geojson
+        fetch('http://www.example.com/new.geojson')
+          .then(response => response.json())
+          .then(newData => {
+            fetch('save-old.php', {
+              method: 'POST',
+              body: JSON.stringify(newData)
+            })
+              .then(response => {
+                if (response.ok) {
+                  console.log('Nový súbor new.geojson bol úspešne nahradený za old.geojson.');
+                } else {
+                  throw new Error('Chyba pri ukladaní nového súboru.');
+                }
+              })
+              .catch(error => {
+                console.log('Chyba: ' + error.message);
+              });
+          })
+          .catch(error => {
+            console.log('Chyba pri načítaní nového GeoJSON súboru: ' + error.message);
+          });
+      })
+      .catch(error => {
+        console.log('Chyba: ' + error.message);
+      });
+    }
+  </script>
+</body>
+</html>
