@@ -1,117 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Porovnanie GeoJSON</title>
-  <style>
-    #map {
-      height: 400px;
-    }
-  </style>
+  <title>Konverzia GeoJSON na CSV</title>
+  <script src="https://cdn.jsdelivr.net/npm/geojson2csv/dist/geojson2csv.min.js"></script>
 </head>
 <body>
-  <label for="file1">Vyberte prvý GeoJSON súbor:</label>
-  <input type="file" id="file1" accept=".geojson">
-
-  <label for="file2">Vyberte druhý GeoJSON súbor:</label>
-  <input type="file" id="file2" accept=".geojson">
-
-  <div>
-    <label for="url1">Alebo zadajte odkaz na prvý GeoJSON súbor:</label>
-    <input type="text" id="url1" placeholder="Odkaz na prvý súbor">
-  </div>
-
-  <div>
-    <label for="url2">Alebo zadajte odkaz na druhý GeoJSON súbor:</label>
-    <input type="text" id="url2" placeholder="Odkaz na druhý súbor">
-  </div>
-
-  <button onclick="compareGeoJSON()">Porovnať</button>
-
-  <div id="map"></div>
+  <h1>Konverzia GeoJSON na CSV</h1>
+  <input type="file" id="geojsonFile" accept=".geojson">
+  <button onclick="convertGeoJSON()">Konvertovať</button>
 
   <script>
-    function compareGeoJSON() {
-      const file1Input = document.getElementById('file1');
-      const file2Input = document.getElementById('file2');
-      const url1Input = document.getElementById('url1');
-      const url2Input = document.getElementById('url2');
+    function convertGeoJSON() {
+      const fileInput = document.getElementById('geojsonFile');
+      const file = fileInput.files[0];
 
-      let file1, file2;
-
-      if (file1Input.files.length > 0) {
-        file1 = file1Input.files[0];
-      } else if (url1Input.value) {
-        file1 = url1Input.value;
-      } else {
-        alert('Prosím, vyberte alebo zadejte odkaz na prvý GeoJSON súbor.');
-        return;
-      }
-
-      if (file2Input.files.length > 0) {
-        file2 = file2Input.files[0];
-      } else if (url2Input.value) {
-        file2 = url2Input.value;
-      } else {
-        alert('Prosím, vyberte alebo zadejte odkaz na druhý GeoJSON súbor.');
-        return;
-      }
-
-      const readGeoJSON = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const data = JSON.parse(reader.result);
-              resolve(data);
-            } catch (error) {
-              reject(error);
-            }
-          };
-          reader.onerror = () => {
-            reject(new Error('Chyba pri čítaní súboru.'));
-          };
-          reader.readAsText(file);
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const geojson = JSON.parse(event.target.result);
+        const csv = geojson2csv(geojson, {
+          separator: ',',
+          prependHeader: true
         });
+
+        // Vytvorenie a stiahnutie CSV súboru
+        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'konvertovane_data.csv';
+        link.click();
       };
 
-      Promise.all([
-        typeof file1 === 'string' ? fetch(file1).then(response => response.json()) : readGeoJSON(file1),
-        typeof file2 === 'string' ? fetch(file2).then(response => response.json()) : readGeoJSON(file2)
-      ]).then(([data1, data2]) => {
-        // Porovnanie geometrie
-        const changedGeom = data1.features.map((feature, index) => {
-          return feature.geometry.coordinates.toString() !== data2.features[index].geometry.coordinates.toString();
-        });
-
-        // Porovnanie hodnôt atribútu
-        const changedAttr = data1.features.map((feature, index) => {
-          return feature.properties.nazov_stlpca !== data2.features[index].properties.nazov_stlpca;
-        });
-
-        // Vytvorenie nového GeoJSON objektu pre zmenené prvky
-        const changedFeatures = {
-          type: 'FeatureCollection',
-          features: data1.features.filter((feature, index) => changedGeom[index] || changedAttr[index])
-        };
-
-        // Vytvorenie mapy s Leaflet
-        const map = L.map('map').setView([latitude, longitude], zoomLevel);
-
-        // Pridanie dlaždíc (mapových podkladov)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: 'OpenStreetMap',
-          maxZoom: 18
-        }).addTo(map);
-
-        // Vykreslenie zmenených prvkov
-        L.geoJSON(changedFeatures).addTo(map);
-      }).catch(error => {
-        alert('Chyba pri načítaní súborov: ' + error.message);
-      });
+      reader.readAsText(file);
     }
   </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
 </body>
 </html>
