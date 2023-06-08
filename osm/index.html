@@ -8,8 +8,7 @@
   <button onclick="runComparison()">Spustiť porovnanie</button>
 
   <form id="saveForm" style="display: none;">
-    <label for="filePath">Umiestnenie súboru:</label>
-    <input type="text" id="filePath" name="filePath" placeholder="Názov súboru s rozdielmi">
+    <input type="hidden" id="filePath" name="filePath" value="rozdiely.geojson">
     <button type="submit">Uložiť</button>
   </form>
 
@@ -43,23 +42,15 @@
                 })
               };
 
-              // Zobrazenie formulára na výber umiestnenia pre uloženie súboru
-              const saveForm = document.getElementById('saveForm');
-              saveForm.style.display = 'block';
-              saveForm.onsubmit = function(event) {
-                event.preventDefault();
-                const filePath = document.getElementById('filePath').value;
-                const fileName = filePath.endsWith('.geojson') ? filePath : filePath + '.geojson';
-
-                // Uloženie rozdielov do zvoleného umiestnenia
-                const diffFileContent = JSON.stringify(diffGeoJSON, null, 2);
-                const diffBlob = new Blob([diffFileContent], { type: 'application/json' });
-                const diffURL = URL.createObjectURL(diffBlob);
-                const downloadLink = document.createElement('a');
-                downloadLink.href = diffURL;
-                downloadLink.download = fileName;
-                downloadLink.click();
-              };
+              // Uloženie rozdielov do súboru
+              const filePath = document.getElementById('filePath').value;
+              const diffFileContent = JSON.stringify(diffGeoJSON, null, 2);
+              const diffBlob = new Blob([diffFileContent], { type: 'application/json' });
+              const diffURL = URL.createObjectURL(diffBlob);
+              const downloadLink = document.createElement('a');
+              downloadLink.href = diffURL;
+              downloadLink.download = filePath;
+              downloadLink.click();
             })
             .catch(error => {
               console.log('Chyba pri načítaní existujúceho GeoJSON súboru: ' + error.message);
