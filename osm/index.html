@@ -7,75 +7,96 @@
   <h1>Porovnanie GeoJSON súborov</h1>
   <button onclick="runComparison()">Spustiť porovnanie</button>
 
+  <form id="saveForm" style="display: none;">
+    <label for="filePath">Umiestnenie súboru:</label>
+    <input type="text" id="filePath" name="filePath" placeholder="Názov súboru s rozdielmi">
+    <button type="submit">Uložiť</button>
+  </form>
+
   <script>
-    const fetch = require('node-fetch');
-const fs = require('fs');
+    function runComparison() {
+      const oldFilePath = './MINV_21052023.geojson';
+      const newFilePath = './MINV_02062023.geojson';
 
-const oldFilePath = './osm/MINV_21052023.geojson';
-const newURL = 'https://minvskaddress.freemap.sk/SK042A526355/source_SK042A526355.geojson';
+      fetch(newFilePath)
+        .then(response => response.json())
+        .then(newData => {
+          fetch(oldFilePath)
+            .then(response => response.json())
+            .then(oldData => {
+              // Porovnanie dát a vytvorenie GeoJSON s rozdielmi
+              const differences = compareGeoJSON(oldData, newData);
 
-fetch(newURL)
-  .then(response => response.json())
-  .then(newData => {
-    const oldData = JSON.parse(fs.readFileSync(oldFilePath));
+              const diffGeoJSON = {
+                type: 'FeatureCollection',
+                features: differences.map(diff => {
+                  const feature = diff.feature;
+                  const properties = { type: diff.type };
+                  if (diff.type === 'Modified') {
+                    properties.oldFeature = diff.oldFeature;
+                  }
+                  return {
+                    type: 'Feature',
+                    geometry: feature.geometry,
+                    properties: properties
+                  };
+                })
+              };
 
-    // Porovnanie dát a vytvorenie GeoJSON s rozdielmi
+              // Zobrazenie formulára na výber umiestnenia pre uloženie súboru
+              const saveForm = document.getElementById('saveForm');
+              saveForm.style.display = 'block';
+              saveForm.onsubmit = function(event) {
+                event.preventDefault();
+                const filePath = document.getElementById('filePath').value;
+                const fileName = filePath.endsWith('.geojson') ? filePath : filePath + '.geojson';
 
-    const diffGeoJSON = {
-      type: 'FeatureCollection',
-      features: differences.map(diff => {
-        const feature = diff.feature;
-        const properties = { type: diff.type };
-        if (diff.type === 'Modified') {
-          properties.oldFeature = diff.oldFeature;
-        }
-        return {
-          type: 'Feature',
-          geometry: feature.geometry,
-          properties: properties
-        };
-      })
-    };
-
-    // Uloženie rozdielov do differences.geojson súboru
-    fs.writeFileSync('differences.geojson', JSON.stringify(diffGeoJSON, null, 2));
-    console.log('Porovnanie dokončené. Nájdené rozdiely boli uložené do differences.geojson súboru.');
-
-    // Nahrať nový súbor ako old.geojson
-    fs.writeFileSync(oldFilePath, JSON.stringify(newData, null, 2));
-    console.log('Nový súbor new.geojson bol úspešne nahradený za old.geojson.');
-  })
-  .catch(error => {
-    console.log('Chyba pri načítaní nového GeoJSON súboru: ' + error.message);
-  });
-        
-        // Nahrať nový súbor ako old.geojson
-        fetch('http://www.example.com/new.geojson')
-          .then(response => response.json())
-          .then(newData => {
-            fetch('save-old.php', {
-              method: 'POST',
-              body: JSON.stringify(newData)
+                // Uloženie rozdielov do zvoleného umiestnenia
+                const diffFileContent = JSON.stringify(diffGeoJSON, null, 2);
+                const diffBlob = new Blob([diffFileContent], { type: 'application/json' });
+                const diffURL = URL.createObjectURL(diffBlob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = diffURL;
+                downloadLink.download = fileName;
+                downloadLink.click();
+              };
             })
-              .then(response => {
-                if (response.ok) {
-                  console.log('Nový súbor new.geojson bol úspešne nahradený za old.geojson.');
-                } else {
-                  throw new Error('Chyba pri ukladaní nového súboru.');
-                }
-              })
-              .catch(error => {
-                console.log('Chyba: ' + error.message);
-              });
-          })
-          .catch(error => {
-            console.log('Chyba pri načítaní nového GeoJSON súboru: ' + error.message);
-          });
-      })
-      .catch(error => {
-        console.log('Chyba: ' + error.message);
-      });
+            .catch(error => {
+              console.log('Chyba pri načítaní existujúceho GeoJSON súboru: ' + error.message);
+            });
+        })
+        .catch(error => {
+          console.log('Chyba pri načítaní nového GeoJSON súboru: ' + error.message);
+        });
     }
+
+    function compareGeoJSON(oldData, newData) {
+        // Implementujte porovnanie dát a vráťte pole rozdielov
+        // Vaša implementácia porovnania dát
+  
+        // Príklad jednoduchého porovnania v tejto ukážke
+        const differences = [];
+  
+        oldData.features.forEach(oldFeature => {
+          const newFeature = newData.features.find(newFeat => newFeat.id === oldFeature.id);
+  
+          if (!newFeature) {
+            differences.push({ type: 'Deleted', feature: oldFeature });
+          } else if (JSON.stringify(newFeature) !== JSON.stringify(oldFeature)) {
+            differences.push({ type: 'Modified', feature: newFeature, oldFeature: oldFeature });
+          }
+        });
+  
+        newData.features.forEach(newFeature => {
+          const oldFeature = oldData.features.find(oldFeat => oldFeat.id === newFeature.id);
+  
+          if (!oldFeature) {
+            differences.push({ type: 'Added', feature: newFeature });
+          }
+        });
+  
+        return differences;
+      }
   </script>
 </body>
 </html>
