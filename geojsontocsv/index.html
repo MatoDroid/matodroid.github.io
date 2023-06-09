@@ -6,32 +6,61 @@
 </head>
 <body>
   <h1>Konverzia GeoJSON na CSV</h1>
-  <input type="file" id="geojsonFile" accept=".geojson">
+  <div>
+    <label for="geojsonFile">Vybrať súbor:</label>
+    <input type="file" id="geojsonFile" accept=".geojson">
+  </div>
+  <div>
+    <label for="geojsonUrl">Vložiť URL:</label>
+    <input type="text" id="geojsonUrl">
+  </div>
   <button onclick="convertGeoJSON()">Konvertovať</button>
 
   <script>
     function convertGeoJSON() {
       const fileInput = document.getElementById('geojsonFile');
+      const urlInput = document.getElementById('geojsonUrl');
       const file = fileInput.files[0];
-      const fileName = file.name;
+      const url = urlInput.value.trim();
 
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const geojson = JSON.parse(event.target.result);
-        const csv = Papa.unparse(geojson.features, {
-          delimiter: ',',
-          header: true
-        });
+      if (file || url) {
+        let reader;
+        if (file) {
+          reader = new FileReader();
+          reader.onload = handleFileRead;
+          reader.readAsText(file);
+        } else {
+          fetch(url)
+            .then(response => response.text())
+            .then(handleFileRead)
+            .catch(error => console.log('Chyba pri načítaní súboru z URL:', error));
+        }
+      } else {
+        console.log('Vyberte súbor alebo vložte URL.');
+      }
+    }
 
-        // Vytvorenie a stiahnutie CSV súboru
-        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName.replace('.geojson', '.csv');
-        link.click();
-      };
+    function handleFileRead(event) {
+      const geojson = JSON.parse(event.target.result);
+      const csv = Papa.unparse(geojson.features, {
+        delimiter: ',',
+        header: true
+      });
 
-      reader.readAsText(file);
+      // Vytvorenie a stiahnutie CSV súboru
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = getOutputFileName();
+      link.click();
+    }
+
+    function getOutputFileName() {
+      const fileInput = document.getElementById('geojsonFile');
+      const urlInput = document.getElementById('geojsonUrl');
+      const fileName = fileInput.files[0]?.name || urlInput.value.trim();
+
+      return fileName.replace('.geojson', '.csv');
     }
   </script>
 </body>
