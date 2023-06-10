@@ -36,12 +36,12 @@
       
       // Hlavička
       const header = Object.keys(features[0].properties);
-      csvArray.push(header.join(','));
+      csvArray.push('id,' + header.join(','));
 
       // Riadky s vlastnosťami
       features.forEach(feature => {
-        const properties = Object.values(feature.properties);
-        csvArray.push(properties.join(','));
+        const row = [feature.id].concat(Object.values(feature.properties));
+        csvArray.push(row.join(','));
       });
 
       // Konverzia do formátu CSV
