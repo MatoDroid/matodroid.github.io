@@ -2,7 +2,6 @@
 <html>
 <head>
   <title>Konverzia GeoJSON na CSV</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
   <h1>Konverzia GeoJSON na CSV</h1>
@@ -32,20 +31,14 @@
     }
 
     function convertToCSV(features) {
-      const csvArray = [];
-      
-      // Hlavička
-      const header = Object.keys(features[0].properties);
-      csvArray.push('id,' + header.join(','));
+      let csv = 'id,' + Object.keys(features[0].properties).join(',') + '\n';
 
-      // Riadky s vlastnosťami
       features.forEach(feature => {
         const row = [feature.id].concat(Object.values(feature.properties));
-        csvArray.push(row.join(','));
+        csv += row.join(',') + '\n';
       });
 
-      // Konverzia do formátu CSV
-      return Papa.unparse(csvArray);
+      return csv;
     }
   </script>
 </body>
