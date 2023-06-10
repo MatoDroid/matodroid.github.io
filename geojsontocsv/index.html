@@ -31,13 +31,12 @@
     }
 
     function convertToCSV(features) {
-      let csv = 'id,latitude,longitude,altitude,geometry\n';
+      let csv = 'id,type,properties,geometry\n';
 
       features.forEach(feature => {
-        const properties = feature.properties;
-        const geometry = feature.geometry;
-        const coordinates = geometry.coordinates;
-        const row = [feature.id, coordinates[1], coordinates[0], coordinates[2] || '', JSON.stringify(geometry)];
+        const properties = JSON.stringify(feature.properties);
+        const geometry = JSON.stringify(feature.geometry);
+        const row = [feature.id, feature.type, properties, geometry];
         csv += row.join(',') + '\n';
       });
 
