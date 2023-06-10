@@ -31,12 +31,10 @@
     }
 
     function convertToCSV(features) {
-      let csv = 'id,type,properties,geometry\n';
+      let csv = 'id,' + Object.keys(features[0].properties).join(',') + '\n';
 
       features.forEach(feature => {
-        const properties = JSON.stringify(feature.properties);
-        const geometry = JSON.stringify(feature.geometry);
-        const row = [feature.id, feature.type, properties, geometry];
+        const row = [feature.id].concat(Object.values(feature.properties));
         csv += row.join(',') + '\n';
       });
 
