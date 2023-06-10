@@ -18,10 +18,7 @@
       const reader = new FileReader();
       reader.onload = function(event) {
         const geojson = JSON.parse(event.target.result);
-        const csv = Papa.unparse(geojson.features, {
-          delimiter: ',',
-          header: true
-        });
+        const csv = convertToCSV(geojson.features);
 
         // Vytvorenie a stiahnutie CSV súboru
         const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
@@ -32,6 +29,23 @@
       };
 
       reader.readAsText(file);
+    }
+
+    function convertToCSV(features) {
+      const csvArray = [];
+      
+      // Hlavička
+      const header = Object.keys(features[0].properties);
+      csvArray.push(header.join(','));
+
+      // Riadky s vlastnosťami
+      features.forEach(feature => {
+        const properties = Object.values(feature.properties);
+        csvArray.push(properties.join(','));
+      });
+
+      // Konverzia do formátu CSV
+      return Papa.unparse(csvArray);
     }
   </script>
 </body>
