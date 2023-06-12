@@ -101,7 +101,7 @@
     });
     
     function geocodeAddress(address) {
-      var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
+      var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(address);
       
       $.getJSON(geocodeUrl, function(data) {
         if (data.length > 0) {
