@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auto-dopĺňanie z CSV</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            // Načítajte CSV súbor
+            $.ajax({
+                type: "GET",
+                url: "obce.csv", // Názov a umiestnenie vášho CSV súboru
+                dataType: "text",
+                success: function (data) {
+                    var lines = data.split("\n");
+                    var autocompleteData = [];
+
+                    // Prejdite cez riadky CSV súboru a získajte údaje zo stĺpca "name"
+                    for (var i = 0; i < lines.length; i++) {
+                        var values = lines[i].split(",");
+                        if (values.length >= 1) {
+                            autocompleteData.push(values[0]);
+                        }
+                    }
+
+                    // Inicializujte auto-dopĺňanie
+                    $("#obceInput").autocomplete({
+                        source: autocompleteData // Použijte načítané údaje z CSV súboru ako zdroj pre auto-dopĺňanie
+                    });
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <label for="obceInput">Zadajte obec:</label>
+    <input type="text" id="obceInput">
+</body>
+</html>
