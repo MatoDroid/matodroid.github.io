@@ -5,6 +5,12 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+    <label for="obceInput">Zadajte obec:</label>
+    <input type="text" id="obceInput">
+    <button id="spracovatButton">Spracovať</button>
+
     <script>
         $(document).ready(function () {
             // Načítajte CSV súbor
@@ -30,12 +36,15 @@
                     });
                 }
             });
+
+            // Obsluha kliknutia na tlačidlo "Spracovať"
+            $("#spracovatButton").click(function () {
+                // Spustite JavaScript súbor "spracuj.js" po kliknutí na tlačidlo
+                $.getScript("spracuj.js", function () {
+                    // Kód vo "spracuj.js" bude spustený po načítaní súboru
+                });
+            });
         });
     </script>
-</head>
-<body>
-    <label for="obceInput">Zadajte obec:</label>
-    <input type="text" id="obceInput">
-    <button id="spracovatButton">Spracovať</button>
 </body>
 </html>
