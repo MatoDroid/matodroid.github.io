@@ -28,8 +28,22 @@
                 return feature.properties;
               });
 
+<<<<<<< HEAD
               // Porovnanie údajov
               var changes = findChanges(properties1, properties2);
+=======
+    .button {
+      display: inline-block;
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 4px;
+      background-color: #4caf50;
+      color: #fff;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
+>>>>>>> 65caf183e36e5733b25562ecfcfea7596c658a2b
 
               // Zapíšte zmeny do nového GeoJSON súboru
               writeChanges(changes);
@@ -94,9 +108,23 @@
   </script>
 </head>
 <body>
+<<<<<<< HEAD
   <h1>Porovnanie údajov z vlastností GeoJSON súborov</h1>
   <input type="file" id="file1">
   <input type="file" id="file2">
   <button id="compareButton">Porovnať</button>
+=======
+  <div class="container">
+    <h1>MatoDroid Github</h1>
+    <p>Prosím, vyberte jednu z možností:</p>
+    <div class="button-container">
+      <a class="button" href="https://matodroid.github.io/geocode/">Geokódovanie adries</a>
+      <a class="button" href="https://matodroid.github.io/imagetotext/">OCR</a>
+      <a class="button" href="https://matodroid.github.io/osm/">OSM</a>
+      <a class="button" href="https://matodroid.github.io/geojsontocsv/">GeojsonToCsv</a>
+      <a class="button" href="https://matodroid.github.io/compare/">Porovnanie</a>
+    </div>
+  </div>
+>>>>>>> 65caf183e36e5733b25562ecfcfea7596c658a2b
 </body>
 </html>
