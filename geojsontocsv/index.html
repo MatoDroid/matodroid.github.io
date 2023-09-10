@@ -31,10 +31,18 @@
     }
 
     function convertToCSV(features) {
-      let csv = 'id,' + Object.keys(features[0].properties).join(',') + '\n';
+      let csv = 'addr:street,addr:conscriptionnumber,addr:streetnumber,identifier,lat,lon\n';
 
       features.forEach(feature => {
-        const row = [feature.id].concat(Object.values(feature.properties));
+        const properties = feature.properties;
+        const row = [
+          properties['addr:street'] || '',
+          properties['addr:conscriptionnumber'] || '',
+          properties['addr:streetnumber'] || '',
+          properties['identifier'] || '',
+          feature.geometry.coordinates[1],
+          feature.geometry.coordinates[0]
+        ];
         csv += row.join(',') + '\n';
       });
 

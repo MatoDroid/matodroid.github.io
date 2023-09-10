@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Overpass API</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+    <label for="obceInput">Zadajte obec:</label>
+    <input type="text" id="obceInput">
+    <button id="spracovatButton">Spracovať</button>
+    
+    <!-- Div na zobrazenie získaných údajov -->
+    <div id="vystup"></div>
+
+    <script>
+        var id = null;
+
+        $(document).ready(function () {
+            // Načítajte CSV súbor
+            $.ajax({
+                type: "GET",
+                url: "obce.csv",
+                dataType: "text",
+                success: function (data) {
+                    var lines = data.split("\n");
+                    var autocompleteData = [];
+
+                    for (var i = 0; i < lines.length; i++) {
+                        var values = lines[i].split(",");
+                        if (values.length >= 1) {
+                            autocompleteData.push(values[0]);
+                        }
+                    }
+
+                    // Inicializujte auto-dopĺňanie
+                    $("#obceInput").autocomplete({
+                        source: autocompleteData
+                    });
+                }
+            });
+
+            // Obsluha kliknutia na tlačidlo "Spracovať"
+            $("#spracovatButton").click(function () {
+                var vybranyName = $("#obceInput").val();
+
+                $.ajax({
+                    type: "GET",
+                    url: "obce.csv",
+                    dataType: "text",
+                    success: function (data) {
+                        var lines = data.split("\n");
+
+                        for (var i = 0; i < lines.length; i++) {
+                            var values = lines[i].split(",");
+                            if (values.length >= 2 && values[0] === vybranyName) {
+                                id = values[1];
+
+                                // Upravený kód pre Overpass API dotaz s použitím fetch
+                                var overpassQuery = `
+                                    [out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber")];
+                                    area(${id})->.searchArea;
+
+                                    (
+                                    node["addr:conscriptionnumber"](area.searchArea);
+                                    way["addr:conscriptionnumber"](area.searchArea);
+                                    relation["addr:conscriptionnumber"](area.searchArea);
+                                    );
+                                    out center;
+                                `;
+
+                                fetch('https://overpass-api.de/api/interpreter', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded'
+                                    },
+                                    body: `data=${encodeURIComponent(overpassQuery)}`
+                                })
+                                .then(response => response.text())
+                                .then(data => {
+                                    // Zobraziť výsledky z Overpass API v div "vystup"
+                                    var vystupElement = $("#vystup");
+                                    vystupElement.empty(); // Vyprázdniť obsah divu
+                                    vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
+                                    vystupElement.append("<pre>" + data + "</pre>");
+                                })
+                                .catch(error => {
+                                    console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
+                                });
+                                break;
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

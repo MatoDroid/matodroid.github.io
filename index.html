@@ -1,60 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MatoDroid</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f2f2f2;
-    }
+  <title>Porovnanie údajov z vlastností GeoJSON súborov</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      // Funkcia na načítanie dvoch GeoJSON súborov a porovnanie ich vlastností
+      function compareGeoJSON() {
+        var file1 = $('#file1')[0].files[0];
+        var file2 = $('#file2')[0].files[0];
 
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
+        if (file1 && file2) {
+          var reader1 = new FileReader();
+          reader1.onload = function(e) {
+            var geojson1 = JSON.parse(e.target.result);
 
-    h1 {
-      color: #333;
-    }
+            var reader2 = new FileReader();
+            reader2.onload = function(e) {
+              var geojson2 = JSON.parse(e.target.result);
 
-    p {
-      color: #666;
-    }
+              // Porovnanie vlastností
+              var properties1 = geojson1.features.map(function(feature) {
+                return feature.properties;
+              });
 
-    .button-container {
-      margin-top: 20px;
-    }
+              var properties2 = geojson2.features.map(function(feature) {
+                return feature.properties;
+              });
 
-    .button {
-      display: inline-block;
-      padding: 10px 20px;
-      font-size: 16px;
-      border-radius: 4px;
-      background-color: #4caf50;
-      color: #fff;
-      text-decoration: none;
-      transition: background-color 0.3s;
-    }
+              // Porovnanie údajov
+              var changes = findChanges(properties1, properties2);
 
-    .button:hover {
-      background-color: #45a049;
-    }
-  </style>
+              // Zapíšte zmeny do nového GeoJSON súboru
+              writeChanges(changes);
+            };
+
+            reader2.readAsText(file2);
+          };
+
+          reader1.readAsText(file1);
+        }
+      }
+
+      // Funkcia na hľadanie zmien v údajoch
+      function findChanges(properties1, properties2) {
+        var changes = [];
+
+        for (var i = 0; i < properties1.length; i++) {
+          var property1 = properties1[i];
+          var property2 = properties2[i];
+          var featureId = i + 1;
+
+          if (property1 && property2) {
+            // Porovnanie vlastností jednotlivých prvkov
+            for (var key in property1) {
+              if (property1.hasOwnProperty(key) && property2.hasOwnProperty(key)) {
+                var value1 = property1[key];
+                var value2 = property2[key];
+
+                // Porovnanie hodnôt
+                if (value1 !== value2) {
+                  var change = {
+                    featureId: featureId,
+                    property: key,
+                    oldValue: value1,
+                    newValue: value2
+                  };
+                  changes.push(change);
+                }
+              }
+            }
+          }
+        }
+
+        return changes;
+      }
+            
+
+      // Funkcia na zápis zmien do súboru
+      function writeChanges(changes) {
+        var jsonData = JSON.stringify(changes, null, 2);
+        var blob = new Blob([jsonData], { type: 'application/geo+json' });
+
+        var downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = 'changes.geojson';
+        downloadLink.click();
+      }
+
+      // Spustenie funkcie pri kliknutí na tlačidlo Porovnať
+      $('#compareButton').click(compareGeoJSON);
+    });
+  </script>
 </head>
 <body>
-  <div class="container">
-    <h1>MatoDroid Github</h1>
-    <p>Prosím, vyberte jednu z možností:</p>
-    <div class="button-container">
-      <a class="button" href="https://matodroid.github.io/geocode/">Geokódovanie adries</a>
-      <a class="button" href="https://matodroid.github.io/imagetotext/">OCR</a>
-      <a class="button" href="https://matodroid.github.io/osm/">OSM</a>
-      <a class="button" href="https://matodroid.github.io/geojsontocsv/">GeojsonToCsv</a>
-    </div>
-  </div>
+  <h1>Porovnanie údajov z vlastností GeoJSON súborov</h1>
+  <input type="file" id="file1">
+  <input type="file" id="file2">
+  <button id="compareButton">Porovnať</button>
 </body>
 </html>
