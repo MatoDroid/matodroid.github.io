@@ -28,10 +28,10 @@
                 return feature.properties;
               });
 
-
+<<<<<<< HEAD
               // Porovnanie údajov
               var changes = findChanges(properties1, properties2);
-
+=======
     .button {
       display: inline-block;
       margin: 5px;
@@ -43,75 +43,13 @@
       text-decoration: none;
       transition: background-color 0.3s;
     }
->>>>>>> 65caf183e36e5733b25562ecfcfea7596c658a2b
 
-              // Zapíšte zmeny do nového GeoJSON súboru
-              writeChanges(changes);
-            };
-
-            reader2.readAsText(file2);
-          };
-
-          reader1.readAsText(file1);
-        }
-      }
-
-      // Funkcia na hľadanie zmien v údajoch
-      function findChanges(properties1, properties2) {
-        var changes = [];
-
-        for (var i = 0; i < properties1.length; i++) {
-          var property1 = properties1[i];
-          var property2 = properties2[i];
-          var featureId = i + 1;
-
-          if (property1 && property2) {
-            // Porovnanie vlastností jednotlivých prvkov
-            for (var key in property1) {
-              if (property1.hasOwnProperty(key) && property2.hasOwnProperty(key)) {
-                var value1 = property1[key];
-                var value2 = property2[key];
-
-                // Porovnanie hodnôt
-                if (value1 !== value2) {
-                  var change = {
-                    featureId: featureId,
-                    property: key,
-                    oldValue: value1,
-                    newValue: value2
-                  };
-                  changes.push(change);
-                }
-              }
-            }
-          }
-        }
-
-        return changes;
-      }
-            
-
-      // Funkcia na zápis zmien do súboru
-      function writeChanges(changes) {
-        var jsonData = JSON.stringify(changes, null, 2);
-        var blob = new Blob([jsonData], { type: 'application/geo+json' });
-
-        var downloadLink = document.createElement('a');
-        downloadLink.href = URL.createObjectURL(blob);
-        downloadLink.download = 'changes.geojson';
-        downloadLink.click();
-      }
-
-      // Spustenie funkcie pri kliknutí na tlačidlo Porovnať
-      $('#compareButton').click(compareGeoJSON);
-    });
-  </script>
+    .button:hover {
+      background-color: #45a049;
+    }
+  </style>
 </head>
 <body>
-  <h1>Porovnanie údajov z vlastností GeoJSON súborov</h1>
-  <input type="file" id="file1">
-  <input type="file" id="file2">
-  <button id="compareButton">Porovnať</button>
   <div class="container">
     <h1>MatoDroid Github</h1>
     <p>Prosím, vyberte jednu z možností:</p>
