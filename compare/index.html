@@ -16,7 +16,6 @@
 
     <script>
         var id = null;
-        var ref = null;
 
         $(document).ready(function () {
             // Načítajte CSV súbor
@@ -46,76 +45,70 @@
             $("#spracovatButton").click(function () {
                 var vybranyName = $("#obceInput").val();
 
-                $.ajax({
-                    type: "GET",
-                    url: "obce.csv",
-                    dataType: "text",
-                    success: function (data) {
-                        var lines = data.split("\n");
+                if (vybranyName) {
+                    $.ajax({
+                        type: "GET",
+                        url: "obce.csv",
+                        dataType: "text",
+                        success: function (data) {
+                            var lines = data.split("\n");
 
-                        for (var i = 0; i < lines.length; i++) {
-                            var values = lines[i].split(",");
-                            if (values.length >= 2 && values[0] === vybranyName) {
-                                id = values[1];
+                            for (var i = 0; i < lines.length; i++) {
+                                var values = lines[i].split(",");
+                                if (values.length >= 2 && values[0] === vybranyName) {
+                                    id = values[1];
 
-                                // Tu vytvorte premennú "ref" z hodnoty stĺpca "ref"
-                                var ref = values[2]; // Predpokladám, že "ref" je na treťom mieste
+                                    // Vytvor odkaz na stiahnutie súboru
+                                    var downloadLink = document.createElement('a');
+                                    var ref = values[2]; // Predpokladám, že "ref" je na treťom mieste
+                                    downloadLink.href = `https://minvskaddress.freemap.sk/${ref}/source_${ref}.geojson`;
+                                    downloadLink.download = `source_${ref}.geojson`;
+                                    downloadLink.innerHTML = 'Stiahnuť GeoJSON súbor';
 
-                                // Vytvor odkaz na stiahnutie súboru
-                                var downloadLink = document.createElement('a');
-                                downloadLink.href = `https://minvskaddress.freemap.sk/${ref}/source_${ref}.geojson`;
-                                downloadLink.download = `source_${ref}.geojson`;
-                                downloadLink.innerHTML = 'Stiahnuť GeoJSON súbor';
-                                $("#vystup").append(downloadLink); // Pridaj odkaz do výstupu
+                                    // Stiahni GeoJSON súbor
+                                    fetch(`https://minvskaddress.freemap.sk/${ref}/source_${ref}.geojson`)
+                                    .then(response => response.json()) // Predpokladám, že súbor je vo formáte JSON
+                                    .then(minvData => {
+                                        // Upravený kód pre Overpass API dotaz s použitím fetch
+                                        var overpassQuery = `
+                                            [out:json];
+                                            area(${id})->.searchArea;
 
-                                // Stiahni GeoJSON súbor
-                                fetch(`https://minvskaddress.freemap.sk/${ref}/source_${ref}.geojson`)
-                                .then(response => response.json()) // Predpokladám, že súbor je vo formáte JSON
-                                .then(data => {
-                                    // Uložiť obsah GeoJSON súboru do premennej "minv"
-                                    var minv = data;
+                                            (
+                                            node["addr:conscriptionnumber"](area.searchArea);
+                                            way["addr:conscriptionnumber"](area.searchArea);
+                                            relation["addr:conscriptionnumber"](area.searchArea);
+                                            );
+                                            out center;
+                                        `;
 
-            
-
-                                // Upravený kód pre Overpass API dotaz s použitím fetch
-                                var overpassQuery = `
-                                    [out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber")];
-                                    area(${id})->.searchArea;
-
-                                    (
-                                    node["addr:conscriptionnumber"](area.searchArea);
-                                    way["addr:conscriptionnumber"](area.searchArea);
-                                    relation["addr:conscriptionnumber"](area.searchArea);
-                                    );
-                                    out center;
-                                `;
-
-                                fetch('https://overpass-api.de/api/interpreter', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/x-www-form-urlencoded'
-                                    },
-                                    body: `data=${encodeURIComponent(overpassQuery)}`
-                                })
-                                .then(response => response.text())
-                                .then(data => {
-                                    // Zobraziť výsledky z Overpass API v div "vystup"
-                                    var vystupElement = $("#vystup");
-                                    vystupElement.empty(); // Vyprázdniť obsah divu
-                                    vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
-                                    vystupElement.append("<p>Ref: " + ref + "</p>"); // Pridaj ref do výstupu
-                                    vystupElement.append(downloadLink); // Pridaj odkaz             
-                                    vystupElement.append("<pre>" + JSON.stringify(minv, null, 2) + "</pre>"); // Zobraziť obsah GeoJSON súboru
-
-                                })
-                                .catch(error => {
-                                    console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
-                                });
-                                break;
+                                        fetch('https://overpass-api.de/api/interpreter', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/x-www-form-urlencoded'
+                                            },
+                                            body: `data=${encodeURIComponent(overpassQuery)}`
+                                        })
+                                        .then(response => response.json())
+                                        .then(overpassData => {
+                                            // Zobraziť výsledky z Overpass API v div "vystup"
+                                            var vystupElement = $("#vystup");
+                                            vystupElement.empty(); // Vyprázdniť obsah divu
+                                            vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
+                                            vystupElement.append("<p>Ref: " + ref + "</p>"); // Pridaj ref do výstupu
+                                            vystupElement.append(downloadLink); // Pridaj odkaz             
+                                            vystupElement.append("<pre>" + JSON.stringify(overpassData, null, 2) + "</pre>"); // Zobraziť obsah Overpass API výstupu
+                                        })
+                                        .catch(error => {
+                                            console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
+                                        });
+                                    });
+                                    break;
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             });
         });
     </script>
