@@ -68,6 +68,14 @@
                                 downloadLink.innerHTML = 'Stiahnuť GeoJSON súbor';
                                 $("#vystup").append(downloadLink); // Pridaj odkaz do výstupu
 
+                                // Stiahni GeoJSON súbor
+                                fetch(`https://minvskaddress.freemap.sk/${ref}/source_${ref}.geojson`)
+                                .then(response => response.json()) // Predpokladám, že súbor je vo formáte JSON
+                                .then(data => {
+                                    // Uložiť obsah GeoJSON súboru do premennej "minv"
+                                    var minv = data;
+
+            
 
                                 // Upravený kód pre Overpass API dotaz s použitím fetch
                                 var overpassQuery = `
@@ -97,7 +105,8 @@
                                     vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
                                     vystupElement.append("<p>Ref: " + ref + "</p>"); // Pridaj ref do výstupu
                                     vystupElement.append(downloadLink); // Pridaj odkaz             
-                                    vystupElement.append("<pre>" + data + "</pre>");
+                                    vystupElement.append("<pre>" + JSON.stringify(minv, null, 2) + "</pre>"); // Zobraziť obsah GeoJSON súboru
+
                                 })
                                 .catch(error => {
                                     console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
