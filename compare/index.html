@@ -79,19 +79,12 @@
                                 })
                                 .then(response => response.text())
                                 .then(data => {
-                                    // Zobraziť výsledky z Overpass API v div "vystup"
-                                    var vystupElement = $("#vystup");
-                                    vystupElement.empty(); // Vyprázdniť obsah divu
-                                    vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
-                                    vystupElement.append("<pre>" + data + "</pre>");
+                                    // Uložte výsledky z Overpass API do premennej
+                                    var overpassData = data;
+
+                                    // Pridajte kód na uloženie do CSV súboru
+                                    saveToCSV(overpassData);
                                 })
-
-                                     // Uložte výsledky z Overpass API do premennej
-                                var overpassData = data;
-
-                                // Pridajte kód na uloženie do CSV súboru
-                                saveToCSV(overpassData);
-                            })
                                 .catch(error => {
                                     console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
                                 });
@@ -101,19 +94,19 @@
                     }
                 });
             });
-        });
 
-        // Funkcia na uloženie výstupu do CSV súboru
-    function saveToCSV(data) {
-        var blob = new Blob([data], { type: 'text/csv' });
-        var a = document.createElement('a');
-        a.href = window.URL.createObjectURL(blob);
-        a.download = 'vystup.csv';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
+            // Funkcia na uloženie výstupu do CSV súboru
+            function saveToCSV(data) {
+                var blob = new Blob([data], { type: 'text/csv' });
+                var a = document.createElement('a');
+                a.href = window.URL.createObjectURL(blob);
+                a.download = 'vystup.csv';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
     </script>
 </body>
 </html>
