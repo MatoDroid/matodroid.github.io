@@ -85,6 +85,13 @@
                                     vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
                                     vystupElement.append("<pre>" + data + "</pre>");
                                 })
+
+                                     // Uložte výsledky z Overpass API do premennej
+                                var overpassData = data;
+
+                                // Pridajte kód na uloženie do CSV súboru
+                                saveToCSV(overpassData);
+                            })
                                 .catch(error => {
                                     console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
                                 });
