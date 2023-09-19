@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-  
+    
     <title>Porovnanie CSV súborov</title>
     <style>
         .difference {
@@ -48,25 +48,28 @@
 
                     resultDiv.innerHTML = '';
 
-                    for (let i = 0; i < lines1.length; i++) {
-                        if (lines1[i] !== lines2[i]) {
-                            const diff1 = lines1[i].split(",");
-                            const diff2 = lines2[i].split(",");
+                    for (let i = 0; i < Math.max(lines1.length, lines2.length); i++) {
+                        const line1 = i < lines1.length ? lines1[i] : "";
+                        const line2 = i < lines2.length ? lines2[i] : "";
+
+                        if (line1 !== line2) {
+                            const diff1 = line1.split(",");
+                            const diff2 = line2.split(",");
                             const resultHtml = [];
 
-                            for (let j = 0; j < diff1.length; j++) {
+                            for (let j = 0; j < Math.max(diff1.length, diff2.length); j++) {
                                 if (diff1[j] !== diff2[j]) {
-                                    resultHtml.push(`<span class="difference">${diff1[j]}</span> | <span class="difference">${diff2[j]}</span>`);
+                                    resultHtml.push(`<span class="difference">${diff1[j] || ""}</span> | <span class="difference">${diff2[j] || ""}</span>`);
                                 } else {
-                                    resultHtml.push(`${diff1[j]} | ${diff2[j]}`);
+                                    resultHtml.push(`${diff1[j] || ""} | ${diff2[j] || ""}`);
                                 }
                             }
 
                             resultDiv.innerHTML += `Riadok ${i + 1}:<br>${resultHtml.join("<br>")}<br><br>`;
-                        } else if (lines1[i] && !lines2[i]) {
-                            resultDiv.innerHTML += `<div class="only-in-file1">Riadok ${i + 1}: ${lines1[i]}</div>`;
-                        } else if (lines2[i] && !lines1[i]) {
-                            resultDiv.innerHTML += `<div class="only-in-file2">Riadok ${i + 1}: ${lines2[i]}</div>`;
+                        } else if (line1 && !line2) {
+                            resultDiv.innerHTML += `<div class="only-in-file1">Riadok ${i + 1}: ${line1}</div>`;
+                        } else if (line2 && !line1) {
+                            resultDiv.innerHTML += `<div class="only-in-file2">Riadok ${i + 1}: ${line2}</div>`;
                         }
                     }
                 };
@@ -79,3 +82,4 @@
     </script>
 </body>
 </html>
+    
