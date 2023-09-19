@@ -44,17 +44,17 @@
                         if (lines1[i] !== lines2[i]) {
                             const diff1 = lines1[i].split(",");
                             const diff2 = lines2[i].split(",");
-                            const diffHtml = [];
+                            const resultHtml = [];
 
                             for (let j = 0; j < diff1.length; j++) {
                                 if (diff1[j] !== diff2[j]) {
-                                    diffHtml.push(`<span class="difference">${diff1[j]}</span>`);
+                                    resultHtml.push(`<span class="difference">${diff1[j]}</span> | <span class="difference">${diff2[j]}</span>`);
                                 } else {
-                                    diffHtml.push(diff1[j]);
+                                    resultHtml.push(`${diff1[j]} | ${diff2[j]}`);
                                 }
                             }
 
-                            resultDiv.innerHTML += `Riadok ${i + 1}:<br>${diffHtml.join(", ")}<br><br>`;
+                            resultDiv.innerHTML += `Riadok ${i + 1}:<br>${resultHtml.join("<br>")}<br><br>`;
                         }
                     }
                 };
