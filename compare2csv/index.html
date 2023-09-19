@@ -6,6 +6,12 @@
         .difference {
             background-color: yellow;
         }
+        .only-in-file1 {
+            background-color: red;
+        }
+        .only-in-file2 {
+            background-color: green;
+        }
     </style>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
@@ -55,6 +61,10 @@
                             }
 
                             resultDiv.innerHTML += `Riadok ${i + 1}:<br>${resultHtml.join("<br>")}<br><br>`;
+                        } else if (lines1[i] && !lines2[i]) {
+                            resultDiv.innerHTML += `<div class="only-in-file1">Riadok ${i + 1}: ${lines1[i]}</div>`;
+                        } else if (lines2[i] && !lines1[i]) {
+                            resultDiv.innerHTML += `<div class="only-in-file2">Riadok ${i + 1}: ${lines2[i]}</div>`;
                         }
                     }
                 };
