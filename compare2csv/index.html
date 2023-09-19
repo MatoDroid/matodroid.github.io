@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Porovnanie CSV súborov</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <input type="file" id="file1" accept=".csv" />
+    <input type="file" id="file2" accept=".csv" />
+    <button onclick="compareCSV()">Porovnať</button>
+    <div id="result"></div>
+
+    <script>
+        function compareCSV() {
+            const file1 = document.getElementById("file1").files[0];
+            const file2 = document.getElementById("file2").files[0];
+
+            if (!file1 || !file2) {
+                alert("Vyberte prosím oba CSV súbory.");
+                return;
+            }
+
+            const reader1 = new FileReader();
+            const reader2 = new FileReader();
+
+            reader1.onload = function (e1) {
+                reader2.onload = function (e2) {
+                    const csv1 = e1.target.result;
+                    const csv2 = e2.target.result;
+
+                    // Porovnanie CSV súborov a zobrazenie rozdielov
+                    const lines1 = csv1.split("\n");
+                    const lines2 = csv2.split("\n");
+                    const differences = [];
+
+                    for (let i = 0; i < lines1.length; i++) {
+                        if (lines1[i] !== lines2[i]) {
+                            differences.push(`Riadok ${i + 1}:<br>${lines1[i]}<br>${lines2[i]}<br><br>`);
+                        }
+                    }
+
+                    const resultDiv = document.getElementById("result");
+                    resultDiv.innerHTML = differences.join("");
+                };
+
+                reader2.readAsText(file2);
+            };
+
+            reader1.readAsText(file1);
+        }
+    </script>
+</body>
+</html>
