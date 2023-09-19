@@ -17,6 +17,12 @@
     <script>
         var id = null;
 
+        // Funkcia na extrakciu čísel z textového reťazca s písmenami
+        function extrahujCislo(s) {
+            const cislo = parseInt(s, 10);
+            return isNaN(cislo) ? 0 : cislo;
+        }
+
         $(document).ready(function () {
             // Načítajte CSV súbor
             $.ajax({
@@ -79,11 +85,61 @@
                                 })
                                 .then(response => response.text())
                                 .then(data => {
-                                    // Zobraziť výsledky z Overpass API v div "vystup"
+                                    // Spracovať výsledky z Overpass API
+                                    var resultLines = data.split('\n'); // Rozdeliť výsledky na riadky
+                                    var firstResult = resultLines[0]; // Prvý riadok
+
+                                    var sortedResults = []; // Pole pre usporiadané výsledky
+                                   
+                                    // V cykle pre spracovanie zvyšku výsledkov Overpass API
+                                    for (var i = 1; i < resultLines.length; i++) {
+                                        var resultValues = resultLines[i].split('\t'); // Rozdeliť riadok na hodnoty
+                                        if (resultValues.length >= 4) {
+                                            // Stĺpec "addr:conscriptionnumber" je na 4. pozícii (index 3)
+                                            var conscriptionNumber = resultValues[3];
+                                            sortedResults.push({
+                                                conscriptionNumber: conscriptionNumber,
+                                                resultLine: resultLines[i]
+                                            });
+                                        }
+                                    }
+
+                                    // Usporiadať výsledky podľa "addr:conscriptionnumber" (čísla)
+                                    sortedResults.sort(function (a, b) {
+                                        return a.conscriptionNumber - b.conscriptionNumber;
+                                    });
+
+                                    //Usporiadať výsledky podľa "addr:streetnumber" (čísla a text)
+                                    sortedResults.sort(function (a, b) {
+                                        var streetNumA = extrahujCislo(a.resultLine.split('\t')[2]);
+                                        var streetNumB = extrahujCislo(b.resultLine.split('\t')[2]);
+
+                                        // Porovnanie podľa čísel
+                                        if (streetNumA !== streetNumB) {
+                                            return streetNumA - streetNumB;
+                                        } else {
+                                            // Ak sú čísla rovnaké, usporiadajte podľa textu v "addr:streetnumber"
+                                            var streetNumA = a.resultLine.split('\t')[2];
+                                            var streetNumB = b.resultLine.split('\t')[2];
+                                            return streetNumA.localeCompare(streetNumB);
+                                        }
+                                    });
+
+                                    // Ďalej usporiadajte podľa "addr:street"
+                                    sortedResults.sort(function (a, b) {
+                                        var streetA = a.resultLine.split('\t')[1];
+                                        var streetB = b.resultLine.split('\t')[1];
+                                        return streetA.localeCompare(streetB);
+                                    });
+
+                                    // Zobraziť usporiadané výsledky v div "vystup"
                                     var vystupElement = $("#vystup");
                                     vystupElement.empty(); // Vyprázdniť obsah divu
-                                    vystupElement.append("<h2>Výsledky z Overpass API:</h2>");
-                                    vystupElement.append("<pre>" + data + "</pre>");
+                                    vystupElement.append("<h2>Vystup udajov:</h2>");
+                                    vystupElement.append("<pre>" + firstResult + "</pre>");
+                                    for (var j = 0; j < sortedResults.length; j++) {
+                                        vystupElement.append("<pre>" + sortedResults[j].resultLine + "</pre>");
+                                    }
                                 })
                                 .catch(error => {
                                     console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
