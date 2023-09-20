@@ -2,32 +2,38 @@
 <html>
 <head>
     <title>Overpass API</title>
-        <style>
-        /* Štýly pre tabuľku */
-        table {
+    <style>
+        /* Štýly pre tabuľku (skrytá na začiatku) */
+        #vystup table {
+            display: none;
+        }
+
+        /* Štýly pre tabuľku po zobrazení */
+        #vystup table.visible {
+            display: table;
             border-collapse: collapse;
             width: 100%;
         }
 
-        table, th, td {
+        #vystup table.visible, #vystup table.visible th, #vystup table.visible td {
             border: none;
         }
 
-        th, td {
+        #vystup table.visible th, #vystup table.visible td {
             padding: 8px;
             text-align: left;
         }
 
         /* Farebné zvýraznenie prvého riadka */
-        tr:first-child {
+        #vystup table.visible tr:first-child {
             background-color: #f2f2f2;
         }
 
         /* Farebné zvýraznenie prvého stĺpca */
-        th:first-child {
+        #vystup table.visible th:first-child {
             background-color: #f2f2f2;
         }
-        </style>
+    </style>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
@@ -39,15 +45,7 @@
     
     <!-- Div na zobrazenie získaných údajov -->
     <div id="vystup">
-    <h2>Vystup udajov:</h2>
-    <table border="1">
-        <tr>
-            <th>ref:minvskaddress</th>
-            <th>addr:street</th>
-            <th>addr:streetnumber</th>
-            <th>addr:conscriptionnumber</th>
-        </tr>
-    </table>
+        <h2>Vystup udajov:</h2>
     </div>
 
     <script>
@@ -125,8 +123,8 @@
                                     var resultLines = data.split('\n'); // Rozdeliť výsledky na riadky
                                     var firstResult = resultLines[0]; // Prvý riadok
 
-                                    var sortedResults = []; // Pole pre usporiadané výsledky
-                                   
+                                    var sortedResults = []; // Pole pre usporadané výsledky
+
                                     // V cykle pre spracovanie zvyšku výsledkov Overpass API
                                     for (var i = 1; i < resultLines.length; i++) {
                                         var resultValues = resultLines[i].split('\t'); // Rozdeliť riadok na hodnoty
@@ -168,31 +166,35 @@
                                         return streetA.localeCompare(streetB);
                                     });
 
-            // Zobraziť usporiadané výsledky v tabuľke
-        var vystupElement = $("#vystup table");
-        vystupElement.find("tr:gt(0)").remove(); // Odstrániť existujúce riadky okrem hlavičky
+                                    // Zobraziť usporiadané výsledky v tabuľke
+                                    var vystupElement = $("#vystup");
+                                    vystupElement.empty(); // Vyprázdniť obsah divu
 
-        for (var j = 0; j < sortedResults.length; j++) {
-            var resultValues = sortedResults[j].resultLine.split('\t');
-            if (resultValues.length >= 4) {
-                var minvskaddress = resultValues[0];
-                var conscriptionNumber = resultValues[3];
-                var street = resultValues[1];
-                var streetNumber = resultValues[2];
+                                    // Pridajte tabuľku a nastavte jej triedu na "visible", aby sa zobrazila
+                                    var table = $("<table>").addClass("visible");
+                                    table.append("<tr><th>ref:minvskaddress</th><th>addr:street</th><th>addr:streetnumber</th><th>addr:conscriptionnumber</th></tr>");
+                                    vystupElement.append(table);
 
-                // Pridať nový riadok s údajmi
-                var newRow = $("<tr>");
-                newRow.append("<td>" + minvskaddress + "</td>");
-                newRow.append("<td>" + street + "</td>");
-                newRow.append("<td>" + streetNumber + "</td>");
-                newRow.append("<td>" + conscriptionNumber + "</td>");
-                vystupElement.append(newRow);
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
-    });
+                                    for (var j = 0; j < sortedResults.length; j++) {
+                                        var resultValues = sortedResults[j].resultLine.split('\t');
+                                        if (resultValues.length >= 4) {
+                                            var conscriptionNumber = resultValues[3];
+                                            var street = resultValues[1];
+                                            var streetNumber = resultValues[2];
+
+                                            // Pridaj nový riadok s údajmi do tabuľky
+                                            var newRow = $("<tr>");
+                                            newRow.append("<td>" + conscriptionNumber + "</td>");
+                                            newRow.append("<td>" + street + "</td>");
+                                            newRow.append("<td>" + streetNumber + "</td>");
+                                            newRow.append("<td>" + conscriptionNumber + "</td>");
+                                            table.append(newRow);
+                                        }
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
+                                });
                                 break;
                             }
                         }
