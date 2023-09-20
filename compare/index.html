@@ -12,11 +12,14 @@
         #vystup table.visible {
             display: table;
             border-collapse: collapse;
-            width: auto; /* Nastavenie šírky tabuľky na auto */
+            width: 100%;
+        }
+
+        #vystup table.visible, #vystup table.visible th, #vystup table.visible td {
+            border: none;
         }
 
         #vystup table.visible th, #vystup table.visible td {
-            border: none;
             padding: 8px;
             text-align: left;
         }
@@ -52,26 +55,6 @@
         function extrahujCislo(s) {
             const cislo = parseInt(s, 10);
             return isNaN(cislo) ? 0 : cislo;
-        }
-
-        // Funkcia na nastavenie šírky stĺpcov tabuľky
-        function nastavSirkuStlpcov(tabulka) {
-            tabulka.find('tr').first().find('th, td').each(function (index, th) {
-                var maxSirka = 0;
-
-                tabulka.find('tr').not(':first').each(function () {
-                    var bunka = $(this).find('td').eq(index);
-                    var obsah = bunka.text();
-                    bunka.css('width', 'auto'); // Nastavte šírku na auto pred meraním
-                    var sirka = bunka.width();
-
-                    if (sirka > maxSirka) {
-                        maxSirka = sirka;
-                    }
-                });
-
-                $(th).css('width', maxSirka + 'px');
-            });
         }
 
         $(document).ready(function () {
@@ -189,27 +172,26 @@
 
                                     // Pridajte tabuľku a nastavte jej triedu na "visible", aby sa zobrazila
                                     var table = $("<table>").addClass("visible");
+                                    table.append("<tr><th>ref:minvskaddress</th><th>addr:street</th><th>addr:streetnumber</th><th>addr:conscriptionnumber</th></tr>");
                                     vystupElement.append(table);
 
                                     for (var j = 0; j < sortedResults.length; j++) {
                                         var resultValues = sortedResults[j].resultLine.split('\t');
                                         if (resultValues.length >= 4) {
+                                            var minvskaddress = resultValues[0];
                                             var conscriptionNumber = resultValues[3];
                                             var street = resultValues[1];
                                             var streetNumber = resultValues[2];
 
                                             // Pridaj nový riadok s údajmi do tabuľky
                                             var newRow = $("<tr>");
-                                            newRow.append("<td>" + conscriptionNumber + "</td>");
+                                            newRow.append("<td>" + minvskaddress + "</td>");
                                             newRow.append("<td>" + street + "</td>");
                                             newRow.append("<td>" + streetNumber + "</td>");
                                             newRow.append("<td>" + conscriptionNumber + "</td>");
                                             table.append(newRow);
                                         }
                                     }
-
-                                    // Nastavte šírku stĺpcov podľa obsahu
-                                    nastavSirkuStlpcov(table);
                                 })
                                 .catch(error => {
                                     console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
