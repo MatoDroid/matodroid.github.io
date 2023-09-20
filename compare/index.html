@@ -16,7 +16,7 @@
     <h2>Vystup udajov:</h2>
     <table border="1">
         <tr>
-            <th>conscriptionNumber</th>
+            <th>ref:minvskaddress</th>
             <th>addr:street</th>
             <th>addr:streetnumber</th>
             <th>addr:conscriptionnumber</th>
@@ -149,13 +149,14 @@
         for (var j = 0; j < sortedResults.length; j++) {
             var resultValues = sortedResults[j].resultLine.split('\t');
             if (resultValues.length >= 4) {
+                var minvskaddress = resultValues[0];
                 var conscriptionNumber = resultValues[3];
                 var street = resultValues[1];
                 var streetNumber = resultValues[2];
 
                 // Pridať nový riadok s údajmi
                 var newRow = $("<tr>");
-                newRow.append("<td>" + conscriptionNumber + "</td>");
+                newRow.append("<td>" + minvskaddress + "</td>");
                 newRow.append("<td>" + street + "</td>");
                 newRow.append("<td>" + streetNumber + "</td>");
                 newRow.append("<td>" + conscriptionNumber + "</td>");
