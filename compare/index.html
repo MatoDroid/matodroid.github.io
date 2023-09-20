@@ -12,7 +12,17 @@
     <button id="spracovatButton">Spracovať</button>
     
     <!-- Div na zobrazenie získaných údajov -->
-    <div id="vystup"></div>
+    <div id="vystup">
+    <h2>Vystup udajov:</h2>
+    <table border="1">
+        <tr>
+            <th>conscriptionNumber</th>
+            <th>addr:street</th>
+            <th>addr:streetnumber</th>
+            <th>addr:conscriptionnumber</th>
+        </tr>
+    </table>
+    </div>
 
     <script>
         var id = null;
@@ -132,18 +142,30 @@
                                         return streetA.localeCompare(streetB);
                                     });
 
-                                    // Zobraziť usporiadané výsledky v div "vystup"
-                                    var vystupElement = $("#vystup");
-                                    vystupElement.empty(); // Vyprázdniť obsah divu
-                                    vystupElement.append("<h2>Vystup udajov:</h2>");
-                                    vystupElement.append("<pre>" + firstResult + "</pre>");
-                                    for (var j = 0; j < sortedResults.length; j++) {
-                                        vystupElement.append("<pre>" + sortedResults[j].resultLine + "</pre>");
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
-                                });
+            // Zobraziť usporiadané výsledky v tabuľke
+        var vystupElement = $("#vystup table");
+        vystupElement.find("tr:gt(0)").remove(); // Odstrániť existujúce riadky okrem hlavičky
+
+        for (var j = 0; j < sortedResults.length; j++) {
+            var resultValues = sortedResults[j].resultLine.split('\t');
+            if (resultValues.length >= 4) {
+                var conscriptionNumber = resultValues[3];
+                var street = resultValues[1];
+                var streetNumber = resultValues[2];
+
+                // Pridať nový riadok s údajmi
+                var newRow = $("<tr>");
+                newRow.append("<td>" + conscriptionNumber + "</td>");
+                newRow.append("<td>" + street + "</td>");
+                newRow.append("<td>" + streetNumber + "</td>");
+                newRow.append("<td>" + conscriptionNumber + "</td>");
+                vystupElement.append(newRow);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
+    });
                                 break;
                             }
                         }
