@@ -62,32 +62,41 @@
     }
 
     function compareGeoJSON(oldData, newData) {
-        // Implementujte porovnanie dát a vráťte pole rozdielov
-        // Vaša implementácia porovnania dát
-  
-        // Príklad jednoduchého porovnania v tejto ukážke
-        const differences = [];
-  
-        oldData.features.forEach(oldFeature => {
-          const newFeature = newData.features.find(newFeat => newFeat.id === oldFeature.id);
-  
-          if (!newFeature) {
-            differences.push({ type: 'Deleted', feature: oldFeature });
-          } else if (JSON.stringify(newFeature) !== JSON.stringify(oldFeature)) {
+      const differences = [];
+
+      oldData.features.forEach(oldFeature => {
+        const newFeature = newData.features.find(newFeat => newFeat.id === oldFeature.id);
+
+        if (!newFeature) {
+          differences.push({ type: 'Deleted', feature: oldFeature });
+        } else {
+          // Check the specific properties for differences
+          const propertiesToCompare = ["addr:street", "addr:streetnumber", "addr:conscriptionnumber", "identifier"];
+          let propertiesDiffer = false;
+
+          for (const property of propertiesToCompare) {
+            if (newFeature.properties[property] !== oldFeature.properties[property]) {
+              propertiesDiffer = true;
+              break;
+            }
+          }
+
+          if (propertiesDiffer) {
             differences.push({ type: 'Modified', feature: newFeature, oldFeature: oldFeature });
           }
-        });
-  
-        newData.features.forEach(newFeature => {
-          const oldFeature = oldData.features.find(oldFeat => oldFeat.id === newFeature.id);
-  
-          if (!oldFeature) {
-            differences.push({ type: 'Added', feature: newFeature });
-          }
-        });
-  
-        return differences;
-      }
+        }
+      });
+
+      newData.features.forEach(newFeature => {
+        const oldFeature = oldData.features.find(oldFeat => oldFeat.id === newFeature.id);
+
+        if (!oldFeature) {
+          differences.push({ type: 'Added', feature: newFeature });
+        }
+      });
+
+      return differences;
+    }
   </script>
 </body>
 </html>
