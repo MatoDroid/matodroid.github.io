@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Konverzia MINV na CSV</title>
+</head>
+<body>
+  <h1>Konverzia GeoJSON na CSV</h1>
+  <input type="file" id="geojsonFile" accept=".geojson">
+  <button onclick="convertGeoJSON()">Konvertovať</button>
+
+  <script>
+    function convertGeoJSON() {
+      const fileInput = document.getElementById('geojsonFile');
+      const file = fileInput.files[0];
+      const fileName = file.name;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const geojson = JSON.parse(event.target.result);
+        const csv = convertToCSV(geojson.features);
+
+        // Vytvorenie a stiahnutie CSV súboru
+        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName.replace('.geojson', '.csv');
+        link.click();
+      };
+
+      reader.readAsText(file);
+    }
+
+    function convertToCSV(features) {
+      let csv = 'addr:street\taddr:conscriptionnumber\taddr:streetnumber\tidentifier\tlat\tlon\n';
+    
+      // Vytvorte pole pre usporiadanie výsledkov
+      const sortedResults = [];
+    
+      features.forEach(feature => {
+        const properties = feature.properties;
+        const row = [
+          properties['addr:street'] || '',
+          properties['addr:conscriptionnumber'] || '',
+          properties['addr:streetnumber'] || '',
+          properties['identifier'] || '',
+          properties['lat'] || '',
+          properties['lon'] || ''
+        ];
+        // Pridajte riadok do usporiadaného poľa
+        sortedResults.push({ resultLine: row.join('\t') });
+      });
+    
+      // Funkcia na extrakciu čísel z textového reťazca s písmenami
+      function extrahujCislo(s) {
+        const cislo = parseInt(s, 10);
+        return isNaN(cislo) ? 0 : cislo;
+      }
+    
+      // Usporiadajte výsledky podľa "addr:conscriptionnumber" (čísla)
+      sortedResults.sort(function (a, b) {
+        return extrahujCislo(a.resultLine.split('\t')[1]) - extrahujCislo(b.resultLine.split('\t')[1]);
+      });
+    
+      // Usporiadajte výsledky podľa "addr:streetnumber" (čísla a text)
+      sortedResults.sort(function (a, b) {
+        var streetNumA = extrahujCislo(a.resultLine.split('\t')[2]);
+        var streetNumB = extrahujCislo(b.resultLine.split('\t')[2]);
+    
+        // Porovnanie podľa čísel
+        if (streetNumA !== streetNumB) {
+          return streetNumA - streetNumB;
+        } else {
+          // Ak sú čísla rovnaké, usporiadajte podľa textu v "addr:streetnumber"
+          var streetNumA = a.resultLine.split('\t')[2];
+          var streetNumB = b.resultLine.split('\t')[2];
+          return streetNumA.localeCompare(streetNumB);
+        }
+      });
+    
+      // Ďalej usporiadajte podľa "addr:street"
+      sortedResults.sort(function (a, b) {
+        var streetA = a.resultLine.split('\t')[0];
+        var streetB = b.resultLine.split('\t')[0];
+        return streetA.localeCompare(streetB);
+      });
+    
+      // Konvertujte usporiadané výsledky na CSV
+      sortedResults.forEach(result => {
+        csv += result.resultLine + '\n';
+      });
+    
+      return csv;
+    }
+  </script>
+</body>
+</html>
