@@ -10,28 +10,41 @@
     <label for="obceInput">Zadajte obec:</label>
     <input type="text" id="obceInput">
     <button id="spracovatButton">Spracovať</button>
+    <button id="generateCSVButton" style="display: none;">Generovať CSV</button>
     
+    <!-- Div pre priebeh skriptu -->
+    <div id="priebeh">
+        <h3>Priebeh skriptu:</h3>
+        <p id="priebehSprava"></p>
+    </div>
+
+
     <!-- Div na zobrazenie získaných údajov -->
     <div id="vystup">
-    <h2>Vystup udajov:</h2>
-    <table border="1">
-        <tr>
-            <th>ref:minvskaddress</th>
-            <th>addr:street</th>
-            <th>addr:streetnumber</th>
-            <th>addr:conscriptionnumber</th>
-        </tr>
-    </table>
+        <h2>Vystup udajov:</h2>
+        <table border="1">
+            <tr>
+                <th>ref:minvskaddress</th>
+                <th>addr:street</th>
+                <th>addr:streetnumber</th>
+                <th>addr:conscriptionnumber</th>
+            </tr>
+        </table>
     </div>
+
+
+
 
     <script>
         var id = null;
+        var vybranyName = null;
 
         // Funkcia na extrakciu čísel z textového reťazca s písmenami
         function extrahujCislo(s) {
             const cislo = parseInt(s, 10);
             return isNaN(cislo) ? 0 : cislo;
         }
+
 
         $(document).ready(function () {
             // Načítajte CSV súbor
@@ -59,7 +72,7 @@
 
             // Obsluha kliknutia na tlačidlo "Spracovať"
             $("#spracovatButton").click(function () {
-                var vybranyName = $("#obceInput").val();
+                vybranyName = $("#obceInput").val(); // Update vybranyName
 
                 $.ajax({
                     type: "GET",
@@ -85,6 +98,9 @@
                                     );
                                     out center;
                                 `;
+
+                                // Zobraziť správu o začiatku spracovania
+                                $("#priebehSprava").text("Spracovanie dát pre obec: " + vybranyName + " začalo...");
 
                                 fetch('https://overpass-api.de/api/interpreter', {
                                     method: 'POST',
@@ -142,37 +158,83 @@
                                         return streetA.localeCompare(streetB);
                                     });
 
-            // Zobraziť usporiadané výsledky v tabuľke
-        var vystupElement = $("#vystup table");
-        vystupElement.find("tr:gt(0)").remove(); // Odstrániť existujúce riadky okrem hlavičky
+                                    // Zobraziť usporiadané výsledky v tabuľke
+                                    var vystupElement = $("#vystup table");
+                                    vystupElement.find("tr:gt(0)").remove(); // Odstrániť existujúce riadky okrem hlavičky
 
-        for (var j = 0; j < sortedResults.length; j++) {
-            var resultValues = sortedResults[j].resultLine.split('\t');
-            if (resultValues.length >= 4) {
-                var minvskaddress = resultValues[0];
-                var conscriptionNumber = resultValues[3];
-                var street = resultValues[1];
-                var streetNumber = resultValues[2];
+                                    for (var j = 0; j < sortedResults.length; j++) {
+                                        var resultValues = sortedResults[j].resultLine.split('\t');
+                                        if (resultValues.length >= 4) {
+                                            var minvskaddress = resultValues[0];
+                                            var conscriptionNumber = resultValues[3];
+                                            var street = resultValues[1];
+                                            var streetNumber = resultValues[2];
 
-                // Pridať nový riadok s údajmi
-                var newRow = $("<tr>");
-                newRow.append("<td>" + minvskaddress + "</td>");
-                newRow.append("<td>" + street + "</td>");
-                newRow.append("<td>" + streetNumber + "</td>");
-                newRow.append("<td>" + conscriptionNumber + "</td>");
-                vystupElement.append(newRow);
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
-    });
+                                            // Pridať nový riadok s údajmi
+                                            var newRow = $("<tr>");
+                                            newRow.append("<td>" + minvskaddress + "</td>");
+                                            newRow.append("<td>" + street + "</td>");
+                                            newRow.append("<td>" + streetNumber + "</td>");
+                                            newRow.append("<td>" + conscriptionNumber + "</td>");
+                                            vystupElement.append(newRow);
+                                        }
+                                    }
+
+
+
+                                    // Zobraziť správu o úspešnom spracovaní
+                                    $("#priebehSprava").text("Dáta pre obec: " + vybranyName + " boli úspešne spracované.");
+
+                                    // Zobraziť tlačidlo "Generovať CSV"
+                                    $("#generateCSVButton").show();
+                                })
+                                .catch(error => {
+                                    console.error('Chyba pri vykonávaní dotazu na Overpass API:', error);
+                                    // Zobraziť chybovú správu
+                                    $("#priebehSprava").text("Chyba pri vykonávaní dotazu na Overpass API: " + error);
+                                });
                                 break;
                             }
                         }
                     }
                 });
             });
+
+            // Obsluha kliknutia na tlačidlo "Generovať CSV"
+            $("#generateCSVButton").click(function () {
+                if (vybranyName) {
+                    // Generovať CSV reťazec
+                    var csvData = generateCSV();
+
+                    // Vytvoriť a stiahnuť CSV súbor
+                    var blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
+                    var link = document.createElement("a");
+                    if (link.download !== undefined) { // Podpora pre "download" atribút
+                        var url = URL.createObjectURL(blob);
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", vybranyName + ".csv");
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                }
+            });
+
+            // Funkcia na generovanie CSV reťazca
+            function generateCSV() {
+                var csv = "ref:minvskaddress\taddr:street\taddr:streetnumber\taddr:conscriptionnumber\n";
+
+                $("#vystup table tr").each(function () {
+                    $(this).find("td").each(function () {
+                        csv += $(this).text() + "\t";
+                    });
+                    csv = csv.slice(0, -1); // Odstrániť poslednú čiarku v riadku
+                    csv += "\n";
+                });
+
+                return csv;
+            }
         });
     </script>
 </body>
