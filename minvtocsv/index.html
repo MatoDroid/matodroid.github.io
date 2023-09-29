@@ -6,6 +6,15 @@
 <body>
   <h1>Konverzia GeoJSON na CSV</h1>
   <input type="file" id="geojsonFile" accept=".geojson">
+  <label>Vyberte stĺpce na export: </label>
+  <select id="columnSelect" multiple>
+    <option value="addr:street">addr:street</option>
+    <option value="addr:conscriptionnumber">addr:conscriptionnumber</option>
+    <option value="addr:streetnumber">addr:streetnumber</option>
+    <option value="identifier">identifier</option>
+    <option value="lat">lat</option>
+    <option value="lon">lon</option>
+  </select>
   <button onclick="convertGeoJSON()">Konvertovať</button>
 
   <script>
@@ -13,11 +22,12 @@
       const fileInput = document.getElementById('geojsonFile');
       const file = fileInput.files[0];
       const fileName = file.name;
+      const selectedColumns = Array.from(document.getElementById('columnSelect').selectedOptions).map(option => option.value);
 
       const reader = new FileReader();
       reader.onload = function(event) {
         const geojson = JSON.parse(event.target.result);
-        const csv = convertToCSV(geojson.features);
+        const csv = convertToCSV(geojson.features, selectedColumns);
 
         // Vytvorenie a stiahnutie CSV súboru
         const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
@@ -30,66 +40,17 @@
       reader.readAsText(file);
     }
 
-    function convertToCSV(features) {
-      let csv = 'addr:street\taddr:conscriptionnumber\taddr:streetnumber\tidentifier\tlat\tlon\n';
-    
-      // Vytvorte pole pre usporiadanie výsledkov
-      const sortedResults = [];
+    function convertToCSV(features, selectedColumns) {
+      let csvHeader = selectedColumns.join('\t') + '\n';
+      let csv = '';
     
       features.forEach(feature => {
         const properties = feature.properties;
-        const row = [
-          properties['addr:street'] || '',
-          properties['addr:conscriptionnumber'] || '',
-          properties['addr:streetnumber'] || '',
-          properties['identifier'] || '',
-          properties['lat'] || '',
-          properties['lon'] || ''
-        ];
-        // Pridajte riadok do usporiadaného poľa
-        sortedResults.push({ resultLine: row.join('\t') });
+        const row = selectedColumns.map(column => properties[column] || '');
+        csv += row.join('\t') + '\n';
       });
     
-      // Funkcia na extrakciu čísel z textového reťazca s písmenami
-      function extrahujCislo(s) {
-        const cislo = parseInt(s, 10);
-        return isNaN(cislo) ? 0 : cislo;
-      }
-    
-      // Usporiadajte výsledky podľa "addr:conscriptionnumber" (čísla)
-      sortedResults.sort(function (a, b) {
-        return extrahujCislo(a.resultLine.split('\t')[1]) - extrahujCislo(b.resultLine.split('\t')[1]);
-      });
-    
-      // Usporiadajte výsledky podľa "addr:streetnumber" (čísla a text)
-      sortedResults.sort(function (a, b) {
-        var streetNumA = extrahujCislo(a.resultLine.split('\t')[2]);
-        var streetNumB = extrahujCislo(b.resultLine.split('\t')[2]);
-    
-        // Porovnanie podľa čísel
-        if (streetNumA !== streetNumB) {
-          return streetNumA - streetNumB;
-        } else {
-          // Ak sú čísla rovnaké, usporiadajte podľa textu v "addr:streetnumber"
-          var streetNumA = a.resultLine.split('\t')[2];
-          var streetNumB = b.resultLine.split('\t')[2];
-          return streetNumA.localeCompare(streetNumB);
-        }
-      });
-    
-      // Ďalej usporiadajte podľa "addr:street"
-      sortedResults.sort(function (a, b) {
-        var streetA = a.resultLine.split('\t')[0];
-        var streetB = b.resultLine.split('\t')[0];
-        return streetA.localeCompare(streetB);
-      });
-    
-      // Konvertujte usporiadané výsledky na CSV
-      sortedResults.forEach(result => {
-        csv += result.resultLine + '\n';
-      });
-    
-      return csv;
+      return csvHeader + csv;
     }
   </script>
 </body>
