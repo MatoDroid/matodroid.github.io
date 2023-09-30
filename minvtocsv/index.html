@@ -92,7 +92,7 @@
     
       // Usporiadajte výsledky podľa "addr:conscriptionnumber" (čísla)
       sortedResults.sort(function (a, b) {
-        return extrahujCislo(a.resultLine.split('\t')[1]) - extrahujCislo(b.resultLine.split('\t')[1]);
+        return extrahujCislo(a.resultLine.split('\t')[3]) - extrahujCislo(b.resultLine.split('\t')[3]);
       });
     
       // Usporiadajte výsledky podľa "addr:streetnumber" (čísla a text)
@@ -113,8 +113,8 @@
     
       // Ďalej usporiadajte podľa "addr:street"
       sortedResults.sort(function (a, b) {
-        var streetA = a.resultLine.split('\t')[0];
-        var streetB = b.resultLine.split('\t')[0];
+        var streetA = a.resultLine.split('\t')[1];
+        var streetB = b.resultLine.split('\t')[1];
         return streetA.localeCompare(streetB);
       });
     
