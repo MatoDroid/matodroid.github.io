@@ -9,10 +9,10 @@
   <button onclick="convertGeoJSON()">Konvertovať</button>
   
   <h2>Vyberte stĺpce pre export:</h2>
-  <label><input type="checkbox" id="exportStreet" checked> addr:street</label><br>
-  <label><input type="checkbox" id="exportConscriptionNumber" checked> addr:conscriptionnumber</label><br>
-  <label><input type="checkbox" id="exportStreetNumber" checked> addr:streetnumber</label><br>
   <label><input type="checkbox" id="exportIdentifier" checked> identifier</label><br>
+  <label><input type="checkbox" id="exportStreet" checked> addr:street</label><br>
+  <label><input type="checkbox" id="exportStreetNumber" checked> addr:streetnumber</label><br>
+  <label><input type="checkbox" id="exportConscriptionNumber" checked> addr:conscriptionnumber</label><br>
   <label><input type="checkbox" id="exportLat" checked> lat</label><br>
   <label><input type="checkbox" id="exportLon" checked> lon</label><br>
 
@@ -50,10 +50,10 @@
         let csvHeader = '';
         let csv = '';
       
-        if (exportStreet) csvHeader += 'addr:street\t';
-        if (exportConscriptionNumber) csvHeader += 'addr:conscriptionnumber\t';
-        if (exportStreetNumber) csvHeader += 'addr:streetnumber\t';
         if (exportIdentifier) csvHeader += 'identifier\t';
+        if (exportStreet) csvHeader += 'addr:street\t';
+        if (exportStreetNumber) csvHeader += 'addr:streetnumber\t';
+        if (exportConscriptionNumber) csvHeader += 'addr:conscriptionnumber\t';
         if (exportLat) csvHeader += 'lat\t';
         if (exportLon) csvHeader += 'lon\t';
       
@@ -72,10 +72,10 @@
           const properties = feature.properties;
           const row = [];
           
-          if (exportStreet) row.push(properties['addr:street'] || '');
-          if (exportConscriptionNumber) row.push(properties['addr:conscriptionnumber'] || '');
-          if (exportStreetNumber) row.push(properties['addr:streetnumber'] || '');
           if (exportIdentifier) row.push(properties['identifier'] || '');
+          if (exportStreet) row.push(properties['addr:street'] || '');
+          if (exportStreetNumber) row.push(properties['addr:streetnumber'] || '');
+          if (exportConscriptionNumber) row.push(properties['addr:conscriptionnumber'] || '');
           if (exportLat) row.push(properties['lat'] || '');
           if (exportLon) row.push(properties['lon'] || '');
       
