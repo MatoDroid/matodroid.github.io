@@ -1,81 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-  
-    <title>Porovnanie CSV súborov</title>
-    <style>
-        .difference {
-            background-color: yellow;
-        }
-        .only-in-file1 {
-            background-color: red;
-        }
-        .only-in-file2 {
-            background-color: green;
-        }
-    </style>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Porovnanie CSV</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.css">
 </head>
 <body>
-    <input type="file" id="file1" accept=".csv" />
-    <input type="file" id="file2" accept=".csv" />
-    <button onclick="compareCSV()">Porovnať</button>
-    <div id="result"></div>
+  <h1>Porovnanie CSV Súborov</h1>
+  <div id="diffOutput"></div>
 
-    <script>
-        function compareCSV() {
-            const file1 = document.getElementById("file1").files[0];
-            const file2 = document.getElementById("file2").files[0];
+  <script>
+    // Nahrajte obsah CSV súborov
+    const file1 = `
+      Prvý riadok, Stĺpec 1, Stĺpec 2
+      1, Hodnota 1, Hodnota 2
+      2, Hodnota 3, Hodnota 4
+    `;
 
-            if (!file1 || !file2) {
-                alert("Vyberte prosím oba CSV súbory.");
-                return;
-            }
+    const file2 = `
+      Prvý riadok, Stĺpec 1, Stĺpec 2
+      1, Hodnota 1, Zmenená Hodnota
+      3, Nový Riadok, Hodnota 5
+    `;
 
-            const reader1 = new FileReader();
-            const reader2 = new FileReader();
-
-            reader1.onload = function (e1) {
-                reader2.onload = function (e2) {
-                    const csv1 = e1.target.result;
-                    const csv2 = e2.target.result;
-
-                    // Porovnanie CSV súborov a zobrazenie rozdielov
-                    const lines1 = csv1.split("\n");
-                    const lines2 = csv2.split("\n");
-                    const resultDiv = document.getElementById("result");
-
-                    resultDiv.innerHTML = '';
-
-                    for (let i = 0; i < lines1.length; i++) {
-                        if (lines1[i] !== lines2[i]) {
-                            const diff1 = lines1[i].split(",");
-                            const diff2 = lines2[i].split(",");
-                            const resultHtml = [];
-
-                            for (let j = 0; j < diff1.length; j++) {
-                                if (diff1[j] !== diff2[j]) {
-                                    resultHtml.push(`<span class="difference">${diff1[j]}</span> | <span class="difference">${diff2[j]}</span>`);
-                                } else {
-                                    resultHtml.push(`${diff1[j]} | ${diff2[j]}`);
-                                }
-                            }
-
-                            resultDiv.innerHTML += `Riadok ${i + 1}:<br>${resultHtml.join("<br>")}<br><br>`;
-                        } else if (lines1[i] && !lines2[i]) {
-                            resultDiv.innerHTML += `<div class="only-in-file1">Riadok ${i + 1}: ${lines1[i]}</div>`;
-                        } else if (lines2[i] && !lines1[i]) {
-                            resultDiv.innerHTML += `<div class="only-in-file2">Riadok ${i + 1}: ${lines2[i]}</div>`;
-                        }
-                    }
-                };
-
-                reader2.readAsText(file2);
-            };
-
-            reader1.readAsText(file1);
-        }
-    </script>
+    // Porovnanie CSV súborov
+    const diffOutput = document.getElementById('diffOutput');
+    const diff2htmlUi = new Diff2HtmlUI({ diff: Diff2Html.getJsonFromDiff(Diff2Html.diffLines(file1, file2)) });
+    diff2htmlUi.draw(diffOutput, { inputFormat: 'json', showFiles: true, matching: 'lines', outputFormat: 'side-by-side' });
+  </script>
 </body>
 </html>
