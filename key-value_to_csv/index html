@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prevod údajov</title>
+</head>
+<body>
+    <input type="file" id="fileInput" accept=".txt">
+    <button onclick="processFile()">Prevod údajov</button>
+
+    <script>
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    const inputData = e.target.result.split('\n');
+                    const numKeys = inputData[0].split(',').length;
+
+                    const outputFileName = 'output.csv';
+                    const outputStream = new Blob([Array.from({ length: numKeys }, (_, i) => `key${i + 1}`).join(',') + '\n'], { type: 'text/csv' });
+
+                    inputData.forEach(line => {
+                        const cleanedLine = line.replace(/"/g, '').replace(/:/g, ',');
+                        outputStream.append(new Blob([cleanedLine.trim() + '\n'], { type: 'text/csv' }));
+                    });
+
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(outputStream);
+                    downloadLink.download = outputFileName;
+                    downloadLink.click();
+                };
+
+                reader.readAsText(file);
+            } else {
+                alert('Vyberte súbor na spracovanie.');
+            }
+        }
+    </script>
+</body>
+</html>
