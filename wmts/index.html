@@ -24,10 +24,11 @@
   var map = L.map('map').setView([48.858844, 2.294350], 13);
 
   // Pridanie WMTS vrstvy zo zadaného zdroja
-  L.tileLayer.wms('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/1.0.0/WMTSCapabilities.xml', {
-    layers: 'OrtoV1',
+  L.tileLayer.wmts('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/1.0.0/WMTSCapabilities.xml', {
+    layer: 'OrtoV1',
     format: 'image/png',
-    transparent: true
+    transparent: true,
+    tileSize: 256
   }).addTo(map);
 
   var geojsonLayer = L.geoJSON().addTo(map);
