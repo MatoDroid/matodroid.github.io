@@ -6,7 +6,9 @@
   <title>Mapa s GeoJSON</title>
   <!-- Pripojenie Leaflet CSS a JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.tilelayer.wmts/L.TileLayer.WMTS.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.tilelayer.wmts/L.TileLayer.WMTS.js"></script>
   <!-- Pripojenie Turf.js -->
   <script src="https://unpkg.com/@turf/turf"></script>
 </head>
@@ -23,8 +25,8 @@
 <script>
   var map = L.map('map').setView([48.858844, 2.294350], 13);
 
-  // Pridanie WMTS vrstvy zo zadaného zdroja
-  L.tileLayer.wmts('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/1.0.0/WMTSCapabilities.xml', {
+  // Pridanie WMTS vrstvy zo zadaného zdroja s pomocou pluginu
+  L.TileLayer.WMTS('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/1.0.0/WMTSCapabilities.xml', {
     layer: 'OrtoV1',
     format: 'image/png',
     transparent: true,
