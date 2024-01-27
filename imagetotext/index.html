@@ -82,7 +82,7 @@
 
     let isDrawing = false;
 
-    let startX, startY;
+    let startX, startY, endX, endY;
 
     canvas.addEventListener('mousedown', e => {
 
@@ -118,23 +118,23 @@
 
       isDrawing = false;
 
+      endX = e.offsetX;
+
+      endY = e.offsetY;
+
     });
 
     document.getElementById('recognize-button').addEventListener('click', (e) => {
 
       const rect = canvas.getBoundingClientRect();
 
-      const left = startX - rect.left;
+      const left = Math.min(startX, endX) - rect.left;
 
-      const top = startY - rect.top;
+      const top = Math.min(startY, endY) - rect.top;
 
-      const right = e.clientX - rect.left;
+      const width = Math.abs(startX - endX);
 
-      const bottom = e.clientY - rect.top;
-
-      const width = right - left;
-
-      const height = bottom - top;
+      const height = Math.abs(startY - endY);
 
       const imageData = ctx.getImageData(left, top, width, height);
 
