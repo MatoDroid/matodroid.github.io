@@ -4,30 +4,40 @@
   <meta charset="UTF-8">
   <title>Porovnanie CSV</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.css">
 </head>
 <body>
   <h1>Porovnanie CSV Súborov</h1>
+  <input type="file" id="file1" name="file1">
+  <input type="file" id="file2" name="file2">
+  <button onclick="compareFiles()">Porovnať</button>
   <div id="diffOutput"></div>
 
   <script>
-    // Nahrajte obsah CSV súborov
-    const file1 = `
-      Prvý riadok, Stĺpec 1, Stĺpec 2
-      1, Hodnota 1, Hodnota 2
-      2, Hodnota 3, Hodnota 4
-    `;
+    function compareFiles() {
+      let file1 = document.getElementById('file1').files[0];
+      let file2 = document.getElementById('file2').files[0];
 
-    const file2 = `
-      Prvý riadok, Stĺpec 1, Stĺpec 2
-      1, Hodnota 1, Zmenená Hodnota
-      3, Nový Riadok, Hodnota 5
-    `;
+      let reader1 = new FileReader();
+      let reader2 = new FileReader();
 
-    // Porovnanie CSV súborov
-    const diffOutput = document.getElementById('diffOutput');
-    const diff2htmlUi = new Diff2HtmlUI({ diff: Diff2Html.getJsonFromDiff(Diff2Html.diffLines(file1, file2)) });
-    diff2htmlUi.draw(diffOutput, { inputFormat: 'json', showFiles: true, matching: 'lines', outputFormat: 'side-by-side' });
+      reader1.onload = function(e) {
+        let content1 = e.target.result;
+
+        reader2.onload = function(e) {
+          let content2 = e.target.result;
+
+          const diffOutput = document.getElementById('diffOutput');
+          const diff2htmlUi = new Diff2HtmlUI({ diff: Diff2Html.getJsonFromDiff(Diff2Html.diffLines(content1, content2)) });
+          diff2htmlUi.draw(diffOutput, { inputFormat: 'json', showFiles: true, matching: 'lines', outputFormat: 'side-by-side' });
+        };
+
+        reader2.readAsText(file2);
+      };
+
+      reader1.readAsText(file1);
+    }
   </script>
 </body>
 </html>
