@@ -1,43 +1,105 @@
-<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Porovnanie CSV</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/2.14.0/diff2html.min.css">
+  <meta charset="utf-8">
+  <title>Porovnanie csv súborov</title>
+  <style>
+    table {
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid black;
+      padding: 5px;
+    }
+    .highlight {
+      background-color: yellow;
+    }
+  </style>
 </head>
 <body>
-  <h1>Porovnanie CSV Súborov</h1>
-  <input type="file" id="file1" name="file1">
-  <input type="file" id="file2" name="file2">
-  <button onclick="compareFiles()">Porovnať</button>
-  <div id="diffOutput"></div>
-
+  <h1>Porovnanie csv súborov</h1>
+  <p>Vyberte dva csv súbory, ktoré chcete porovnať, a stĺpce, v ktorých chcete hľadať rozdiely.</p>
+  <form id="form">
+    <label for="file1">Súbor 1:</label>
+    <input type="file" id="file1" accept=".csv" required>
+    <label for="col1">Stĺpec 1:</label>
+    <input type="number" id="col1" min="1" value="1" required>
+    <br>
+    <label for="file2">Súbor 2:</label>
+    <input type="file" id="file2" accept=".csv" required>
+    <label for="col2">Stĺpec 2:</label>
+    <input type="number" id="col2" min="1" value="1" required>
+    <br>
+    <button type="submit">Porovnať</button>
+  </form>
+  <div id="result"></div>
   <script>
-    function compareFiles() {
-      let file1 = document.getElementById('file1').files[0];
-      let file2 = document.getElementById('file2').files[0];
-
-      let reader1 = new FileReader();
-      let reader2 = new FileReader();
-
-      reader1.onload = function(e) {
-        let content1 = e.target.result;
-
-        reader2.onload = function(e) {
-          let content2 = e.target.result;
-
-          const diffOutput = document.getElementById('diffOutput');
-          const diff2htmlUi = new Diff2HtmlUI({ diff: Diff2Html.getJsonFromDiff(Diff2Html.diffLines(content1, content2)) });
-          diff2htmlUi.draw(diffOutput, { inputFormat: 'json', showFiles: true, matching: 'lines', outputFormat: 'side-by-side' });
+    // Funkcia na načítanie csv súboru do poľa
+    function readCSV(file) {
+      return new Promise((resolve, reject) => {
+        let reader = new FileReader();
+        reader.onload = () => {
+          let data = reader.result;
+          let lines = data.split("\n");
+          let array = [];
+          for (let line of lines) {
+            let values = line.split(",");
+            array.push(values);
+          }
+          resolve(array);
         };
-
-        reader2.readAsText(file2);
-      };
-
-      reader1.readAsText(file1);
+        reader.onerror = () => {
+          reject(reader.error);
+        };
+        reader.readAsText(file);
+      });
     }
+
+    // Funkcia na porovnanie dvoch polí a zvýraznenie rozdielov
+    function compareArrays(array1, array2, col1, col2) {
+      let result = "";
+      let rows = Math.max(array1.length, array2.length);
+      let cols = Math.max(array1[0].length, array2[0].length);
+      result += "<table>";
+      for (let i = 0; i < rows; i++) {
+        result += "<tr>";
+        for (let j = 0; j < cols; j++) {
+          let value1 = array1[i] ? array1[i][j] : "";
+          let value2 = array2[i] ? array2[i][j] : "";
+          let cell = value1 || value2;
+          let style = "";
+          if (j == col1 - 1 || j == col2 - 1) {
+            if (value1 != value2) {
+              style = "class='highlight'";
+            }
+          }
+          result += `<td ${style}>${cell}</td>`;
+        }
+        result += "</tr>";
+      }
+      result += "</table>";
+      return result;
+    }
+
+    // Získanie elementov formulára a výsledku
+    let form = document.getElementById("form");
+    let result = document.getElementById("result");
+
+    // Pridanie udalosti na odoslanie formulára
+    form.addEventListener("submit", async (event) => {
+      // Zabrániť predvolenej akcii
+      event.preventDefault();
+      // Získanie hodnôt z formulára
+      let file1 = document.getElementById("file1").files[0];
+      let file2 = document.getElementById("file2").files[0];
+      let col1 = document.getElementById("col1").value;
+      let col2 = document.getElementById("col2").value;
+      // Načítanie csv súborov do polí
+      let array1 = await readCSV(file1);
+      let array2 = await readCSV(file2);
+      // Porovnanie polí a zobrazenie výsledku
+      let output = compareArrays(array1, array2, col1, col2);
+      result.innerHTML = output;
+    });
   </script>
 </body>
 </html>
