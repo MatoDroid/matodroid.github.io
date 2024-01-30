@@ -5,7 +5,7 @@
 </head>
 <body>
   <h1>Konverzia GeoJSON na CSV</h1>
-  <input type="file" id="geojsonFile" accept=".geojson">
+  <input type="file" id="geojsonFiles" accept=".geojson" multiple>
   <button onclick="convertGeoJSON()">Konvertovať</button>
   
   <h2>Vyberte stĺpce pre export:</h2>
@@ -18,24 +18,28 @@
 
   <script>
     function convertGeoJSON() {
-      const fileInput = document.getElementById('geojsonFile');
-      const file = fileInput.files[0];
-      const fileName = file.name;
+      const fileInput = document.getElementById('geojsonFiles');
+      const files = fileInput.files;
 
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const geojson = JSON.parse(event.target.result);
-        const csv = convertToCSV(geojson.features);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = file.name;
 
-        // Vytvorenie a stiahnutie CSV súboru
-        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName.replace('.geojson', '.csv');
-        link.click();
-      };
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const geojson = JSON.parse(event.target.result);
+          const csv = convertToCSV(geojson.features);
 
-      reader.readAsText(file);
+          // Vytvorenie a stiahnutie CSV súboru
+          const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName.replace('.geojson', '.csv');
+          link.click();
+        };
+
+        reader.readAsText(file);
+      }
     }
 
     function convertToCSV(features) {
