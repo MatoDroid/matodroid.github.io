@@ -71,18 +71,18 @@
                         }
                         delete feature.properties['lat'];
                         delete feature.properties['lon'];
-                        delete feature.properties['dont_tag_buildings2'];
                         delete feature.properties['dont_tag_buildings'];
+                        delete feature.properties['dont_tag_buildings2'];
                     });
 
                     // Save modified file
-                    const modifiedContent = JSON.stringify(geojson);
+                    const modifiedContent = JSON.stringify(geojson, null, 2);
                     const blob = new Blob([modifiedContent], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
 
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'modified.geojson';
+                    a.download = file.name.replace('.geojson', '_modified.geojson');
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
