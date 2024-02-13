@@ -1,99 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mapa s GeoJSON</title>
-  <!-- Pripojenie Leaflet CSS a JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-providers/leaflet-providers.js"></script>
-  <script src="https://unpkg.com/proj4leaflet/proj4leaflet.js"></script>
-  <!-- Pripojenie Turf.js -->
-  <script src="https://unpkg.com/@turf/turf"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoJSON Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
+    <h1>GeoJSON Editor</h1>
+    <form id="geojsonForm">
+        <label for="fileInput">Select GeoJSON file:</label>
+        <input type="file" id="fileInput" accept=".geojson" required>
+        <button type="submit">Edit and Save</button>
+    </form>
 
-<!-- Mapový kontajner -->
-<div id="map" style="height: 400px;"></div>
+    <script>
+        document.getElementById('geojsonForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
 
-<!-- Tlačidlá pre prácu s GeoJSON -->
-<input type="file" id="fileInput" accept=".geojson" />
-<button onclick="loadGeoJSON()">Nahrať GeoJSON</button>
-<button onclick="saveGeoJSON()">Uložiť GeoJSON</button>
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    const geojson = JSON.parse(content);
+                    
+                    // Edit GeoJSON file
+                    geojson.features.forEach(feature => {
+                        if (feature.properties.hasOwnProperty('identifier')) {
+                            feature.properties['ref:minvskaddress'] = feature.properties['identifier'];
+                            delete feature.properties['identifier'];
+                        }
+                        delete feature.properties['lat'];
+                        delete feature.properties['lon'];
+                        delete feature.properties['dont_building'];
+                    });
 
-<script>
-  var map = L.map('map').setView([48.858844, 2.294350], 13);
+                    // Save modified file
+                    const modifiedContent = JSON.stringify(geojson);
+                    const blob = new Blob([modifiedContent], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
 
-  // Definícia projekcie pre WMTS vrstvu
-  var crs = new L.Proj.CRS('EPSG:3857',
-    '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs',
-    {
-      resolutions: function () {
-        var res = [];
-        for (var i = 0; i < 19; i++) {
-          res.push(Math.pow(2, i) * 256);
-        }
-        return res;
-      }()
-    }
-  );
-
-  // Pridanie WMTS vrstvy zo zadaného zdroja
-  L.tileLayer.provider('TileLayer.WMTS', {
-    layer: 'OrtoV1',
-    format: 'image/png',
-    transparent: true,
-    tileSize: 256,
-    continuousWorld: true,
-    crs: crs
-  }).addTo(map);
-
-  var geojsonLayer = L.geoJSON().addTo(map);
-
-  function loadGeoJSON() {
-    var fileInput = document.getElementById('fileInput');
-    var file = fileInput.files[0];
-
-    if (file) {
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        var geojsonData = JSON.parse(e.target.result);
-        geojsonLayer.clearLayers();
-        geojsonLayer.addData(geojsonData);
-        map.fitBounds(geojsonLayer.getBounds());
-      };
-      reader.readAsText(file);
-    }
-  }
-
-  function saveGeoJSON() {
-    var features = [];
-    geojsonLayer.eachLayer(function (layer) {
-      var feature = layer.toGeoJSON();
-      features.push(feature);
-    });
-
-    var geojson = {
-      type: 'FeatureCollection',
-      features: features
-    };
-
-    var blob = new Blob([JSON.stringify(geojson)], { type: 'application/json' });
-    var link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = 'edited_points.geojson';
-    link.click();
-  }
-
-  geojsonLayer.eachLayer(function (layer) {
-    layer.dragging.enable();
-    layer.on('dragend', function (event) {
-      var newLatLng = event.target.getLatLng();
-      console.log('Nové súradnice:', newLatLng);
-    });
-  });
-</script>
-
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'modified.geojson';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please select a file.');
+            }
+        });
+    </script>
 </body>
 </html>
