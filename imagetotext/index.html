@@ -1,163 +1,61 @@
 <!DOCTYPE html>
-
-<html>
-
+<html lang="en">
 <head>
-
-  <meta charset="UTF-8">
-
-  <title>OCR Demo</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Region Selector</title>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.12.313/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.4.0/dist/tesseract.min.js"></script>
 </head>
-
 <body>
-
-  <h1>OCR Demo</h1>
-
-  <p>Vyberte obrázok alebo vložte odkaz na obrázok a nakreslite obdĺžnik okolo textu, ktorý chcete prečítať.</p>
-
-  <input type="file" id="image-selector">
-
-  <br>
-
-  <input type="text" id="url-input" placeholder="Vložte URL obrázka">
-
-  <br>
-
-  <canvas id="canvas"></canvas>
-
-  <br>
-
-  <button id="recognize-button">Rozpoznať text</button>
-
-  <p id="text-output"></p>
-
-  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@2.1.1'></script>
-
-  <script>
-
-    const canvas = document.getElementById('canvas');
-
-    const ctx = canvas.getContext('2d');
-
-    let img;
-
-    function loadImage(src) {
-
-      img = new Image();
-
-      img.onload = function () {
-
-        canvas.width = img.width;
-
-        canvas.height = img.height;
-
-        ctx.drawImage(img, 0, 0);
-
-      };
-
-      img.src = src;
-
-    }
-
-    document.getElementById('image-selector').addEventListener('change', e => {
-
-      const file = e.target.files[0];
-
-      const reader = new FileReader();
-
-      reader.readAsDataURL(file);
-
-      reader.onload = () => loadImage(reader.result);
-
-    });
-
-    document.getElementById('url-input').addEventListener('change', e => {
-
-      const url = e.target.value;
-
-      loadImage(url);
-
-    });
-
-    let isDrawing = false;
-
-    let startX, startY, endX, endY;
-
-    canvas.addEventListener('mousedown', e => {
-
-      startX = e.offsetX;
-
-      startY = e.offsetY;
-
-      isDrawing = true;
-
-    });
-
-    canvas.addEventListener('mousemove', e => {
-
-      if (!isDrawing) return;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.drawImage(img, 0, 0);
-
-      const x = Math.min(startX, e.offsetX);
-
-      const y = Math.min(startY, e.offsetY);
-
-      const width = Math.abs(startX - e.offsetX);
-
-      const height = Math.abs(startY - e.offsetY);
-
-      ctx.strokeRect(x, y, width, height);
-
-    });
-
-    canvas.addEventListener('mouseup', e => {
-
-      isDrawing = false;
-
-      endX = e.offsetX;
-
-      endY = e.offsetY;
-
-    });
-
-    document.getElementById('recognize-button').addEventListener('click', (e) => {
-
-      const rect = canvas.getBoundingClientRect();
-
-      const left = Math.min(startX, endX) - rect.left;
-
-      const top = Math.min(startY, endY) - rect.top;
-
-      const width = Math.abs(startX - endX);
-
-      const height = Math.abs(startY - endY);
-
-      const imageData = ctx.getImageData(left, top, width, height);
-
-      const options = {
-
-        lang: 'slk',
-
-      };
-
-      Tesseract.recognize(imageData, options)
-
-        .then(({data: {text}}) => {
-
-          const textOutput = document.getElementById('text-output');
-
-          textOutput.innerText = text;
-
+<input type="file" id="fileInput" accept=".pdf">
+<div id="pdfContainer"></div>
+<script>
+document.getElementById('fileInput').addEventListener('change', function(event) {
+    var file = event.target.files[0];
+    var fileReader = new FileReader();
+    fileReader.onload = function() {
+        var typedarray = new Uint8Array(this.result);
+        PDFJS.getDocument(typedarray).promise.then(function(pdf) {
+            var canvasContainer = document.getElementById('pdfContainer');
+            for (var i = 0; i < pdf.numPages; i++) {
+                var pageNum = i + 1;
+                pdf.getPage(pageNum).then(function(page) {
+                    var viewport = page.getViewport({ scale: 1.5 });
+                    var canvas = document.createElement('canvas');
+                    var context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    canvasContainer.appendChild(canvas);
+                    page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    });
+                    canvas.addEventListener('click', function(event) {
+                        var rect = this.getBoundingClientRect();
+                        var x = event.clientX - rect.left;
+                        var y = event.clientY - rect.top;
+                        var regionName = prompt('Enter the name for this region:');
+                        if (regionName) {
+                            var canvasContext = canvas.getContext('2d');
+                            canvasContext.strokeStyle = 'red';
+                            canvasContext.lineWidth = 2;
+                            canvasContext.strokeRect(x, y, 100, 50); // Zmena na zvolenú veľkosť oblasti
+                            Tesseract.recognize(canvasContext.getImageData(x, y, 100, 50))
+                                .then(function(result) {
+                                    var text = result.data.text;
+                                    console.log("Region '" + regionName + "': " + text);
+                                    // Uložiť text do premennej s názvom regionName
+                                    window[regionName] = text;
+                                });
+                        }
+                    });
+                });
+            }
         });
-
-    });
-
-  </script>
-
+    };
+    fileReader.readAsArrayBuffer(file);
+});
+</script>
 </body>
-
 </html>
