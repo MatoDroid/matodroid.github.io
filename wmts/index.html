@@ -1,98 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoJSON Editor</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-
-        h1 {
-            text-align: center;
-        }
-
-        form {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        label {
-            margin-bottom: 10px;
-        }
-
-        input[type="file"] {
-            margin-bottom: 20px;
-        }
-
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaflet Map with WMS Layer, Custom Data Import, and Drawing Tools</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
+  <style>
+    #map {
+      height: 600px;
+      width: 800px;
+    }
+  </style>
 </head>
 <body>
-    <h1>GeoJSON Editor</h1>
-    <form id="geojsonForm">
-        <label for="fileInput">Select GeoJSON file:</label>
-        <input type="file" id="fileInput" accept=".geojson" required>
-        <button type="submit">Edit and Save</button>
-    </form>
 
-    <script>
-        document.getElementById('geojsonForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+<div id="map"></div>
 
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const content = e.target.result;
-                    const geojson = JSON.parse(content);
-                    
-                    // Edit GeoJSON file
-                    geojson.features.forEach(feature => {
-                        if (feature.properties.hasOwnProperty('identifier')) {
-                            feature.properties['ref:minvskaddress'] = feature.properties['identifier'];
-                            delete feature.properties['identifier'];
-                        }
-                        delete feature.properties['lat'];
-                        delete feature.properties['lon'];
-                        delete feature.properties['dont_tag_buildings'];
-                        delete feature.properties['dont_tag_buildings2'];
-                    });
+<input type="file" id="file-input"/>
+<button id="draw-point">Draw Point</button>
+<button id="draw-line">Draw Line</button>
 
-                    // Save modified file
-                    const modifiedContent = JSON.stringify(geojson, null, 2);
-                    const blob = new Blob([modifiedContent], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.js"></script>
+<script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+<script>
+  var map = L.map('map').setView([0, 0], 2); // Nastavte priblíženie a polohu mapy
 
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = file.name.replace('.geojson', '_modified.geojson');
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                };
-                reader.readAsText(file);
-            } else {
-                alert('Please select a file.');
-            }
-        });
-    </script>
+  // Pridanie WMS vrstvy
+  var wmsLayer = L.tileLayer.wms('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer?', {
+    layers: '0', // Vrstva, ktorú chcete zobraziť
+    format: 'image/png',
+    transparent: true
+  }).addTo(map);
+
+  // Pridanie možnosti importovať vlastné body a trasy
+  document.getElementById('file-input').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    var layer = L.fileLayer.file(file).addTo(map);
+    map.fitBounds(layer.getBounds());
+  });
+
+  // Pridanie tlačidiel pre kreslenie bodov a trás
+  var drawControl = new L.Control.Draw({
+    draw: {
+      marker: true, // Povoliť kreslenie bodov
+      polyline: true, // Povoliť kreslenie línií
+      polygon: false, // Zakázať kreslenie polygónov
+      circle: false, // Zakázať kreslenie kruhov
+      rectangle: false // Zakázať kreslenie obdĺžnikov
+    }
+  });
+  map.addControl(drawControl);
+
+  // Funkcia pre spracovanie vytvorených prvkov
+  map.on('draw:created', function(e) {
+    var type = e.layerType;
+    var layer = e.layer;
+
+    if (type === 'marker') {
+      // Ak bola vytvorená vrstva bodu, pridajte ju do mapy
+      layer.addTo(map);
+    } else if (type === 'polyline') {
+      // Ak bola vytvorená vrstva línie, pridajte ju do mapy
+      layer.addTo(map);
+    }
+  });
+
+  // Funkcie pre pridanie bodu pomocou tlačidla
+  document.getElementById('draw-point').addEventListener('click', function() {
+    map.off('click'); // Vypnutie predchádzajúcej funkcionality klikania na mapu
+
+    map.on('click', function(e) {
+      var marker = new L.Marker(e.latlng);
+      marker.addTo(map);
+    });
+  });
+
+  // Funkcie pre pridanie trasy pomocou tlačidla
+  document.getElementById('draw-line').addEventListener('click', function() {
+    map.off('click'); // Vypnutie predchádzajúcej funkcionality klikania na mapu
+
+    var latlngs = [];
+    map.on('click', function(e) {
+      latlngs.push(e.latlng);
+      var polyline = new L.Polyline(latlngs, {color: 'red'});
+      polyline.addTo(map);
+    });
+  });
+</script>
+
 </body>
 </html>
