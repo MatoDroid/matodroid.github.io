@@ -28,6 +28,14 @@
 <button id="draw-point">Draw Point</button>
 <button id="draw-line">Draw Line</button>
 
+<form id="wms-form">
+  <label for="wms-url">WMS/WMTS URL:</label><br>
+  <input type="text" id="wms-url" name="wms-url"><br>
+  <label for="wms-layers">Layers:</label><br>
+  <input type="text" id="wms-layers" name="wms-layers"><br>
+  <button type="submit">Add WMS/WMTS Layer</button>
+</form>
+
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.js"></script>
 <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
@@ -37,13 +45,6 @@
   // Pridanie základnej vrstvy mapy OSM Classic
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Pridanie WMS vrstvy
-  var wmsLayer = L.tileLayer.wms('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer?', {
-    layers: '0', // Vrstva, ktorú chcete zobraziť
-    format: 'image/png',
-    transparent: true
   }).addTo(map);
 
   // Pridanie možnosti importovať vlastné body a trasy
@@ -99,6 +100,22 @@
       var polyline = new L.Polyline(latlngs, {color: 'red'});
       polyline.addTo(map);
     });
+  });
+
+  // Spracovanie pridania WMS/WMTS vrstvy
+  document.getElementById('wms-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var wmsUrl = document.getElementById('wms-url').value;
+    var wmsLayers = document.getElementById('wms-layers').value;
+    if (wmsUrl && wmsLayers) {
+      var wmsLayer = L.tileLayer.wms(wmsUrl, {
+        layers: wmsLayers,
+        format: 'image/png',
+        transparent: true
+      }).addTo(map);
+    } else {
+      alert('Please provide both WMS/WMTS URL and layers.');
+    }
   });
 </script>
 
