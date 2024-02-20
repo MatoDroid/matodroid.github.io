@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leaflet Map with WMS Layer, Custom Data Import, and Drawing Tools</title>
+  <title>Leaflet Map with WMS Layer, Custom Data Import, Drawing Tools, and OSM Classic Basemap</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
   <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
     #map {
-      height: 600px;
-      width: 800px;
+      height: 100%;
+      width: 100%;
     }
   </style>
 </head>
@@ -26,7 +32,12 @@
 <script src="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.js"></script>
 <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
 <script>
-  var map = L.map('map').setView([0, 0], 2); // Nastavte priblíženie a polohu mapy
+  var map = L.map('map').setView([48.669, 19.699], 8); // Centrovanie na Slovensko
+
+  // Pridanie základnej vrstvy mapy OSM Classic
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
   // Pridanie WMS vrstvy
   var wmsLayer = L.tileLayer.wms('https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer?', {
