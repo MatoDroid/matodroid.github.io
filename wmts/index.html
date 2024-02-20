@@ -86,7 +86,7 @@
     if (wmsUrl && wmsLayers) {
       var wmsLayer = L.tileLayer(wmsUrl, {
         layers: wmsLayers,
-        format: 'image/jpgpng',
+        format: 'image/png',
         transparent: true
       }).addTo(map);
     } else {
