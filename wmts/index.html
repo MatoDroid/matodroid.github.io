@@ -16,8 +16,9 @@
       overflow: hidden;
     }
     #map {
-      height: 100%;
-      width: 100%;
+      height: 90vh; /* 90% výšky obrazovky */
+      width: 90vw; /* 90% šírky obrazovky */
+      margin: auto; /* centruje mapu */
     }
   </style>
 </head>
@@ -49,10 +50,14 @@
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
+  // Vytvorenie vrstvy pre úpravu bodov a trás
+  var editableLayers = new L.FeatureGroup();
+  map.addLayer(editableLayers);
+
   // Pridanie možnosti importovať vlastné body a trasy
   document.getElementById('file-input').addEventListener('change', function(e) {
     var file = e.target.files[0];
-    var layer = L.fileLayer.file(file).addTo(map);
+    var layer = L.fileLayer.file(file).addTo(editableLayers);
     layer.enableEdit();
     map.fitBounds(layer.getBounds());
   });
@@ -60,7 +65,7 @@
   // Pridanie tlačidiel pre kreslenie bodov a trás
   var drawControl = new L.Control.Draw({
     draw: {
-      marker: false, // Toto tlačidlo nepotrebujeme
+      marker: true, // Povoliť kreslenie bodov
       polyline: true, // Povoliť kreslenie línií
       polygon: false, // Zakázať kreslenie polygónov
       circle: false, // Zakázať kreslenie kruhov
@@ -72,9 +77,9 @@
   // Pridanie možnosti úpravy bodov a trás
   map.on('draw:created', function(e) {
     var layer = e.layer;
-    if (layer instanceof L.Polyline) {
+    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+      editableLayers.addLayer(layer);
       layer.enableEdit();
-      map.addLayer(layer);
     }
   });
 
