@@ -31,9 +31,9 @@
 
 <form id="wms-form">
   <label for="wms-url">WMS/WMTS URL:</label><br>
-  <input type="text" id="wms-url" name="wms-url"><br>
+  <input type="text" id="wms-url" name="wms-url" value="https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/tile/1.0.0/OrtoV1/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}"><br>
   <label for="wms-layers">Layers:</label><br>
-  <input type="text" id="wms-layers" name="wms-layers"><br>
+  <input type="text" id="wms-layers" name="wms-layers" value="0"><br>
   <button type="submit">Add WMS/WMTS Layer</button>
 </form>
 
@@ -60,7 +60,7 @@
   // Pridanie tlačidiel pre kreslenie bodov a trás
   var drawControl = new L.Control.Draw({
     draw: {
-      marker: true, // Povoliť kreslenie bodov
+      marker: false, // Toto tlačidlo nepotrebujeme
       polyline: true, // Povoliť kreslenie línií
       polygon: false, // Zakázať kreslenie polygónov
       circle: false, // Zakázať kreslenie kruhov
@@ -72,42 +72,10 @@
   // Pridanie možnosti úpravy bodov a trás
   map.on('draw:created', function(e) {
     var layer = e.layer;
-    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+    if (layer instanceof L.Polyline) {
       layer.enableEdit();
+      map.addLayer(layer);
     }
-  });
-
-  // Funkcie pre spracovanie vytvorených prvkov
-  map.on('draw:edited', function(e) {
-    var layers = e.layers;
-    layers.eachLayer(function(layer) {
-      // Ak bola vrstva upravená, môžete spracovať zmeny tu
-      console.log('Layer edited:', layer);
-    });
-  });
-
-  // Funkcie pre pridanie bodu pomocou tlačidla
-  document.getElementById('draw-point').addEventListener('click', function() {
-    map.off('click'); // Vypnutie predchádzajúcej funkcionality klikania na mapu
-
-    map.on('click', function(e) {
-      var marker = new L.Marker(e.latlng);
-      marker.addTo(map);
-      marker.enableEdit();
-    });
-  });
-
-  // Funkcie pre pridanie trasy pomocou tlačidla
-  document.getElementById('draw-line').addEventListener('click', function() {
-    map.off('click'); // Vypnutie predchádzajúcej funkcionality klikania na mapu
-
-    var latlngs = [];
-    map.on('click', function(e) {
-      latlngs.push(e.latlng);
-      var polyline = new L.Polyline(latlngs, {color: 'red'});
-      polyline.addTo(map);
-      polyline.enableEdit();
-    });
   });
 
   // Spracovanie pridania WMS/WMTS vrstvy
@@ -116,9 +84,9 @@
     var wmsUrl = document.getElementById('wms-url').value;
     var wmsLayers = document.getElementById('wms-layers').value;
     if (wmsUrl && wmsLayers) {
-      var wmsLayer = L.tileLayer.wms(wmsUrl, {
+      var wmsLayer = L.tileLayer(wmsUrl, {
         layers: wmsLayers,
-        format: 'image/png',
+        format: 'image/jpgpng',
         transparent: true
       }).addTo(map);
     } else {
