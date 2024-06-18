@@ -2,7 +2,7 @@ const axios = require('axios');
 
 // Definujte váš Overpass API dotaz
 const overpassQuery = `
-[out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber")];
+[out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber","note")];
 area(${id})->.searchArea;
 
 (
