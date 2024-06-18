@@ -28,6 +28,7 @@
                 <th>addr:street</th>
                 <th>addr:streetnumber</th>
                 <th>addr:conscriptionnumber</th>
+                <th>note</th>
             </tr>
         </table>
     </div>
@@ -88,7 +89,7 @@
 
                                 // Upravený kód pre Overpass API dotaz s použitím fetch
                                 var overpassQuery = `
-                                    [out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber")];
+                                    [out:csv("ref:minvskaddress","addr:street","addr:streetnumber","addr:conscriptionnumber","note")];
                                     area(${id})->.searchArea;
 
                                     (
@@ -169,6 +170,7 @@
                                             var conscriptionNumber = resultValues[3];
                                             var street = resultValues[1];
                                             var streetNumber = resultValues[2];
+                                            var note = resultValues[3];
 
                                             // Pridať nový riadok s údajmi
                                             var newRow = $("<tr>");
@@ -176,6 +178,7 @@
                                             newRow.append("<td>" + street + "</td>");
                                             newRow.append("<td>" + streetNumber + "</td>");
                                             newRow.append("<td>" + conscriptionNumber + "</td>");
+                                            newRow.append("<td>" + note + "</td>");
                                             vystupElement.append(newRow);
                                         }
                                     }
@@ -223,7 +226,7 @@
 
             // Funkcia na generovanie CSV reťazca
             function generateCSV() {
-                var csv = "ref:minvskaddress\taddr:street\taddr:streetnumber\taddr:conscriptionnumber\n";
+                var csv = "ref:minvskaddress\taddr:street\taddr:streetnumber\taddr:conscriptionnumber\tnote\n";
 
                 $("#vystup table tr").each(function () {
                     $(this).find("td").each(function () {
