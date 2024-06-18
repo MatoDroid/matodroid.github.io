@@ -165,12 +165,12 @@
 
                                     for (var j = 0; j < sortedResults.length; j++) {
                                         var resultValues = sortedResults[j].resultLine.split('\t');
-                                        if (resultValues.length >= 4) {
+                                        if (resultValues.length >= 5) {
                                             var minvskaddress = resultValues[0];
                                             var conscriptionNumber = resultValues[3];
                                             var street = resultValues[1];
                                             var streetNumber = resultValues[2];
-                                            var note = resultValues[3];
+                                            var note = resultValues[4];
 
                                             // Pridať nový riadok s údajmi
                                             var newRow = $("<tr>");
