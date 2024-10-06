@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Kód Skenovanie</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+    <style>
+        video {
+            width: 100%;
+        }
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h2>Skenuj QR kód</h2>
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const seenCodes = new Set();  // Pre záznam už naskenovaných QR kódov
+        
+        // Nahraď touto URL adresou, ktorú si získal z Google Apps Script
+        const googleScriptURL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true); // required to tell iOS safari we don't want fullscreen
+                video.play();
+                requestAnimationFrame(tick);
+            });
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, canvas.width, canvas.height);
+                
+                if (code && !seenCodes.has(code.data)) {
+                    seenCodes.add(code.data);  // Pridaj QR kód do sady
+                    alert('QR kód skenovaný: ' + code.data);
+                    
+                    // Pošli naskenovaný QR kód na Google Apps Script
+                    fetch(googleScriptURL + '?qrCode=' + encodeURIComponent(code.data))
+                        .then(response => response.text())
+                        .then(data => console.log(data))
+                        .catch(error => console.error('Chyba:', error));
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+    </script>
+</body>
+</html>
