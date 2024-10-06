@@ -24,7 +24,7 @@
     <video id="video" autoplay></video>
     <canvas id="canvas"></canvas>
     <button id="switchCamera">Prepnúť kameru</button>
-    
+
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -32,39 +32,47 @@
         const seenCodes = new Set();
         let usingRearCamera = true; // Začíname so zadnou kamerou
         
-        const googleScriptURL = 'https://script.google.com/macros/s/AKfycbyyPM9OBHLNmp7NQHLILML93tfdiH5emAMZyeVTKUa_BWCUCsUI0tXUT4JDTNLOd0Bd/exec';
-        
+        const googleScriptURL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+
+        // Funkcia na spustenie kamery
         function startCamera() {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: usingRearCamera ? 'environment' : 'user' } })
                 .then(stream => {
                     video.srcObject = stream;
                     video.setAttribute('playsinline', true); // required to tell iOS safari we don't want fullscreen
                     video.play();
-                    requestAnimationFrame(tick);
+                    requestAnimationFrame(tick); // Po načítaní spustí skenovanie
                 })
                 .catch(error => console.error('Chyba prístupu ku kamere:', error));
         }
 
+        // Hlavná funkcia pre snímanie videa
         function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 canvas.height = video.videoHeight;
                 canvas.width = video.videoWidth;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height);
                 
+                // Načítanie QR kódu
+                const code = jsQR(imageData.data, canvas.width, canvas.height);
+
                 if (code && !seenCodes.has(code.data)) {
                     seenCodes.add(code.data); // Pridaj QR kód do sady
-                    alert('QR kód skenovaný: ' + code.data);
+                    console.log('QR kód nájdený:', code.data); // Debug: Zobrazí QR kód v konzole
                     
                     // Pošli naskenovaný QR kód na Google Apps Script
                     fetch(googleScriptURL + '?qrCode=' + encodeURIComponent(code.data))
                         .then(response => response.text())
-                        .then(data => console.log(data))
-                        .catch(error => console.error('Chyba:', error));
+                        .then(data => {
+                            console.log('Odozva zo servera:', data); // Debug: Zobrazí odozvu zo servera
+                        })
+                        .catch(error => console.error('Chyba odoslania kódu:', error));
+                } else if (code === null) {
+                    console.log('Žiadny QR kód nezistený'); // Debug: Ak nie je kód nájdený
                 }
             }
-            requestAnimationFrame(tick);
+            requestAnimationFrame(tick); // Pokračuj v skenovaní
         }
 
         // Spusti kameru pri načítaní stránky
@@ -77,6 +85,7 @@
             startCamera(); // Spustiť kameru s novým nastavením
         });
 
+        // Zastavenie streamu kamery
         function stopCamera() {
             const stream = video.srcObject;
             const tracks = stream.getTracks();
