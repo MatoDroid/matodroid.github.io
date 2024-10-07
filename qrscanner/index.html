@@ -1,92 +1,112 @@
 <!DOCTYPE html>
-<html lang="sk">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Kód Skenovanie</title>
-    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script> <!-- Alternatívny zdroj pre jsQR -->
-    <style>
-        video {
-            width: 100%;
-        }
-        canvas {
-            display: none;
-        }
-        button {
-            margin-top: 10px;
-            padding: 10px;
-            font-size: 16px;
-        }
-    </style>
+  <title>QR Code Scanner & Google Sheets</title>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 </head>
 <body>
-    <h2>Skenuj QR kód</h2>
-    <video id="video" autoplay></video>
-    <canvas id="canvas"></canvas>
-    <button id="switchCamera">Prepnúť kameru</button>
-    
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
-        const seenCodes = new Set();
-        let usingRearCamera = true; // Začíname so zadnou kamerou
-        
-        const googleScriptURL = 'https://script.google.com/macros/s/AKfycbzyU5QPblG_Ceocth9_gGYcgmOERdX8AhTmMlfRsZNUowSOr7UqXwWv2P1HyNjfmX7h/exec';
-        
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: usingRearCamera ? 'environment' : 'user' } })
-                .then(stream => {
-                    video.srcObject = stream;
-                    video.setAttribute('playsinline', true); // required to tell iOS safari we don't want fullscreen
-                    video.play();
-                    requestAnimationFrame(tick);
-                })
-                .catch(error => console.error('Chyba prístupu ku kamere:', error));
+  <h1>QR Code Scanner & Google Sheets Integration</h1>
+  <button id="authorize_button" style="display: none;">Prihlásiť sa Google účtom</button>
+  <button id="signout_button" style="display: none;">Odhlásiť sa</button>
+
+  <video id="video" width="300" height="200" style="border: 1px solid black"></video>
+  <canvas id="canvas" width="300" height="200" style="display:none;"></canvas>
+
+  <script>
+    let CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';  // Nahraď vlastným CLIENT_ID
+    let API_KEY = 'YOUR_API_KEY';  // Nahraď vlastným API_KEY
+    let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+    let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+
+    let authorizeButton = document.getElementById('authorize_button');
+    let signoutButton = document.getElementById('signout_button');
+
+    function handleClientLoad() {
+      gapi.load('client:auth2', initClient);
+    }
+
+    function initClient() {
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES
+      }).then(() => {
+        // Prihlásenie stavu
+        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        authorizeButton.onclick = handleAuthClick;
+        signoutButton.onclick = handleSignoutClick;
+      });
+    }
+
+    function updateSigninStatus(isSignedIn) {
+      if (isSignedIn) {
+        authorizeButton.style.display = 'none';
+        signoutButton.style.display = 'block';
+        startScanner();
+      } else {
+        authorizeButton.style.display = 'block';
+        signoutButton.style.display = 'none';
+      }
+    }
+
+    function handleAuthClick(event) {
+      gapi.auth2.getAuthInstance().signIn();
+    }
+
+    function handleSignoutClick(event) {
+      gapi.auth2.getAuthInstance().signOut();
+    }
+
+    function startScanner() {
+      let video = document.getElementById('video');
+      let canvas = document.getElementById('canvas');
+      let ctx = canvas.getContext('2d');
+      let constraints = { video: { facingMode: 'environment' } };
+
+      navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+        video.srcObject = stream;
+        video.play();
+        scanQRCode();
+      });
+
+      function scanQRCode() {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          console.log("Naskenovaný QR kód:", code.data);
+          appendToSheet(code.data);
         }
+        requestAnimationFrame(scanQRCode);
+      }
+    }
 
-        function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.height = video.videoHeight;
-                canvas.width = video.videoWidth;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height);
-                
-                if (code && !seenCodes.has(code.data)) {
-                    seenCodes.add(code.data); // Pridaj QR kód do sady
-                    alert('QR kód skenovaný: ' + code.data);
-                    
-                    // Pošli naskenovaný QR kód na Google Apps Script
-                    fetch(googleScriptURL + '?qrCode=' + encodeURIComponent(code.data))
-                        .then(response => response.text())
-                        .then(data => console.log(data))
-                        .catch(error => console.error('Chyba:', error));
-                }
-            }
-            requestAnimationFrame(tick);
-        }
+    function appendToSheet(qrData) {
+      let spreadsheetId = 'YOUR_SPREADSHEET_ID';  // Nahraď vlastným Spreadsheet ID
+      let range = 'Sheet1!A1';  // Prispôsob podľa potreby
+      let values = [
+        [qrData]  // Údaje QR kódu
+      ];
+      let body = {
+        values: values
+      };
+      gapi.client.sheets.spreadsheets.values.append({
+        spreadsheetId: spreadsheetId,
+        range: range,
+        valueInputOption: 'RAW',
+        resource: body
+      }).then((response) => {
+        let result = response.result;
+        console.log(`${result.updates.updatedCells} bunky boli aktualizované.`);
+      });
+    }
 
-        // Spusti kameru pri načítaní stránky
-        startCamera();
-
-        // Funkcia na prepnutie kamery
-        document.getElementById('switchCamera').addEventListener('click', () => {
-            usingRearCamera = !usingRearCamera; // Prepnúť kameru
-            stopCamera(); // Zastaviť aktuálny stream
-            startCamera(); // Spustiť kameru s novým nastavením
-        });
-
-        function stopCamera() {
-            const stream = video.srcObject;
-            const tracks = stream.getTracks();
-
-            tracks.forEach(function(track) {
-                track.stop();
-            });
-
-            video.srcObject = null;
-        }
-    </script>
+    // Načítanie klienta a autentifikácie po načítaní stránky
+    handleClientLoad();
+  </script>
 </body>
 </html>
