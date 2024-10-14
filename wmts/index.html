@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leaflet with Vector OSM and WMTS Layer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
     <style>
         #map {
             width: 100%;
@@ -20,6 +22,7 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/osmtogeojson/osmtogeojson.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
 <script>
     // Inicializácia mapy - Spišská Nová Ves
@@ -69,16 +72,55 @@
         // Konverzia OSM dát na GeoJSON
         var geojsonLayer = osmtogeojson(data);
         
-        // Pridanie OSM vrstvy bez oblastí na mapu
+        // MarkerCluster pre efektívne zobrazenie POI
+        var markers = L.markerClusterGroup();
+
+        // Pridanie OSM vrstvy so štýlom zhodujúcim sa so štýlom OSM.org
         L.geoJSON(geojsonLayer, {
             style: function (feature) {
-                return {color: "blue", weight: 2};
+                // Štýl pre cesty
+                if (feature.properties.highway) {
+                    if (feature.properties.highway === 'motorway') {
+                        return {color: "#E74C3C", weight: 4};  // Diaľnice (červená)
+                    } else if (feature.properties.highway === 'trunk') {
+                        return {color: "#E67E22", weight: 3};  // Hlavné cesty (oranžová)
+                    } else if (feature.properties.highway === 'primary') {
+                        return {color: "#F1C40F", weight: 3};  // Prvoradé cesty (žltá)
+                    } else if (feature.properties.highway === 'secondary') {
+                        return {color: "#2ECC71", weight: 2};  // Sekundárne cesty (zelená)
+                    } else if (feature.properties.highway === 'tertiary') {
+                        return {color: "#3498DB", weight: 2};  // Tercialne cesty (modrá)
+                    } else {
+                        return {color: "#000000", weight: 1};  // Ostatné cesty (čierna)
+                    }
+                } else if (feature.properties.waterway) {
+                    return {color: "#00BFFF", weight: 2};  // Vodné toky (svetlo modrá)
+                } else if (feature.properties.railway) {
+                    return {color: "#A9A9A9", weight: 2};  // Železnice (šedá)
+                } else {
+                    return {color: "#000000", weight: 1};  // Všetko ostatné (čierna)
+                }
+            },
+            pointToLayer: function (feature, latlng) {
+                // Vytvorenie ikony pre POI
+                if (feature.properties.amenity) {
+                    var iconUrl = "https://example.com/icons/" + feature.properties.amenity + ".png"; // Nastav si vlastný URL pre ikony
+                    var icon = L.icon({
+                        iconUrl: iconUrl,
+                        iconSize: [25, 41], // Veľkosť ikony
+                        iconAnchor: [12, 41], // Umiestnenie ikony
+                        popupAnchor: [1, -34] // Umiestnenie popupu
+                    });
+                    return L.marker(latlng, {icon: icon}).addTo(markers);
+                }
+                return null; // Nepridávať, ak to nie je POI
             },
             filter: function (feature) {
-                // Filtruj len vektorové línie a body, žiadne oblasti
+                // Filtruj len línie a body, vylúč polygóny
                 return feature.geometry.type !== "Polygon";
             }
-        }).addTo(map);
+        }).addTo(markers);
+        map.addLayer(markers);
     })
     .catch(error => console.error("Error loading OSM data: ", error));
 
