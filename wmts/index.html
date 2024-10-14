@@ -1,103 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leaflet Map with WMS Layer, Custom Data Import, Drawing Tools, and OSM Classic Basemap</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-editable/dist/Leaflet.Editable.css"/>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-    }
-    #map {
-      height: 90vh; /* 90% výšky obrazovky */
-      width: 90vw; /* 90% šírky obrazovky */
-      margin: auto; /* centruje mapu */
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet with WMTS Layer on GitHub Pages</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
 </head>
 <body>
 
 <div id="map"></div>
-
-<input type="file" id="file-input"/>
-<button id="draw-point">Draw Point</button>
-<button id="draw-line">Draw Line</button>
-
-<form id="wms-form">
-  <label for="wms-url">WMS/WMTS URL:</label><br>
-  <input type="text" id="wms-url" name="wms-url" value="https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/WMTS/tile/1.0.0/OrtoV1/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}"><br>
-  <label for="wms-layers">Layers:</label><br>
-  <input type="text" id="wms-layers" name="wms-layers" value="0"><br>
-  <button type="submit">Add WMS/WMTS Layer</button>
-</form>
+<label for="opacity">Opacity: </label>
+<input type="range" id="opacity" min="0" max="1" step="0.1" value="1">
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-filelayer/dist/leaflet.filelayer.js"></script>
-<script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
-<script src="https://unpkg.com/leaflet-editable/dist/Leaflet.Editable.js"></script>
+
 <script>
-  var map = L.map('map').setView([48.669, 19.699], 8); // Centrovanie na Slovensko
+    // Inicializácia mapy - Spišská Nová Ves
+    var map = L.map('map').setView([48.9465, 20.5616], 13); // Súradnice Spišskej Novej Vsi
 
-  // Pridanie základnej vrstvy mapy OSM Classic
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+    // Základná vrstva (OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    }).addTo(map);
 
-  // Vytvorenie vrstvy pre úpravu bodov a trás
-  var editableLayers = new L.FeatureGroup();
-  map.addLayer(editableLayers);
+    // Pridanie WMTS vrstvy (Ortofotografia)
+    var wmtsUrl = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/tile/{z}/{y}/{x}";
+    
+    var wmtsLayer = L.tileLayer(wmtsUrl, {
+        tileSize: 256,
+        maxZoom: 19,
+        opacity: 1,
+        attribution: '&copy; <a href="https://www.arcgis.com/">ArcGIS</a>'
+    }).addTo(map);
 
-  // Pridanie možnosti importovať vlastné body a trasy
-  document.getElementById('file-input').addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    var layer = L.fileLayer.file(file).addTo(editableLayers);
-    layer.enableEdit();
-    map.fitBounds(layer.getBounds());
-  });
+    // Ovládanie priehľadnosti
+    document.getElementById('opacity').addEventListener('input', function(e) {
+        var opacityValue = e.target.value;
+        wmtsLayer.setOpacity(opacityValue);
+    });
 
-  // Pridanie tlačidiel pre kreslenie bodov a trás
-  var drawControl = new L.Control.Draw({
-    draw: {
-      marker: true, // Povoliť kreslenie bodov
-      polyline: true, // Povoliť kreslenie línií
-      polygon: false, // Zakázať kreslenie polygónov
-      circle: false, // Zakázať kreslenie kruhov
-      rectangle: false // Zakázať kreslenie obdĺžnikov
-    }
-  });
-  map.addControl(drawControl);
-
-  // Pridanie možnosti úpravy bodov a trás
-  map.on('draw:created', function(e) {
-    var layer = e.layer;
-    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
-      editableLayers.addLayer(layer);
-      layer.enableEdit();
-    }
-  });
-
-  // Spracovanie pridania WMS/WMTS vrstvy
-  document.getElementById('wms-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var wmsUrl = document.getElementById('wms-url').value;
-    var wmsLayers = document.getElementById('wms-layers').value;
-    if (wmsUrl && wmsLayers) {
-      var wmsLayer = L.tileLayer(wmsUrl, {
-        layers: wmsLayers,
-        format: 'image/png',
-        transparent: true
-      }).addTo(map);
-    } else {
-      alert('Please provide both WMS/WMTS URL and layers.');
-    }
-  });
 </script>
 
 </body>
