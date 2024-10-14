@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet with WMTS and OSM Layers</title>
+    <title>Leaflet with WMTS Layer on GitHub Pages</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         #map {
@@ -19,7 +19,6 @@
 <input type="range" id="opacity" min="0" max="1" step="0.1" value="1">
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/osmtogeojson/osmtogeojson.js"></script>
 
 <script>
     // Inicializácia mapy - Spišská Nová Ves
@@ -40,49 +39,11 @@
         attribution: '&copy; <a href="https://www.arcgis.com/">ArcGIS</a>'
     }).addTo(map);
 
-    // Ovládanie priehľadnosti WMTS vrstvy
+    // Ovládanie priehľadnosti
     document.getElementById('opacity').addEventListener('input', function(e) {
         var opacityValue = e.target.value;
         wmtsLayer.setOpacity(opacityValue);
     });
-
-    // Overpass API query - Získanie OSM dát bez oblastí
-    var overpassUrl = "https://overpass-api.de/api/interpreter";
-    var overpassQuery = `
-    [out:json][timeout:25];
-    (
-      // Všetky body a línie (highway, amenity) v Spišskej Novej Vsi, ale bez oblastí
-      node["highway"](48.9465,20.5616,48.9565,20.5716);
-      way["highway"](48.9465,20.5616,48.9565,20.5716);
-      node["amenity"](48.9465,20.5616,48.9565,20.5716);
-      way["amenity"](48.9465,20.5616,48.9565,20.5716);
-    );
-    out body;
-    >;
-    out skel qt;
-    `;
-
-    // Načítanie dát z Overpass API
-    fetch(overpassUrl, {
-        method: "POST",
-        body: overpassQuery,
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Konverzia OSM dát na GeoJSON
-        var geojsonLayer = osmtogeojson(data);
-        
-        // Pridanie OSM vrstvy bez oblastí na mapu
-        L.geoJSON(geojsonLayer, {
-            style: function (feature) {
-                return {color: "blue"};
-            }
-        }).addTo(map);
-    })
-    .catch(error => console.error("Error loading OSM data: ", error));
 
 </script>
 
