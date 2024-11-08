@@ -76,7 +76,7 @@
                             switch (feature.properties.highway) {
                                 case "secondary":
                                 case "residential":
-                                    return { color: "white", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
+                                    return { color: "yellow", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
                                 case "path":
                                     return { color: "brown", weight: 2 }; // Hnedá pre chodníky
                                 case "steps":
@@ -88,9 +88,16 @@
                         return { color: "grey", weight: 1 }; // Predvolený štýl
                     },
                     onEachFeature: function (feature, layer) {
-                        if (feature.properties && feature.properties.name) {
-                            layer.bindPopup(feature.properties.name);
-                        }
+                        // Zobrazenie vlastností po kliknutí na prvok
+                        layer.on('click', function () {
+                            var popupContent = "<strong>Vlastnosti:</strong><br>";
+                            for (var prop in feature.properties) {
+                                if (feature.properties.hasOwnProperty(prop)) {
+                                    popupContent += `<strong>${prop}:</strong> ${feature.properties[prop]}<br>`;
+                                }
+                            }
+                            layer.bindPopup(popupContent).openPopup();
+                        });
                     }
                 });
                 uploadedLayer.addTo(map);
