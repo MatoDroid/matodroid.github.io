@@ -81,6 +81,8 @@
                                     return { color: "brown", weight: 2 }; // Hnedá pre chodníky
                                 case "steps":
                                     return { color: "red", weight: 2, dashArray: '4, 4' }; // Prerušovaná červená pre schody
+                                case "footway":
+                                    return { color: "red", weight: 2 }; // Prerušovaná červená pre schody
                                 default:
                                     return { color: "grey", weight: 1 }; // Štandardná farba pre ostatné typy ciest
                             }
