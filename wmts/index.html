@@ -3,20 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet with WMTS Layer on GitHub Pages</title>
+    <title>Leaflet s nahrávaním GeoJSON dát</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
         #map {
             width: 100%;
-            height: 500px;
+            height: 100%;
+        }
+
+        #controls-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
-<label for="opacity">Opacity: </label>
-<input type="range" id="opacity" min="0" max="1" step="0.1" value="1">
+<div id="controls-container">
+    <label for="opacity">Priehľadnosť:</label>
+    <input type="range" id="opacity" min="0" max="1" step="0.1" value="1"><br>
+    <label for="geojson-upload">Nahraj GeoJSON súbor:</label>
+    <input type="file" id="geojson-upload" accept=".geojson,application/geo+json">
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -39,12 +57,49 @@
         attribution: '&copy; <a href="https://www.arcgis.com/">ArcGIS</a>'
     }).addTo(map);
 
-    // Ovládanie priehľadnosti
+    // Ovládanie priehľadnosti pre WMTS vrstvu
     document.getElementById('opacity').addEventListener('input', function(e) {
         var opacityValue = e.target.value;
         wmtsLayer.setOpacity(opacityValue);
     });
 
+    // Pridanie funkcie na nahrávanie GeoJSON súboru
+    document.getElementById('geojson-upload').addEventListener('change', function(event) {
+        var file = event.target.files[0];
+        if (file && file.type === "application/geo+json" || file.name.endsWith(".geojson")) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var geojsonData = JSON.parse(e.target.result);
+                var uploadedLayer = L.geoJSON(geojsonData, {
+                    style: function(feature) {
+                        if (feature.properties && feature.properties.highway) {
+                            switch (feature.properties.highway) {
+                                case "secondary":
+                                case "residential":
+                                    return { color: "white", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
+                                case "path":
+                                    return { color: "brown", weight: 2 }; // Hnedá pre chodníky
+                                case "steps":
+                                    return { color: "red", weight: 2, dashArray: '4, 4' }; // Prerušovaná červená pre schody
+                                default:
+                                    return { color: "grey", weight: 1 }; // Štandardná farba pre ostatné typy ciest
+                            }
+                        }
+                        return { color: "grey", weight: 1 }; // Predvolený štýl
+                    },
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties && feature.properties.name) {
+                            layer.bindPopup(feature.properties.name);
+                        }
+                    }
+                });
+                uploadedLayer.addTo(map);
+            };
+            reader.readAsText(file);
+        } else {
+            alert("Prosím, nahrajte platný GeoJSON súbor.");
+        }
+    });
 </script>
 
 </body>
