@@ -18,7 +18,7 @@
         #controls-container {
             position: absolute;
             top: 10px;
-            left: 50px;
+            left: 10px;
             background-color: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 5px;
@@ -71,23 +71,36 @@
             reader.onload = function(e) {
                 var geojsonData = JSON.parse(e.target.result);
                 var uploadedLayer = L.geoJSON(geojsonData, {
+                    // Štýlovanie bodov a ciest
+                    pointToLayer: function(feature, latlng) {
+                        // Vytvorenie modrej bodky pre body
+                        return L.circleMarker(latlng, {
+                            radius: 4,
+                            fillColor: "blue",
+                            color: "blue",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
                     style: function(feature) {
+                        // Štýl pre línie podľa typu cesty
                         if (feature.properties && feature.properties.highway) {
                             switch (feature.properties.highway) {
                                 case "secondary":
                                 case "residential":
-                                    return { color: "yellow", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
+                                    return { color: "red", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
                                 case "path":
                                     return { color: "brown", weight: 2 }; // Hnedá pre chodníky
                                 case "steps":
                                     return { color: "red", weight: 2, dashArray: '4, 4' }; // Prerušovaná červená pre schody
                                 case "footway":
-                                    return { color: "red", weight: 2 }; // Prerušovaná červená pre schody
+                                    return { color: "red", weight: 2 }; // Červená pre chodníky
                                 default:
                                     return { color: "grey", weight: 1 }; // Štandardná farba pre ostatné typy ciest
                             }
                         }
-                        return { color: "grey", weight: 1 }; // Predvolený štýl
+                        return { color: "grey", weight: 1 }; // Predvolený štýl pre ostatné prvky
                     },
                     onEachFeature: function (feature, layer) {
                         // Zobrazenie vlastností po kliknutí na prvok
