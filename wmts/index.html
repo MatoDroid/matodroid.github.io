@@ -87,17 +87,20 @@
                         // Štýl pre línie podľa typu cesty
                         if (feature.properties && feature.properties.highway) {
                             switch (feature.properties.highway) {
-                                case "secondary":
-                                case "residential":
-                                    return { color: "yellow", weight: 4 }; // Červená pre sekundárne a rezidenčné cesty
                                 case "path":
-                                    return { color: "brown", weight: 2 }; // Hnedá pre chodníky
+                                    return { color: "brown", weight: 1 }; // Hnedá pre chodníky
                                 case "steps":
                                     return { color: "red", weight: 2, dashArray: '4, 4' }; // Prerušovaná červená pre schody
+                                case "track":
+                                    return { color: "brown", weight: 2 }; // Prerušovaná červená pre schody
                                 case "footway":
                                     return { color: "red", weight: 2 }; // Červená pre chodníky
+                                case "service":
+                                    return { color: "yellow", weight: 2 }; // Červená pre chodníky
+                                case "cycleway":
+                                    return { color: "blue", weight: 2 }; // Červená pre chodníky
                                 default:
-                                    return { color: "grey", weight: 1 }; // Štandardná farba pre ostatné typy ciest
+                                    return { color: "yellow", weight: 4 }; // Štandardná farba pre ostatné typy ciest
                             }
                         }
                         return { color: "grey", weight: 1 }; // Predvolený štýl pre ostatné prvky
