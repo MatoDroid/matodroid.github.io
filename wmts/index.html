@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet s Overpass API</title>
+    <title>Leaflet s nahrávaním a kreslením GeoJSON dát</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <style>
@@ -35,7 +35,6 @@
     <input type="range" id="opacity" min="0" max="1" step="0.1" value="1"><br>
     <label for="geojson-upload">Nahraj GeoJSON súbor:</label>
     <input type="file" id="geojson-upload" accept=".geojson,application/geo+json"><br>
-    <button id="load-overpass">Načítaj z Overpass API</button><br>
     <button id="export-geojson">Export GeoJSON</button>
 </div>
 
@@ -65,7 +64,35 @@
             var reader = new FileReader();
             reader.onload = function(e) {
                 var geojsonData = JSON.parse(e.target.result);
-                var uploadedLayer = L.geoJSON(geojsonData).addTo(map);
+                var uploadedLayer = L.geoJSON(geojsonData, {
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, { radius: 4, fillColor: "blue", color: "blue", weight: 1, opacity: 1, fillOpacity: 0.8 });
+                    },
+                    style: function(feature) {
+                        if (feature.properties && feature.properties.highway) {
+                            switch (feature.properties.highway) {
+                                case "path": return { color: "brown", weight: 1 };
+                                case "steps": return { color: "red", weight: 2, dashArray: '4, 4' };
+                                case "track": return { color: "brown", weight: 2 };
+                                case "footway": return { color: "red", weight: 2 };
+                                case "service": return { color: "yellow", weight: 2 };
+                                case "cycleway": return { color: "blue", weight: 2 };
+                                default: return { color: "yellow", weight: 4 };
+                            }
+                        }
+                        return { color: "grey", weight: 1 };
+                    },
+                    onEachFeature: function (feature, layer) {
+                        layer.on('click', function () {
+                            var popupContent = "<strong>Vlastnosti:</strong><br>";
+                            for (var prop in feature.properties) {
+                                popupContent += `<strong>${prop}:</strong> ${feature.properties[prop]}<br>`;
+                            }
+                            layer.bindPopup(popupContent).openPopup();
+                        });
+                    }
+                });
+                uploadedLayer.addTo(map);
             };
             reader.readAsText(file);
         } else {
@@ -94,39 +121,28 @@
     // Pridanie udalosti po dokončení kreslenia
     map.on(L.Draw.Event.CREATED, function(event) {
         var layer = event.layer;
+        var properties = {};
+
+        // Získanie vlastností od užívateľa
+        var propertyCount = parseInt(prompt("Zadajte počet vlastností:"));
+        for (var i = 0; i < propertyCount; i++) {
+            var key = prompt("Názov vlastnosti:");
+            var value = prompt("Hodnota vlastnosti:");
+            properties[key] = value;
+        }
+
+        layer.feature = layer.feature || {};
+        layer.feature.type = "Feature";
+        layer.feature.properties = properties;
+
+        // Pridanie popupu s vlastnosťami
+        var popupContent = "<strong>Vlastnosti:</strong><br>";
+        for (var prop in properties) {
+            popupContent += `<strong>${prop}:</strong> ${properties[prop]}<br>`;
+        }
+        layer.bindPopup(popupContent);
+
         drawnItems.addLayer(layer);
-    });
-
-    // Funkcia pre načítanie dát z Overpass API
-    document.getElementById('load-overpass').addEventListener('click', function() {
-        var bbox = map.getBounds();
-        var query = `[out:json][timeout:25];
-            (
-                node["amenity"="cafe"](${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()});
-                way["highway"](${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()});
-            );
-            out body;
-            >;
-            out skel qt;`;
-
-        fetch("https://overpass-api.de/api/interpreter", {
-            method: "POST",
-            body: query
-        })
-        .then(response => response.json())
-        .then(data => {
-            var geojsonData = osmtogeojson(data);
-            L.geoJSON(geojsonData, {
-                onEachFeature: function (feature, layer) {
-                    var popupContent = "<strong>Vlastnosti:</strong><br>";
-                    for (var prop in feature.properties) {
-                        popupContent += `<strong>${prop}:</strong> ${feature.properties[prop]}<br>`;
-                    }
-                    layer.bindPopup(popupContent);
-                }
-            }).addTo(map);
-        })
-        .catch(error => alert("Chyba pri načítaní dát z Overpass API: " + error));
     });
 
     // Export GeoJSON dát
@@ -143,6 +159,6 @@
         URL.revokeObjectURL(url);
     });
 </script>
-<script src="https://unpkg.com/osmtogeojson"></script>
+
 </body>
 </html>
