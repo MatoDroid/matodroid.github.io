@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet s nahrávaním a kreslením GeoJSON dát</title>
+    <title>Základná vrstva z Freemap.sk</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <style>
@@ -31,10 +31,10 @@
 
 <div id="map"></div>
 <div id="controls-container">
-    <label for="opacity">Priehľadnosť:</label>
-    <input type="range" id="opacity" min="0" max="1" step="0.1" value="1"><br>
-    <label for="geojson-upload">Nahraj GeoJSON súbor:</label>
-    <input type="file" id="geojson-upload" accept=".geojson,application/geo+json"><br>
+    <label for="opacity-transparent">Priehľadnosť Transparent Layer:</label>
+    <input type="range" id="opacity-transparent" min="0" max="1" step="0.1" value="0.7"><br>
+    <label for="opacity-ortov1">Priehľadnosť OrtoV1:</label>
+    <input type="range" id="opacity-ortov1" min="0" max="1" step="0.1" value="1"><br>
     <button id="export-geojson">Export GeoJSON</button>
 </div>
 
@@ -42,69 +42,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    // Inicializácia mapy - Spišská Nová Ves
+    // Inicializácia mapy
     var map = L.map('map').setView([48.9465, 20.5616], 13);
 
-    // Základná vrstva (OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    // Základná podkladová vrstva (Freemap.sk)
+    var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
+    }).addTo(map);
 
-    // Pridanie WMTS vrstvy (Ortofotografia)
+    // Ortofotografia vrstva (OrtoV1)
     var wmtsUrl = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/tile/{z}/{y}/{x}";
     var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 19, opacity: 1 }).addTo(map);
 
-    // Ovládanie priehľadnosti pre WMTS vrstvu
-    document.getElementById('opacity').addEventListener('input', function(e) {
+    // Transparentná vrstva
+    var transparentLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        opacity: 0.7,
+        attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+
+    // Posuvník priehľadnosti pre transparentnú vrstvu
+    document.getElementById('opacity-transparent').addEventListener('input', function(e) {
+        transparentLayer.setOpacity(e.target.value);
+    });
+
+    // Posuvník priehľadnosti pre vrstvu OrtoV1
+    document.getElementById('opacity-ortov1').addEventListener('input', function(e) {
         wmtsLayer.setOpacity(e.target.value);
     });
 
-    // Funkcia na nahrávanie GeoJSON súboru
-    document.getElementById('geojson-upload').addEventListener('change', function(event) {
-        var file = event.target.files[0];
-        if (file && (file.type === "application/geo+json" || file.name.endsWith(".geojson"))) {
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var geojsonData = JSON.parse(e.target.result);
-                var uploadedLayer = L.geoJSON(geojsonData, {
-                    pointToLayer: function(feature, latlng) {
-                        return L.circleMarker(latlng, { radius: 4, fillColor: "blue", color: "blue", weight: 1, opacity: 1, fillOpacity: 0.8 });
-                    },
-                    style: function(feature) {
-                        if (feature.properties && feature.properties.highway) {
-                            switch (feature.properties.highway) {
-                                case "path": return { color: "brown", weight: 1 };
-                                case "steps": return { color: "red", weight: 2, dashArray: '4, 4' };
-                                case "track": return { color: "brown", weight: 2 };
-                                case "footway": return { color: "red", weight: 2 };
-                                case "service": return { color: "yellow", weight: 2 };
-                                case "cycleway": return { color: "blue", weight: 2 };
-                                default: return { color: "yellow", weight: 4 };
-                            }
-                        }
-                        return { color: "grey", weight: 1 };
-                    },
-                    onEachFeature: function (feature, layer) {
-                        layer.on('click', function () {
-                            var popupContent = "<strong>Vlastnosti:</strong><br>";
-                            for (var prop in feature.properties) {
-                                popupContent += `<strong>${prop}:</strong> ${feature.properties[prop]}<br>`;
-                            }
-                            layer.bindPopup(popupContent).openPopup();
-                        });
-                    }
-                });
-                uploadedLayer.addTo(map);
-            };
-            reader.readAsText(file);
-        } else {
-            alert("Prosím, nahrajte platný GeoJSON súbor.");
-        }
-    });
-
-    // Vytvorenie kresliacej vrstvy
+    // Funkcia na export GeoJSON dát
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
-    // Nastavenie nástrojov na kreslenie a úpravu
     var drawControl = new L.Control.Draw({
         edit: { featureGroup: drawnItems },
         draw: {
@@ -118,34 +90,11 @@
     });
     map.addControl(drawControl);
 
-    // Pridanie udalosti po dokončení kreslenia
     map.on(L.Draw.Event.CREATED, function(event) {
         var layer = event.layer;
-        var properties = {};
-
-        // Získanie vlastností od užívateľa
-        var propertyCount = parseInt(prompt("Zadajte počet vlastností:"));
-        for (var i = 0; i < propertyCount; i++) {
-            var key = prompt("Názov vlastnosti:");
-            var value = prompt("Hodnota vlastnosti:");
-            properties[key] = value;
-        }
-
-        layer.feature = layer.feature || {};
-        layer.feature.type = "Feature";
-        layer.feature.properties = properties;
-
-        // Pridanie popupu s vlastnosťami
-        var popupContent = "<strong>Vlastnosti:</strong><br>";
-        for (var prop in properties) {
-            popupContent += `<strong>${prop}:</strong> ${properties[prop]}<br>`;
-        }
-        layer.bindPopup(popupContent);
-
         drawnItems.addLayer(layer);
     });
 
-    // Export GeoJSON dát
     document.getElementById('export-geojson').addEventListener('click', function() {
         var data = drawnItems.toGeoJSON();
         var blob = new Blob([JSON.stringify(data)], { type: "application/geo+json" });
