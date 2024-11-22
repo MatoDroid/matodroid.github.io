@@ -47,17 +47,17 @@
 
     // Základná podkladová vrstva (Freemap.sk)
     var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
-        maxZoom: 19,
+        maxZoom: 24,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     }).addTo(map);
 
     // Ortofotografia vrstva (OrtoV1)
     var wmtsUrl = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/tile/{z}/{y}/{x}";
-    var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 19, opacity: 1 }).addTo(map);
+    var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 24, opacity: 1 }).addTo(map);
 
     // Transparentná vrstva
     var transparentLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
+        maxZoom: 24,
         opacity: 0.7,
         attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
     }).addTo(map);
