@@ -20,47 +20,49 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 10px;
         }
 
         .header {
             background-color: #fff;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .header h1 {
             color: #333;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
+            font-size: 1.5rem;
+            text-align: center;
         }
 
         .tables-section {
             background: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .tables-section h2 {
+            margin-bottom: 10px;
         }
 
         .table-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 10px;
         }
 
         .table-button {
-            padding: 15px;
+            padding: 12px;
             border: none;
             border-radius: 8px;
             background-color: #e8f0fe;
             cursor: pointer;
             transition: all 0.3s;
+            width: 100%;
         }
 
         .table-button:hover {
@@ -83,27 +85,29 @@
 
         .order-section {
             background: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .menu-categories {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 15px;
             overflow-x: auto;
             padding-bottom: 10px;
+            -webkit-overflow-scrolling: touch;
         }
 
         .category-button {
-            padding: 10px 20px;
+            padding: 8px 16px;
             border: none;
             border-radius: 20px;
             background-color: #e8f0fe;
             cursor: pointer;
             white-space: nowrap;
             transition: all 0.3s;
+            font-size: 0.9rem;
         }
 
         .category-button:hover {
@@ -117,13 +121,13 @@
 
         .menu-items {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
         .menu-item {
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             background-color: #f8f9fa;
             cursor: pointer;
@@ -143,43 +147,50 @@
         .menu-item h3 {
             margin-bottom: 5px;
             color: #333;
+            font-size: 0.95rem;
         }
 
         .menu-item p {
             color: #666;
             font-weight: bold;
+            font-size: 0.9rem;
         }
 
         .current-order {
-            margin-top: 20px;
-            padding-top: 20px;
+            margin-top: 15px;
+            padding-top: 15px;
             border-top: 1px solid #eee;
         }
 
+        .current-order h2 {
+            font-size: 1.1rem;
+        }
+
         .order-items {
-            margin: 20px 0;
-            max-height: 400px;
+            margin: 15px 0;
+            max-height: 300px;
             overflow-y: auto;
         }
 
         .order-item {
             display: grid;
             grid-template-columns: auto 1fr auto auto;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
-            padding: 10px;
+            padding: 8px;
             border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
         }
 
         .item-quantity {
             font-weight: bold;
             color: #1a73e8;
-            min-width: 40px;
+            min-width: 35px;
         }
 
         .quantity-controls {
             display: flex;
-            gap: 5px;
+            gap: 4px;
         }
 
         .quantity-btn {
@@ -199,26 +210,28 @@
         .total-section {
             display: flex;
             justify-content: space-between;
-            margin-top: 20px;
-            padding-top: 20px;
+            margin-top: 15px;
+            padding-top: 15px;
             border-top: 2px solid #eee;
             font-weight: bold;
-            font-size: 1.2em;
+            font-size: 1.1rem;
         }
 
         .action-buttons {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .action-button {
-            padding: 12px 24px;
+            padding: 12px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
+            font-size: 0.9rem;
         }
 
         .action-button:disabled {
@@ -243,6 +256,55 @@
         .cancel-button:hover:not(:disabled) {
             background-color: #d33426;
         }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 5px;
+            }
+
+            .header {
+                padding: 10px;
+                margin-bottom: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+
+            .tables-section, .order-section {
+                padding: 10px;
+            }
+
+            .table-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .menu-items {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            }
+
+            .category-button {
+                padding: 6px 12px;
+                font-size: 0.85rem;
+            }
+
+            .menu-item h3 {
+                font-size: 0.9rem;
+            }
+
+            .menu-item p {
+                font-size: 0.85rem;
+            }
+
+            .order-item {
+                font-size: 0.85rem;
+                gap: 5px;
+            }
+
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -251,130 +313,128 @@
             <h1>Restaurant POS System</h1>
         </header>
 
-        <div class="main-grid">
-            <section class="tables-section">
-                <h2>Stoly</h2>
-                <div class="table-grid">
-                    <button class="table-button" data-table="1">Stôl 1</button>
-                    <button class="table-button" data-table="2">Stôl 2</button>
-                    <button class="table-button" data-table="3">Stôl 3</button>
-                    <button class="table-button" data-table="4">Stôl 4</button>
-                    <button class="table-button" data-table="5">Stôl 5</button>
-                    <button class="table-button" data-table="6">Stôl 6</button>
+        <section class="tables-section">
+            <h2>Stoly</h2>
+            <div class="table-grid">
+                <button class="table-button" data-table="1">Stôl 1</button>
+                <button class="table-button" data-table="2">Stôl 2</button>
+                <button class="table-button" data-table="3">Stôl 3</button>
+                <button class="table-button" data-table="4">Stôl 4</button>
+                <button class="table-button" data-table="5">Stôl 5</button>
+                <button class="table-button" data-table="6">Stôl 6</button>
+            </div>
+        </section>
+
+        <section class="order-section">
+            <div class="menu-categories">
+                <button class="category-button active" data-category="main">Hlavné jedlá</button>
+                <button class="category-button" data-category="appetizer">Predjedlá</button>
+                <button class="category-button" data-category="soup">Polievky</button>
+                <button class="category-button" data-category="dessert">Dezerty</button>
+                <button class="category-button" data-category="drink">Nápoje</button>
+            </div>
+
+            <div class="menu-items">
+                <!-- Main Dishes -->
+                <div class="menu-item active-category" data-category="main" data-price="12.90">
+                    <h3>Rezeň so zemiakmi</h3>
+                    <p>12.90 €</p>
                 </div>
-            </section>
-
-            <section class="order-section">
-                <div class="menu-categories">
-                    <button class="category-button active" data-category="main">Hlavné jedlá</button>
-                    <button class="category-button" data-category="appetizer">Predjedlá</button>
-                    <button class="category-button" data-category="soup">Polievky</button>
-                    <button class="category-button" data-category="dessert">Dezerty</button>
-                    <button class="category-button" data-category="drink">Nápoje</button>
+                <div class="menu-item active-category" data-category="main" data-price="14.50">
+                    <h3>Sviečková na smotane</h3>
+                    <p>14.50 €</p>
                 </div>
-
-                <div class="menu-items">
-                    <!-- Main Dishes -->
-                    <div class="menu-item active-category" data-category="main" data-price="12.90">
-                        <h3>Rezeň so zemiakmi</h3>
-                        <p>12.90 €</p>
-                    </div>
-                    <div class="menu-item active-category" data-category="main" data-price="14.50">
-                        <h3>Sviečková na smotane</h3>
-                        <p>14.50 €</p>
-                    </div>
-                    <div class="menu-item active-category" data-category="main" data-price="11.90">
-                        <h3>Penne Carbonara</h3>
-                        <p>11.90 €</p>
-                    </div>
-                    <div class="menu-item active-category" data-category="main" data-price="15.90">
-                        <h3>Losos s ryžou</h3>
-                        <p>15.90 €</p>
-                    </div>
-                    <div class="menu-item active-category" data-category="main" data-price="13.90">
-                        <h3>Kuracie Supreme</h3>
-                        <p>13.90 €</p>
-                    </div>
-
-                    <!-- Appetizers -->
-                    <div class="menu-item" data-category="appetizer" data-price="6.90">
-                        <h3>Bruschetta</h3>
-                        <p>6.90 €</p>
-                    </div>
-                    <div class="menu-item" data-category="appetizer" data-price="7.50">
-                        <h3>Carpaccio</h3>
-                        <p>7.50 €</p>
-                    </div>
-                    <div class="menu-item" data-category="appetizer" data-price="5.90">
-                        <h3>Grécky šalát</h3>
-                        <p>5.90 €</p>
-                    </div>
-
-                    <!-- Soups -->
-                    <div class="menu-item" data-category="soup" data-price="4.50">
-                        <h3>Slepačí vývar</h3>
-                        <p>4.50 €</p>
-                    </div>
-                    <div class="menu-item" data-category="soup" data-price="4.90">
-                        <h3>Paradajková polievka</h3>
-                        <p>4.90 €</p>
-                    </div>
-                    <div class="menu-item" data-category="soup" data-price="5.20">
-                        <h3>Cesnaková polievka</h3>
-                        <p>5.20 €</p>
-                    </div>
-
-                    <!-- Desserts -->
-                    <div class="menu-item" data-category="dessert" data-price="5.90">
-                        <h3>Tiramisu</h3>
-                        <p>5.90 €</p>
-                    </div>
-                    <div class="menu-item" data-category="dessert" data-price="5.50">
-                        <h3>Čokoládová torta</h3>
-                        <p>5.50 €</p>
-                    </div>
-                    <div class="menu-item" data-category="dessert" data-price="4.90">
-                        <h3>Palacinky s nutelou</h3>
-                        <p>4.90 €</p>
-                    </div>
-
-                    <!-- Drinks -->
-                    <div class="menu-item" data-category="drink" data-price="2.50">
-                        <h3>Coca-Cola</h3>
-                        <p>2.50 €</p>
-                    </div>
-                    <div class="menu-item" data-category="drink" data-price="2.50">
-                        <h3>Minerálna voda</h3>
-                        <p>2.50 €</p>
-                    </div>
-                    <div class="menu-item" data-category="drink" data-price="2.90">
-                        <h3>Džús pomarančový</h3>
-                        <p>2.90 €</p>
-                    </div>
-                    <div class="menu-item" data-category="drink" data-price="3.50">
-                        <h3>Káva Espresso</h3>
-                        <p>3.50 €</p>
-                    </div>
+                <div class="menu-item active-category" data-category="main" data-price="11.90">
+                    <h3>Penne Carbonara</h3>
+                    <p>11.90 €</p>
+                </div>
+                <div class="menu-item active-category" data-category="main" data-price="15.90">
+                    <h3>Losos s ryžou</h3>
+                    <p>15.90 €</p>
+                </div>
+                <div class="menu-item active-category" data-category="main" data-price="13.90">
+                    <h3>Kuracie Supreme</h3>
+                    <p>13.90 €</p>
                 </div>
 
-                <div class="current-order">
-                    <h2>Vyberte stôl</h2>
-                    <div class="order-items">
-                        <!-- Order items will be dynamically added here -->
-                    </div>
-
-                    <div class="total-section">
-                        <span>Spolu:</span>
-                        <span>0.00 €</span>
-                    </div>
-
-                    <div class="action-buttons">
-                        <button class="action-button pay-button" disabled>Zaplatiť</button>
-                        <button class="action-button cancel-button" disabled>Zrušiť</button>
-                    </div>
+                <!-- Appetizers -->
+                <div class="menu-item" data-category="appetizer" data-price="6.90">
+                    <h3>Bruschetta</h3>
+                    <p>6.90 €</p>
                 </div>
-            </section>
-        </div>
+                <div class="menu-item" data-category="appetizer" data-price="7.50">
+                    <h3>Carpaccio</h3>
+                    <p>7.50 €</p>
+                </div>
+                <div class="menu-item" data-category="appetizer" data-price="5.90">
+                    <h3>Grécky šalát</h3>
+                    <p>5.90 €</p>
+                </div>
+
+                <!-- Soups -->
+                <div class="menu-item" data-category="soup" data-price="4.50">
+                    <h3>Slepačí vývar</h3>
+                    <p>4.50 €</p>
+                </div>
+                <div class="menu-item" data-category="soup" data-price="4.90">
+                    <h3>Paradajková polievka</h3>
+                    <p>4.90 €</p>
+                </div>
+                <div class="menu-item" data-category="soup" data-price="5.20">
+                    <h3>Cesnaková polievka</h3>
+                    <p>5.20 €</p>
+                </div>
+
+                <!-- Desserts -->
+                <div class="menu-item" data-category="dessert" data-price="5.90">
+                    <h3>Tiramisu</h3>
+                    <p>5.90 €</p>
+                </div>
+                <div class="menu-item" data-category="dessert" data-price="5.50">
+                    <h3>Čokoládová torta</h3>
+                    <p>5.50 €</p>
+                </div>
+                <div class="menu-item" data-category="dessert" data-price="4.90">
+                    <h3>Palacinky s nutelou</h3>
+                    <p>4.90 €</p>
+                </div>
+
+                <!-- Drinks -->
+                <div class="menu-item" data-category="drink" data-price="2.50">
+                    <h3>Coca-Cola</h3>
+                    <p>2.50 €</p>
+                </div>
+                <div class="menu-item" data-category="drink" data-price="2.50">
+                    <h3>Minerálna voda</h3>
+                    <p>2.50 €</p>
+                </div>
+                <div class="menu-item" data-category="drink" data-price="2.90">
+                    <h3>Džús pomarančový</h3>
+                    <p>2.90 €</p>
+                </div>
+                <div class="menu-item" data-category="drink" data-price="3.50">
+                    <h3>Káva Espresso</h3>
+                    <p>3.50 €</p>
+                </div>
+            </div>
+
+            <div class="current-order">
+                <h2>Vyberte stôl</h2>
+                <div class="order-items">
+                    <!-- Order items will be dynamically added here -->
+                </div>
+
+                <div class="total-section">
+                    <span>Spolu:</span>
+                    <span>0.00 €</span>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="action-button pay-button" disabled>Zaplatiť</button>
+                    <button class="action-button cancel-button" disabled>Zrušiť</button>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script>
