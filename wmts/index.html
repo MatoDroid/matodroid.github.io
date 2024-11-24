@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Základná vrstva z Freemap.sk</title>
+    <title>Mapa s kreslením, cestami a exportom</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <style>
@@ -19,7 +19,7 @@
         #controls-container {
             position: absolute;
             top: 10px;
-            left: 50px;
+            right: 10px;
             background-color: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 5px;
@@ -31,81 +31,154 @@
 
 <div id="map"></div>
 <div id="controls-container">
-    <label for="opacity-transparent">Priehľadnosť Transparent Layer:</label>
-    <input type="range" id="opacity-transparent" min="0" max="1" step="0.1" value="0.7"><br>
-    <label for="opacity-ortov1">Priehľadnosť OrtoV1:</label>
+    <label for="opacity-osm">OSM</label>
+    <input type="range" id="opacity-osm" min="0" max="1" step="0.1" value="0"><br>
+    <label for="opacity-roads">Cesty</label>
+    <input type="range" id="opacity-roads" min="0" max="1" step="0.1" value="1"><br>
+    <label for="opacity-ortov1">OrtoV1</label>
     <input type="range" id="opacity-ortov1" min="0" max="1" step="0.1" value="1"><br>
-    <button id="export-geojson">Export GeoJSON</button>
+    <button id="export-geojson">Export do GeoJSON</button>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.min.js"></script>
 
 <script>
     // Inicializácia mapy
-    var map = L.map('map').setView([48.9465, 20.5616], 13);
+    var map = L.map('map').setView([48.9465, 20.5613], 13);
 
     // Základná podkladová vrstva (Freemap.sk)
     var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
-        maxZoom: 24,
+        maxZoom: 22,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     }).addTo(map);
 
     // Ortofotografia vrstva (OrtoV1)
     var wmtsUrl = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/tile/{z}/{y}/{x}";
-    var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 24, opacity: 1 }).addTo(map);
+    var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 22, opacity: 1 }).addTo(map);
 
-    // Transparentná vrstva
-    var transparentLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 24,
-        opacity: 0.7,
-        attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+    // Transparentná vrstva (OSM)
+    var osmTransparentLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        opacity: 0
     }).addTo(map);
 
-
-    // Posuvník priehľadnosti pre transparentnú vrstvu
-    document.getElementById('opacity-transparent').addEventListener('input', function(e) {
-        transparentLayer.setOpacity(e.target.value);
+    // Posuvníky priehľadnosti
+    document.getElementById('opacity-osm').addEventListener('input', function(e) {
+        osmTransparentLayer.setOpacity(e.target.value);
     });
 
-    // Posuvník priehľadnosti pre vrstvu OrtoV1
     document.getElementById('opacity-ortov1').addEventListener('input', function(e) {
         wmtsLayer.setOpacity(e.target.value);
     });
 
-    // Funkcia na export GeoJSON dát
+    // Štýly z OpenStreetMap (upravené)
+    function osmStyle(feature) {
+        var highway = feature.properties.highway || "default";
+
+        var styles = {
+            "primary": { color: "#f4f41a", weight: 6, opacity: 0.8 },
+            "secondary": { color: "#f4f41a", weight: 4, opacity: 0.8 },
+            "secondary_link": { color: "#f4f41a", weight: 4, opacity: 0.8 },
+            "tertiary": { color: "#ffffff", weight: 3, opacity: 0.8 },
+            "tertiary_link": { color: "#ffffff", weight: 3, opacity: 0.8 },
+            "residential": { color: "#ffffff", weight: 2, opacity: 0.8 },
+            "living_street": { color: "#ffffff", weight: 2, opacity: 0.8 },
+            "unclassified": { color: "#ffffff", weight: 1.5, opacity: 0.8 },
+            "service": { color: "#ffffff", weight: 1.5, opacity: 0.8 },
+            "pedestrian": { color: "#fabada", weight: 1.5, opacity: 0.8 },
+            "footway": { color: "#ff2929", weight: 1.5, dashArray: "4,4", opacity: 0.8 },
+            "cycleway": { color: "#001dd6", weight: 1.5, dashArray: "4,4", opacity: 0.8 },
+            "path": { color: "#855800", weight: 2, dashArray: "2,4", opacity: 0.8 },
+            "steps": { color: "#ff0000", weight: 4, dashArray: "7,7", opacity: 0.8 },
+            "track": { color: "#855800", weight: 2, opacity: 0.8 },
+            "default": { color: "#808080", weight: 2, opacity: 0.8 }
+        };
+
+        return styles[highway] || styles["default"];
+    }
+
+    // Vrstvy pre cesty
+    var roadsLayer;
+
+    // Funkcia na načítanie ciest cez Overpass API
+    function loadRoads() {
+        var bbox = map.getBounds();
+        var query = `
+            [out:json];
+            way["highway"](${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()});
+            out geom;`;
+
+        var overpassUrl = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+
+        fetch(overpassUrl)
+            .then(response => response.json())
+            .then(data => {
+                var geojsonData = osmtogeojson(data);
+
+                // Odstrániť starú vrstvu ciest
+                if (roadsLayer) {
+                    map.removeLayer(roadsLayer);
+                }
+
+                roadsLayer = L.geoJSON(geojsonData, {
+                    style: osmStyle,
+                    onEachFeature: function(feature, layer) {
+                        if (feature.properties && feature.properties.name) {
+                            layer.bindPopup(`<strong>${feature.properties.name}</strong><br>${feature.properties.highway || "unknown type"}`);
+                        }
+                    }
+                }).addTo(map);
+
+                // Posuvník na úpravu priehľadnosti ciest
+                document.getElementById('opacity-roads').addEventListener('input', function(e) {
+                    var opacity = e.target.value;
+                    roadsLayer.setStyle({ opacity: opacity });
+                });
+            })
+            .catch(err => console.error("Chyba pri načítaní ciest:", err));
+    }
+
+    // Načítanie ciest pri zmene mapy
+    map.on('moveend', loadRoads);
+    loadRoads();
+
+    // Vrstvy na kreslenie
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
     var drawControl = new L.Control.Draw({
-        edit: { featureGroup: drawnItems },
+        edit: {
+            featureGroup: drawnItems,
+            remove: true
+        },
         draw: {
+            polyline: true,
             polygon: false,
-            rectangle: false,
             circle: false,
-            circlemarker: false,
-            polyline: { shapeOptions: { color: 'blue' } },
-            marker: { icon: new L.Icon.Default() }
+            marker: true,
+            rectangle: false
         }
     });
     map.addControl(drawControl);
 
-    map.on(L.Draw.Event.CREATED, function(event) {
-        var layer = event.layer;
+    // Udalosť po nakreslení prvku
+    map.on('draw:created', function(e) {
+        var layer = e.layer;
         drawnItems.addLayer(layer);
     });
 
+    // Export do GeoJSON
     document.getElementById('export-geojson').addEventListener('click', function() {
         var data = drawnItems.toGeoJSON();
-        var blob = new Blob([JSON.stringify(data)], { type: "application/geo+json" });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement("a");
-        a.href = url;
-        a.download = "export.geojson";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+        var downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "map_data.geojson");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
     });
 </script>
 
