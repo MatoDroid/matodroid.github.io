@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Restaurant POS System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -466,141 +469,154 @@
     </div>
 
     <script>
-$(document).ready(function () {
-    const tableOrders = loadOrders(); // Načítanie uložených objednávok z LocalStorage
-    let currentTable = null;
+    const firebaseConfig = {
+        apiKey: "AIzaSyB-uDBYhglM4A_OiASWkIq7egW0ab4BJIM",
+        authDomain: "restaurantpos-9a083.firebaseapp.com",
+        projectId: "restaurantpos-9a083",
+        storageBucket: "restaurantpos-9a083.firebasestorage.app",
+        messagingSenderId: "1002332737131",
+        appId: "1:1002332737131:web:b76fef5199b39de8c9eb2e",
+        measurementId: "G-2Y20ZB2VH5"
+        };
+        
+        // Inicializácia Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+          
 
-    function saveOrders() {
-        localStorage.setItem('tableOrders', JSON.stringify(tableOrders));
-    }
-
-    function loadOrders() {
-        const savedOrders = localStorage.getItem('tableOrders');
-        return savedOrders ? JSON.parse(savedOrders) : {};
-    }
-
-    function updateOrderDisplay() {
-        const orderItems = $('.order-items');
-        orderItems.empty();
-
-        if (!currentTable || !tableOrders[currentTable]) {
-            $('.total-section span:last').text('0.00 €');
-            return;
-        }
-
-        Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
-            const itemTotal = (item.price * item.quantity).toFixed(2);
-            const newItem = $(`
-                <div class="order-item">
-                    <span class="item-quantity">${item.quantity}x</span>
-                    <span class="item-name">${itemName}</span>
-                    <div class="quantity-controls">
-                        <button class="quantity-btn minus">-</button>
-                        <button class="quantity-btn plus">+</button>
-                    </div>
-                    <span class="item-total">${itemTotal} €</span>
-                </div>
-            `);
-
-            newItem.find('.minus').click(() => updateItemQuantity(itemName, -1));
-            newItem.find('.plus').click(() => updateItemQuantity(itemName, 1));
-
-            orderItems.append(newItem);
-        });
-
-        $('.total-section span:last').text(
-            tableOrders[currentTable].total.toFixed(2) + ' €'
-        );
-    }
-
-    function updateItemQuantity(itemName, delta) {
-        if (!currentTable || !tableOrders[currentTable]) return;
-
-        const item = tableOrders[currentTable].items[itemName];
-        if (!item) return;
-
-        const newQuantity = item.quantity + delta;
-        if (newQuantity <= 0) {
-            tableOrders[currentTable].total -= item.price * item.quantity;
-            delete tableOrders[currentTable].items[itemName];
-        } else {
-            tableOrders[currentTable].total += item.price * delta;
-            item.quantity = newQuantity;
-        }
-
-        if (Object.keys(tableOrders[currentTable].items).length === 0) {
-            delete tableOrders[currentTable];
-            $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
-        }
-
-        saveOrders();
-        updateOrderDisplay();
-    }
-
-    $('.table-button').click(function () {
-        const tableNumber = $(this).data('table');
-        $('.table-button').removeClass('active');
-        $(this).addClass('active');
-        currentTable = tableNumber;
-        updateOrderDisplay();
-        $('.action-buttons button').prop('disabled', false);
-        $('.current-order h2').text(`Aktuálna objednávka - Stôl ${tableNumber}`);
-    });
-
-    $('.menu-item').click(function () {
-        if (!currentTable) {
-            alert('Najprv vyberte stôl!');
-            return;
-        }
-
-        const itemName = $(this).find('h3').text();
-        const itemPrice = parseFloat($(this).data('price'));
-
-        if (!tableOrders[currentTable]) {
-            tableOrders[currentTable] = { items: {}, total: 0 };
-        }
-
-        if (tableOrders[currentTable].items[itemName]) {
-            tableOrders[currentTable].items[itemName].quantity += 1;
-            tableOrders[currentTable].total += itemPrice;
-        } else {
-            tableOrders[currentTable].items[itemName] = { price: itemPrice, quantity: 1 };
-            tableOrders[currentTable].total += itemPrice;
-        }
-
-        $(`.table-button[data-table="${currentTable}"]`).addClass('has-order');
-        saveOrders();
-        updateOrderDisplay();
-    });
-
-    $('.pay-button').click(function () {
-        if (currentTable && tableOrders[currentTable]) {
-            alert(`Objednávka pre stôl ${currentTable} zaplatená: ${tableOrders[currentTable].total.toFixed(2)} €`);
-            delete tableOrders[currentTable];
-            $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
-            saveOrders();
-            updateOrderDisplay();
-        }
-    });
-
-    $('.cancel-button').click(function () {
-        if (currentTable && tableOrders[currentTable]) {
-            if (confirm(`Naozaj chcete zrušiť objednávku pre stôl ${currentTable}?`)) {
-                delete tableOrders[currentTable];
-                $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
-                saveOrders();
+        $(document).ready(function () {
+            const tableOrders = {}; // Lokálna kópia objednávok
+            let currentTable = null;
+        
+            // Načítanie objednávok z Firestore
+            function loadOrdersFromFirestore() {
+                db.collection("orders").get().then(snapshot => {
+                    snapshot.forEach(doc => {
+                        tableOrders[doc.id] = doc.data();
+                        $(`.table-button[data-table="${doc.id}"]`).addClass('has-order');
+                    });
+                });
+            }
+        
+            // Uloženie objednávok do Firestore
+            function saveOrderToFirestore(tableNumber) {
+                db.collection("orders").doc(tableNumber).set(tableOrders[tableNumber]);
+            }
+        
+            // Odstránenie objednávky zo Firestore
+            function deleteOrderFromFirestore(tableNumber) {
+                db.collection("orders").doc(tableNumber).delete();
+            }
+        
+            function updateOrderDisplay() {
+                const orderItems = $('.order-items');
+                orderItems.empty();
+        
+                if (!currentTable || !tableOrders[currentTable]) {
+                    $('.total-section span:last').text('0.00 €');
+                    return;
+                }
+        
+                Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
+                    const newItem = $(`
+                        <div class="order-item">
+                            <span class="item-quantity">${item.quantity}x</span>
+                            <span class="item-name">${itemName}</span>
+                            <div class="quantity-controls">
+                                <button class="quantity-btn minus">-</button>
+                                <button class="quantity-btn plus">+</button>
+                            </div>
+                            <span class="item-total">${itemTotal} €</span>
+                        </div>
+                    `);
+        
+                    newItem.find('.minus').click(() => updateItemQuantity(itemName, -1));
+                    newItem.find('.plus').click(() => updateItemQuantity(itemName, 1));
+        
+                    orderItems.append(newItem);
+                });
+        
+                $('.total-section span:last').text(
+                    tableOrders[currentTable].total.toFixed(2) + ' €'
+                );
+            }
+        
+            function updateItemQuantity(itemName, delta) {
+                if (!currentTable || !tableOrders[currentTable]) return;
+        
+                const item = tableOrders[currentTable].items[itemName];
+                if (!item) return;
+        
+                const newQuantity = item.quantity + delta;
+                if (newQuantity <= 0) {
+                    tableOrders[currentTable].total -= item.price * item.quantity;
+                    delete tableOrders[currentTable].items[itemName];
+                } else {
+                    tableOrders[currentTable].total += item.price * delta;
+                    item.quantity = newQuantity;
+                }
+        
+                if (Object.keys(tableOrders[currentTable].items).length === 0) {
+                    delete tableOrders[currentTable];
+                    $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
+                    deleteOrderFromFirestore(currentTable);
+                } else {
+                    saveOrderToFirestore(currentTable);
+                }
+        
                 updateOrderDisplay();
             }
-        }
-    });
-
-    // Načítanie uložených objednávok po načítaní stránky
-    Object.keys(tableOrders).forEach(tableNumber => {
-        if (Object.keys(tableOrders[tableNumber].items).length > 0) {
-            $(`.table-button[data-table="${tableNumber}"]`).addClass('has-order');
-        }
-    });
-});
+        
+            $('.table-button').click(function () {
+                const tableNumber = $(this).data('table');
+                $('.table-button').removeClass('active');
+                $(this).addClass('active');
+                currentTable = tableNumber;
+                updateOrderDisplay();
+                $('.action-buttons button').prop('disabled', false);
+                $('.current-order h2').text(`Aktuálna objednávka - Stôl ${tableNumber}`);
+            });
+        
+            $('.menu-item').click(function () {
+                if (!currentTable) {
+                    alert('Najprv vyberte stôl!');
+                    return;
+                }
+        
+                const itemName = $(this).find('h3').text();
+                const itemPrice = parseFloat($(this).data('price'));
+        
+                if (!tableOrders[currentTable]) {
+                    tableOrders[currentTable] = { items: {}, total: 0 };
+                }
+        
+                if (tableOrders[currentTable].items[itemName]) {
+                    tableOrders[currentTable].items[itemName].quantity += 1;
+                    tableOrders[currentTable].total += itemPrice;
+                } else {
+                    tableOrders[currentTable].items[itemName] = { price: itemPrice, quantity: 1 };
+                    tableOrders[currentTable].total += itemPrice;
+                }
+        
+                $(`.table-button[data-table="${currentTable}"]`).addClass('has-order');
+                saveOrderToFirestore(currentTable);
+                updateOrderDisplay();
+            });
+        
+            $('.pay-button').click(function () {
+                if (currentTable && tableOrders[currentTable]) {
+                    alert(`Objednávka pre stôl ${currentTable} zaplatená: ${tableOrders[currentTable].total.toFixed(2)} €`);
+                    delete tableOrders[currentTable];
+                    $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
+                    deleteOrderFromFirestore(currentTable);
+                    updateOrderDisplay();
+                }
+            });
+        
+            loadOrdersFromFirestore(); // Načítanie objednávok pri načítaní stránky
+        });
+        
     </script>
 </body>
 </html>
