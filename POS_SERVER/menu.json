@@ -1,0 +1,47 @@
+{
+  "menu": [
+    {
+      "category": "main",
+      "items": [
+        { "name": "Rezeň so zemiakmi", "price": 12.90 },
+        { "name": "Sviečková na smotane", "price": 14.50 },
+        { "name": "Penne Carbonara", "price": 11.90 },
+        { "name": "Losos s ryžou", "price": 15.90 },
+        { "name": "Kuracie Supreme", "price": 13.90 }
+      ]
+    },
+    {
+      "category": "appetizer",
+      "items": [
+        { "name": "Bruschetta", "price": 6.90 },
+        { "name": "Carpaccio", "price": 7.50 },
+        { "name": "Grécky šalát", "price": 5.90 }
+      ]
+    },
+    {
+      "category": "soup",
+      "items": [
+        { "name": "Slepačí vývar", "price": 4.50 },
+        { "name": "Paradajková polievka", "price": 4.90 },
+        { "name": "Cesnaková polievka", "price": 5.20 }
+      ]
+    },
+    {
+      "category": "dessert",
+      "items": [
+        { "name": "Tiramisu", "price": 5.90 },
+        { "name": "Čokoládová torta", "price": 5.50 },
+        { "name": "Palacinky s nutelou", "price": 4.90 }
+      ]
+    },
+    {
+      "category": "drink",
+      "items": [
+        { "name": "Coca-Cola", "price": 2.50 },
+        { "name": "Minerálna voda", "price": 2.50 },
+        { "name": "Džús pomarančový", "price": 2.90 },
+        { "name": "Káva Espresso", "price": 3.50 }
+      ]
+    }
+  ]
+}
