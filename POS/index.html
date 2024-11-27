@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Restaurant POS System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -478,6 +479,20 @@ $(document).ready(function () {
         const savedOrders = localStorage.getItem('tableOrders');
         return savedOrders ? JSON.parse(savedOrders) : {};
     }
+
+    $('.category-button').click(function () {
+        // Nastaviť aktívne tlačidlo
+        $('.category-button').removeClass('active');
+        $(this).addClass('active');
+    
+        // Získať kategóriu z atribútu data-category
+        const selectedCategory = $(this).data('category');
+    
+        // Skryť všetky položky menu a zobraziť len tie s vybranou kategóriou
+        $('.menu-item').removeClass('active-category');
+        $(`.menu-item[data-category="${selectedCategory}"]`).addClass('active-category');
+    });
+    
 
     function updateOrderDisplay() {
         const orderItems = $('.order-items');
