@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Správa Menu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #a71d2a;
+        }
+
+        .json-output {
+            background-color: #f8f9fa;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin - Správa Menu</h1>
+
+    <div class="section">
+        <h2>Stoly</h2>
+        <div id="tables-list"></div>
+        <input type="text" id="new-table" placeholder="Nový stôl">
+        <button id="add-table">Pridať Stôl</button>
+    </div>
+
+    <div class="section">
+        <h2>Kategórie</h2>
+        <div id="categories-list"></div>
+        <input type="text" id="new-category-name" placeholder="Názov kategórie">
+        <input type="text" id="new-category-id" placeholder="ID kategórie">
+        <button id="add-category">Pridať Kategóriu</button>
+    </div>
+
+    <div class="section">
+        <h2>Položky Menu</h2>
+        <div id="items-list"></div>
+        <input type="text" id="new-item-name" placeholder="Názov položky">
+        <input type="number" step="0.01" id="new-item-price" placeholder="Cena položky">
+        <select id="new-item-category"></select>
+        <button id="add-item">Pridať Položku</button>
+    </div>
+
+    <div class="section">
+        <h2>Export JSON</h2>
+        <button id="download-json">Stiahnuť Aktualizovaný JSON</button>
+    </div>
+
+    <script>
+$(document).ready(function () {
+    let menuData = {};
+
+    // Načítanie JSON zo súboru
+    function loadMenuData() {
+        fetch('menu-data.json')
+            .then(response => {
+                if (!response.ok) throw new Error('Chyba pri načítaní JSON súboru!');
+                return response.json();
+            })
+            .then(data => {
+                menuData = data;
+                renderAll();
+            })
+            .catch(error => alert(error.message));
+    }
+
+    // Renderovanie údajov
+    function renderTables() {
+        $('#tables-list').empty();
+        menuData.tables.forEach((table, index) => {
+            $('#tables-list').append(`
+                <div>
+                    ${table}
+                    <button class="btn-danger" onclick="removeTable(${index})">Odstrániť</button>
+                </div>
+            `);
+        });
+    }
+
+    function renderCategories() {
+        $('#categories-list').empty();
+        $('#new-item-category').empty();
+        menuData.categories.forEach((category, index) => {
+            $('#categories-list').append(`
+                <div>
+                    ${category.name} (${category.id})
+                    <button class="btn-danger" onclick="removeCategory(${index})">Odstrániť</button>
+                </div>
+            `);
+            $('#new-item-category').append(`<option value="${category.id}">${category.name}</option>`);
+        });
+    }
+
+    function renderItems() {
+        $('#items-list').empty();
+        menuData.items.forEach((item, index) => {
+            $('#items-list').append(`
+                <div>
+                    ${item.name} (${item.price.toFixed(2)} €) - ${item.category}
+                    <button class="btn-danger" onclick="removeItem(${index})">Odstrániť</button>
+                </div>
+            `);
+        });
+    }
+
+    function renderAll() {
+        renderTables();
+        renderCategories();
+        renderItems();
+    }
+
+    // Odstránenie položiek
+    window.removeTable = function (index) {
+        menuData.tables.splice(index, 1);
+        renderTables();
+    };
+
+    window.removeCategory = function (index) {
+        const removedCategory = menuData.categories[index].id;
+        menuData.categories.splice(index, 1);
+        menuData.items = menuData.items.filter(item => item.category !== removedCategory);
+        renderCategories();
+        renderItems();
+    };
+
+    window.removeItem = function (index) {
+        menuData.items.splice(index, 1);
+        renderItems();
+    };
+
+    // Pridávanie nových údajov
+    $('#add-table').click(function () {
+        const newTable = $('#new-table').val().trim();
+        if (newTable) {
+            menuData.tables.push(newTable);
+            $('#new-table').val('');
+            renderTables();
+        }
+    });
+
+    $('#add-category').click(function () {
+        const newCategoryName = $('#new-category-name').val().trim();
+        const newCategoryId = $('#new-category-id').val().trim();
+        if (newCategoryName && newCategoryId) {
+            menuData.categories.push({ id: newCategoryId, name: newCategoryName });
+            $('#new-category-name').val('');
+            $('#new-category-id').val('');
+            renderCategories();
+        }
+    });
+
+    $('#add-item').click(function () {
+        const newItemName = $('#new-item-name').val().trim();
+        const newItemPrice = parseFloat($('#new-item-price').val());
+        const newItemCategory = $('#new-item-category').val();
+        if (newItemName && !isNaN(newItemPrice) && newItemCategory) {
+            menuData.items.push({ name: newItemName, price: newItemPrice, category: newItemCategory });
+            $('#new-item-name').val('');
+            $('#new-item-price').val('');
+            renderItems();
+        }
+    });
+
+    // Stiahnutie aktualizovaného JSON
+    $('#download-json').click(function () {
+        const blob = new Blob([JSON.stringify(menuData, null, 4)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'menu-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Načítanie údajov pri spustení
+    loadMenuData();
+});
+    </script>
+</body>
+</html>
