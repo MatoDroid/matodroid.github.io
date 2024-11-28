@@ -49,13 +49,19 @@
             background-color: #a71d2a;
         }
 
-        .json-output {
-            background-color: #f8f9fa;
+        .btn-edit {
+            background-color: #ffc107;
+        }
+
+        .btn-edit:hover {
+            background-color: #e0a800;
+        }
+
+        .form-section {
             border: 1px solid #ccc;
-            padding: 10px;
-            margin-top: 20px;
-            white-space: pre-wrap;
-            font-family: monospace;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
         }
     </style>
 </head>
@@ -116,6 +122,7 @@ $(document).ready(function () {
             $('#tables-list').append(`
                 <div>
                     ${table}
+                    <button class="btn-edit" onclick="editTable(${index})">Upraviť</button>
                     <button class="btn-danger" onclick="removeTable(${index})">Odstrániť</button>
                 </div>
             `);
@@ -129,6 +136,7 @@ $(document).ready(function () {
             $('#categories-list').append(`
                 <div>
                     ${category.name} (${category.id})
+                    <button class="btn-edit" onclick="editCategory(${index})">Upraviť</button>
                     <button class="btn-danger" onclick="removeCategory(${index})">Odstrániť</button>
                 </div>
             `);
@@ -142,6 +150,7 @@ $(document).ready(function () {
             $('#items-list').append(`
                 <div>
                     ${item.name} (${item.price.toFixed(2)} €) - ${item.category}
+                    <button class="btn-edit" onclick="editItem(${index})">Upraviť</button>
                     <button class="btn-danger" onclick="removeItem(${index})">Odstrániť</button>
                 </div>
             `);
@@ -153,6 +162,39 @@ $(document).ready(function () {
         renderCategories();
         renderItems();
     }
+
+    // Editácia stolov
+    window.editTable = function (index) {
+        const newName = prompt('Zadajte nový názov stola:', menuData.tables[index]);
+        if (newName) {
+            menuData.tables[index] = newName;
+            renderTables();
+        }
+    };
+
+    // Editácia kategórií
+    window.editCategory = function (index) {
+        const newName = prompt('Zadajte nový názov kategórie:', menuData.categories[index].name);
+        const newId = prompt('Zadajte nové ID kategórie:', menuData.categories[index].id);
+        if (newName && newId) {
+            menuData.categories[index].name = newName;
+            menuData.categories[index].id = newId;
+            renderCategories();
+        }
+    };
+
+    // Editácia položiek menu
+    window.editItem = function (index) {
+        const newName = prompt('Zadajte nový názov položky:', menuData.items[index].name);
+        const newPrice = parseFloat(prompt('Zadajte novú cenu položky:', menuData.items[index].price));
+        const newCategory = prompt('Zadajte novú kategóriu položky:', menuData.items[index].category);
+        if (newName && !isNaN(newPrice) && newCategory) {
+            menuData.items[index].name = newName;
+            menuData.items[index].price = newPrice;
+            menuData.items[index].category = newCategory;
+            renderItems();
+        }
+    };
 
     // Odstránenie položiek
     window.removeTable = function (index) {
@@ -212,14 +254,3 @@ $(document).ready(function () {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'menu-data.json';
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    // Načítanie údajov pri spustení
-    loadMenuData();
-});
-    </script>
-</body>
-</html>
