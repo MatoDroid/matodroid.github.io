@@ -1,0 +1,25 @@
+{
+  "tables": [
+    "Stôl 1",
+    "Stôl 2",
+    "Stôl 3",
+    "Stôl 4",
+    "Stôl 5",
+    "Stôl 6"
+  ],
+  "categories": [
+    { "id": "main", "name": "Hlavné jedlá" },
+    { "id": "appetizer", "name": "Predjedlá" },
+    { "id": "soup", "name": "Polievky" },
+    { "id": "dessert", "name": "Dezerty" },
+    { "id": "drink", "name": "Nápoje" }
+  ],
+  "items": [
+    { "category": "main", "name": "Rezeň so zemiakmi", "price": 12.90 },
+    { "category": "main", "name": "Sviečková na smotane", "price": 14.50 },
+    { "category": "appetizer", "name": "Bruschetta", "price": 6.90 },
+    { "category": "soup", "name": "Slepačí vývar", "price": 4.50 },
+    { "category": "dessert", "name": "Tiramisu", "price": 5.90 },
+    { "category": "drink", "name": "Coca-Cola", "price": 2.50 }
+  ]
+}
