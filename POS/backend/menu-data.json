@@ -3,13 +3,13 @@
     "title": "Restaurant POS System"
   },
   "tables": [
-    "Stôl 1",
-    "Stôl 2",
-    "Stôl 3",
-    "Stôl 4",
-    "Stôl 5",
-    "Stôl 6"
-  ],
+      { "number": 1, "name": "Stôl 1" },
+      { "number": 2, "name": "Stôl 2" },
+      { "number": 3, "name": "Stôl 3" },
+      { "number": 4, "name": "Stôl 4" },
+      { "number": 5, "name": "Stôl 5" },
+      { "number": 6, "name": "Stôl 6" }
+  ]
   "categories": [
     { "id": "main", "name": "Hlavné jedlá" },
     { "id": "appetizer", "name": "Predjedlá" },
