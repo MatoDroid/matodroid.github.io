@@ -9,7 +9,7 @@
       { "number": 4, "name": "Stôl 4" },
       { "number": 5, "name": "Stôl 5" },
       { "number": 6, "name": "Stôl 6" }
-  ]
+  ],
   "categories": [
     { "id": "main", "name": "Hlavné jedlá" },
     { "id": "appetizer", "name": "Predjedlá" },
