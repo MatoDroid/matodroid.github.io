@@ -130,7 +130,8 @@
         function renderTables() {
             const tableBody = document.querySelector("#tablesTable tbody");
             tableBody.innerHTML = ''; // Vyčistenie tabuľky
-
+        
+            // Iterujeme cez stoly a zobrazujeme ich správne
             menuData.tables.forEach((table, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -141,19 +142,17 @@
                 tableBody.appendChild(row);
             });
         }
-
+        
+        // Funkcia na aktualizáciu informácií o stoloch
         function updateTable(index, key, value) {
             menuData.tables[index][key] = value;
+            console.log(menuData.tables);  // Skontrolujte, či sa údaje aktualizujú správne
         }
-
-        function addTable() {
-            menuData.tables.push({ number: menuData.tables.length + 1, name: `Stôl ${menuData.tables.length + 1}` });
-            renderTables();
-        }
-
+        
+        // Funkcia na odstránenie stola
         function deleteTable(index) {
-            menuData.tables.splice(index, 1);
-            renderTables();
+            menuData.tables.splice(index, 1); // Odstránenie stola zo zoznamu
+            renderTables();  // Prekreslenie tabuľky po odstránení
         }
 
         // Správa kategórií
