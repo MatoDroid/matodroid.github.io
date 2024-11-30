@@ -3,254 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Správa Menu</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <title>Administrácia Menu</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            padding: 20px;
-            max-width: 800px;
-            margin: auto;
+            margin: 20px;
         }
-
-        h1, h2 {
-            text-align: center;
-            color: #333;
-        }
-
-        .section {
+        table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 20px;
         }
-
-        input, select, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
         }
-
+        th {
+            background-color: #f4f4f4;
+        }
+        input, select {
+            padding: 5px;
+            margin: 5px;
+        }
         button {
+            padding: 10px;
             background-color: #007bff;
             color: white;
+            border: none;
             cursor: pointer;
         }
-
         button:hover {
             background-color: #0056b3;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-        }
-
-        .btn-danger:hover {
-            background-color: #a71d2a;
-        }
-
-        .btn-edit {
-            background-color: #ffc107;
-        }
-
-        .btn-edit:hover {
-            background-color: #e0a800;
-        }
-
-        .form-section {
-            border: 1px solid #ccc;
-            padding: 15px;
-            margin-bottom: 20px;
-            background-color: #f8f9fa;
         }
     </style>
 </head>
 <body>
-    <h1>Admin - Správa Menu</h1>
+    <h1>Administrácia Menu</h1>
 
-    <div class="section">
+    <!-- Správa stolov -->
+    <div>
         <h2>Stoly</h2>
-        <div id="tables-list"></div>
-        <input type="text" id="new-table" placeholder="Nový stôl">
-        <button id="add-table">Pridať Stôl</button>
+        <table id="tablesTable">
+            <thead>
+                <tr>
+                    <th>Číslo</th>
+                    <th>Názov</th>
+                    <th>Akcia</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button onclick="addTable()">Pridať nový stôl</button>
     </div>
 
-    <div class="section">
+    <!-- Správa kategórií -->
+    <div>
         <h2>Kategórie</h2>
-        <div id="categories-list"></div>
-        <input type="text" id="new-category-name" placeholder="Názov kategórie">
-        <input type="text" id="new-category-id" placeholder="ID kategórie">
-        <button id="add-category">Pridať Kategóriu</button>
+        <table id="categoriesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Názov</th>
+                    <th>Akcia</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button onclick="addCategory()">Pridať novú kategóriu</button>
     </div>
 
-    <div class="section">
+    <!-- Správa položiek menu -->
+    <div>
         <h2>Položky Menu</h2>
-        <div id="items-list"></div>
-        <input type="text" id="new-item-name" placeholder="Názov položky">
-        <input type="number" step="0.01" id="new-item-price" placeholder="Cena položky">
-        <select id="new-item-category"></select>
-        <button id="add-item">Pridať Položku</button>
+        <table id="menuTable">
+            <thead>
+                <tr>
+                    <th>Kategória</th>
+                    <th>Názov</th>
+                    <th>Cena</th>
+                    <th>Akcia</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button onclick="addMenuItem()">Pridať novú položku</button>
     </div>
 
-    <div class="section">
-        <h2>Export JSON</h2>
-        <button id="download-json">Stiahnuť Aktualizovaný JSON</button>
-    </div>
+    <button onclick="saveMenuData()">Uložiť zmeny</button>
 
     <script>
-$(document).ready(function () {
-    let menuData = {};
+        const API_URL = "https://menu-backend.onrender.com"; // URL vášho backendu na Render
+        let menuData = {};
 
-    // Načítanie JSON zo súboru
-    function loadMenuData() {
-        fetch('menu-data.json')
-            .then(response => {
-                if (!response.ok) throw new Error('Chyba pri načítaní JSON súboru!');
-                return response.json();
-            })
-            .then(data => {
-                menuData = data;
-                renderAll();
-            })
-            .catch(error => alert(error.message));
-    }
+        // Načítanie dát z backendu
+        async function loadMenuData() {
+            try {
+                const response = await fetch(`${API_URL}/data`);
+                menuData = await response.json();
+                renderTables();
+                renderCategories();
+                renderMenuItems();
+            } catch (error) {
+                alert('Nepodarilo sa načítať menu data: ' + error.message);
+            }
+        }
 
-    // Renderovanie údajov
-    function renderTables() {
-        $('#tables-list').empty();
-        menuData.tables.forEach((table, index) => {
-            $('#tables-list').append(`
-                <div>
-                    ${table}
-                    <button class="btn-edit" onclick="editTable(${index})">Upraviť</button>
-                    <button class="btn-danger" onclick="removeTable(${index})">Odstrániť</button>
-                </div>
-            `);
-        });
-    }
+        // Uloženie dát na backend
+        async function saveMenuData() {
+            try {
+                const response = await fetch(`${API_URL}/data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(menuData),
+                });
+                if (response.ok) {
+                    alert('Dáta boli úspešne uložené!');
+                } else {
+                    alert('Chyba pri ukladaní dát.');
+                }
+            } catch (error) {
+                alert('Nepodarilo sa uložiť dáta: ' + error.message);
+            }
+        }
 
-    function renderCategories() {
-        $('#categories-list').empty();
-        $('#new-item-category').empty();
-        menuData.categories.forEach((category, index) => {
-            $('#categories-list').append(`
-                <div>
-                    ${category.name} (${category.id})
-                    <button class="btn-edit" onclick="editCategory(${index})">Upraviť</button>
-                    <button class="btn-danger" onclick="removeCategory(${index})">Odstrániť</button>
-                </div>
-            `);
-            $('#new-item-category').append(`<option value="${category.id}">${category.name}</option>`);
-        });
-    }
+        // Správa stolov
+        function renderTables() {
+            const tableBody = document.querySelector("#tablesTable tbody");
+            tableBody.innerHTML = ''; // Vyčistenie tabuľky
 
-    function renderItems() {
-        $('#items-list').empty();
-        menuData.items.forEach((item, index) => {
-            $('#items-list').append(`
-                <div>
-                    ${item.name} (${item.price.toFixed(2)} €) - ${item.category}
-                    <button class="btn-edit" onclick="editItem(${index})">Upraviť</button>
-                    <button class="btn-danger" onclick="removeItem(${index})">Odstrániť</button>
-                </div>
-            `);
-        });
-    }
+            menuData.tables.forEach((table, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="number" value="${table.number}" onchange="updateTable(${index}, 'number', parseInt(this.value))"></td>
+                    <td><input type="text" value="${table.name}" onchange="updateTable(${index}, 'name', this.value)"></td>
+                    <td><button onclick="deleteTable(${index})">Odstrániť</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
 
-    function renderAll() {
-        renderTables();
-        renderCategories();
-        renderItems();
-    }
+        function updateTable(index, key, value) {
+            menuData.tables[index][key] = value;
+        }
 
-    // Editácia stolov
-    window.editTable = function (index) {
-        const newName = prompt('Zadajte nový názov stola:', menuData.tables[index]);
-        if (newName) {
-            menuData.tables[index] = newName;
+        function addTable() {
+            menuData.tables.push({ number: menuData.tables.length + 1, name: `Stôl ${menuData.tables.length + 1}` });
             renderTables();
         }
-    };
 
-    // Editácia kategórií
-    window.editCategory = function (index) {
-        const newName = prompt('Zadajte nový názov kategórie:', menuData.categories[index].name);
-        const newId = prompt('Zadajte nové ID kategórie:', menuData.categories[index].id);
-        if (newName && newId) {
-            menuData.categories[index].name = newName;
-            menuData.categories[index].id = newId;
-            renderCategories();
-        }
-    };
-
-    // Editácia položiek menu
-    window.editItem = function (index) {
-        const newName = prompt('Zadajte nový názov položky:', menuData.items[index].name);
-        const newPrice = parseFloat(prompt('Zadajte novú cenu položky:', menuData.items[index].price));
-        const newCategory = prompt('Zadajte novú kategóriu položky:', menuData.items[index].category);
-        if (newName && !isNaN(newPrice) && newCategory) {
-            menuData.items[index].name = newName;
-            menuData.items[index].price = newPrice;
-            menuData.items[index].category = newCategory;
-            renderItems();
-        }
-    };
-
-    // Odstránenie položiek
-    window.removeTable = function (index) {
-        menuData.tables.splice(index, 1);
-        renderTables();
-    };
-
-    window.removeCategory = function (index) {
-        const removedCategory = menuData.categories[index].id;
-        menuData.categories.splice(index, 1);
-        menuData.items = menuData.items.filter(item => item.category !== removedCategory);
-        renderCategories();
-        renderItems();
-    };
-
-    window.removeItem = function (index) {
-        menuData.items.splice(index, 1);
-        renderItems();
-    };
-
-    // Pridávanie nových údajov
-    $('#add-table').click(function () {
-        const newTable = $('#new-table').val().trim();
-        if (newTable) {
-            menuData.tables.push(newTable);
-            $('#new-table').val('');
+        function deleteTable(index) {
+            menuData.tables.splice(index, 1);
             renderTables();
         }
-    });
 
-    $('#add-category').click(function () {
-        const newCategoryName = $('#new-category-name').val().trim();
-        const newCategoryId = $('#new-category-id').val().trim();
-        if (newCategoryName && newCategoryId) {
-            menuData.categories.push({ id: newCategoryId, name: newCategoryName });
-            $('#new-category-name').val('');
-            $('#new-category-id').val('');
+        // Správa kategórií
+        function renderCategories() {
+            const tableBody = document.querySelector("#categoriesTable tbody");
+            tableBody.innerHTML = ''; // Vyčistenie tabuľky
+
+            menuData.categories.forEach((category, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" value="${category.id}" onchange="updateCategory(${index}, 'id', this.value)"></td>
+                    <td><input type="text" value="${category.name}" onchange="updateCategory(${index}, 'name', this.value)"></td>
+                    <td><button onclick="deleteCategory(${index})">Odstrániť</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function updateCategory(index, key, value) {
+            menuData.categories[index][key] = value;
+        }
+
+        function addCategory() {
+            menuData.categories.push({ id: '', name: '' });
             renderCategories();
         }
-    });
 
-    $('#add-item').click(function () {
-        const newItemName = $('#new-item-name').val().trim();
-        const newItemPrice = parseFloat($('#new-item-price').val());
-        const newItemCategory = $('#new-item-category').val();
-        if (newItemName && !isNaN(newItemPrice) && newItemCategory) {
-            menuData.items.push({ name: newItemName, price: newItemPrice, category: newItemCategory });
-            $('#new-item-name').val('');
-            $('#new-item-price').val('');
-            renderItems();
+        function deleteCategory(index) {
+            menuData.categories.splice(index, 1);
+            renderCategories();
         }
-    });
 
-    // Stiahnutie aktualizovaného JSON
-    $('#download-json').click(function () {
-        const blob = new Blob([JSON.stringify(menuData, null, 4)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+        // Správa položiek menu
+        function renderMenuItems() {
+            const tableBody = document.querySelector("#menuTable tbody");
+            tableBody.innerHTML = ''; // Vyčistenie tabuľky
+
+            menuData.menuItems.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <select onchange="updateMenuItem(${index}, 'category', this.value)">
+                            ${menuData.categories.map(category => `
+                                <option value="${category.id}" ${item.category === category.id ? 'selected' : ''}>
+                                    ${category.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </td>
+                    <td><input type="text" value="${item.name}" onchange="updateMenuItem(${index}, 'name', this.value)"></td>
+                    <td><input type="number" step="0.01" value="${item.price}" onchange="updateMenuItem(${index}, 'price', parseFloat(this.value))"></td>
+                    <td><button onclick="deleteMenuItem(${index})">Odstrániť</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function updateMenuItem(index, key, value) {
+            menuData.menuItems[index][key] = value;
+        }
+
+        function addMenuItem() {
+            menuData.menuItems.push({ category: '', name: '', price: 0 });
+            renderMenuItems();
+        }
+
+        function deleteMenuItem(index) {
+            menuData.menuItems.splice(index, 1);
+            renderMenuItems();
+        }
+
+        // Načítanie dát pri spustení
+        loadMenuData();
+    </script>
+</body>
+</html>
