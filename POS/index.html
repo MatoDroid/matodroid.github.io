@@ -333,6 +333,28 @@
             .action-buttons {
                 grid-template-columns: 1fr;
             }
+            #qr-modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+            }
+            
+            #qr-modal .modal-content {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
         }
     </style>
 </head>
@@ -361,6 +383,18 @@
                     <button class="action-button pay-button" disabled>Zaplatiť</button>
                     <button class="action-button cancel-button" disabled>Zrušiť</button>
                 </div>
+                
+
+                <!-- QR Code Modal -->
+                <div id="qr-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                        <h3>Platobný QR kód</h3>
+                        <img id="qr-code" alt="QR kód pre platbu" style="margin-bottom:15px;">
+                        <br>
+                        <button id="close-modal" style="padding:10px 20px; background:#ea4335; color:white; border:none; border-radius:5px; cursor:pointer;">Zavrieť</button>
+                    </div>
+                </div>
+             
             </div>
         </section>
     </div>
@@ -533,21 +567,24 @@
             $('.pay-button').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
-                const confirmed = confirm(`Naozaj chcete zaplatiť za stôl ${currentTable} Suma: ${tableOrders[currentTable].total.toFixed(2)} €`);
-                if (confirmed) {
-                    // Vymazanie objednávky pre aktuálny stôl
-                    delete tableOrders[currentTable];
-                    saveOrders();
+                const totalAmount = tableOrders[currentTable].total.toFixed(2); // Celková suma
+                const IBAN = "SK5611110000112344567789"; // IBAN na platbu
+                const beneficiaryName = "Moje Meno"; // Meno príjemcu
+                const variableSymbol = currentTable; // Variabilný symbol = číslo stola
             
-                    // Aktualizácia UI
-                    updateOrderDisplay();
-                    $('.table-button').filter(`[data-table="${currentTable}"]`).removeClass('has-order');
-                    alert(`Platba za stôl ${currentTable} bola úspešná.`);
-                    $('.current-order h2').text('Vyberte stôl');
-                    $('.action-buttons button').prop('disabled', true);
-                    currentTable = null;
-                }
+                // Dynamická URL pre generovanie QR kódu
+                const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${totalAmount}&currencyCode=EUR&dueDate=20241231&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
+            
+                // Nastavenie QR kódu a zobrazenie modálu
+                $('#qr-code').attr('src', qrUrl); // Nastaví zdroj obrázka
+                $('#qr-modal').fadeIn(); // Zobrazí modálne okno
             });
+            
+            // Skrytie modálneho okna pri kliknutí na tlačidlo Zavrieť
+            $('#close-modal').click(function () {
+                $('#qr-modal').fadeOut();
+            });
+            
             
             $('.cancel-button').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
