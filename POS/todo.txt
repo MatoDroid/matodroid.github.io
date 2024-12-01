@@ -1,0 +1,5 @@
+nevybavene objednavky z localstorage do actual_orders
+vybavené objednavky do complete_orders.json vratane generovania cisla objednavky (+variabilny symbol do qr)
+admin menu do hlavnej stranky
+heslo na admin menu
+
