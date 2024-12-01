@@ -366,7 +366,8 @@
     </div>
 
     <script>
-        $(document).ready(function () {
+       $(document).ready(function () {
+            const API_URL = "https://menu-backend.onrender.com/data"; // URL backendového servera
             const tableOrders = loadOrders(); 
             let currentTable = null;
         
@@ -380,7 +381,8 @@
             }
         
             function loadMenuData() {
-                $.getJSON('backend/menu-data.json', function (data) {
+                $.getJSON(API_URL, function (data) {
+
                     // Načítanie stolov
                     data.tables.forEach(table => {
                         $('.table-grid').append(
@@ -406,8 +408,9 @@
                         );
                     });
         
-                    // Pridať udalosti na tlačidlá
-                    bindEvents();
+                    bindEvents(); // Pripojenie udalostí
+                }).fail(function () {
+                    alert('Nepodarilo sa načítať údaje zo servera.');
                 });
             }
         
