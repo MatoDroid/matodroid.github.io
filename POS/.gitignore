@@ -1,0 +1,14 @@
+# Ignorovanie menu-data.json
+menu-data.json
+
+# Ignorovanie priečinka logs
+logs/
+
+# Ignorovanie súborov s príponou .log
+*.log
+
+# Ignorovanie priečinka node_modules
+node_modules/
+
+# Ignorovanie priečinka .env (súbory s citlivými údajmi)
+.env
