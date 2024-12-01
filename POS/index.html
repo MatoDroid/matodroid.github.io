@@ -580,10 +580,26 @@
                 $('#qr-modal').fadeIn(); // Zobrazí modálne okno
             });
             
-            // Skrytie modálneho okna pri kliknutí na tlačidlo Zavrieť
             $('#close-modal').click(function () {
+                if (!currentTable || !tableOrders[currentTable]) return;
+            
+                // Odstránenie objednávky zo stola
+                delete tableOrders[currentTable];
+                saveOrders();
+            
+                // Aktualizácia štýlu tlačidla stola
+                $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
+            
+                // Obnovenie stavu zobrazenia
+                updateOrderDisplay();
                 $('#qr-modal').fadeOut();
+            
+                // Reset aktuálneho stola
+                currentTable = null;
+                $('.action-buttons button').prop('disabled', true);
+                $('.current-order h2').text('Vyberte stôl');
             });
+
             
             
             $('.cancel-button').click(function () {
