@@ -73,7 +73,7 @@
             // Funkcia na uloženie objednávok do JSONBin.io
             async function saveOrdersToJSONBin() {
                 try {
-                    // Ak `tableOrders` je prázdny objekt, odošleme prázdne pole
+                    // Ak `tableOrders` je prázdny objekt, odošleme prázdne pole []
                     const dataToSave = Object.keys(tableOrders).length === 0 ? [] : tableOrders;
             
                     const response = await fetch(ORDERS_API_URL, {
@@ -94,6 +94,7 @@
                     console.error("Chyba pri ukladaní objednávok:", error);
                 }
             }
+            
             
             
             
@@ -433,9 +434,6 @@
             $('#close-modal').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
-                // Odstránenie objednávky zo stola
-                delete tableOrders[currentTable];
-                saveOrders();
             
                 // Aktualizácia štýlu tlačidla stola
                 $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
@@ -445,17 +443,16 @@
                 $('#qr-modal').fadeOut();
 
                 
-                // Vymazanie objednávky zo `tableOrders`
+                // Odstránenie objednávky zo `tableOrders`
                 delete tableOrders[currentTable];
-
-                // Aktualizácia JSONBin.io
                 saveOrdersToJSONBin();
 
-                // Reset aktuálneho stola
-                currentTable = null;
+                // Aktualizácia UI
+                updateOrderDisplay();
+                $('.table-button').filter(`[data-table="${currentTable}"]`).removeClass('has-order');
                 $('.action-buttons button').prop('disabled', true);
                 $('.current-order h2').text('Vyberte stôl');
-
+                currentTable = null;
             });
 
             
@@ -463,15 +460,11 @@
             $('.cancel-button').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
-                const confirmed = confirm(`Naozaj chcete zrušiť objednávku pre stôl ${currentTable}? Suma: ${tableOrders[currentTable].total.toFixed(2)} €`);
+                const confirmed = confirm(`Naozaj chcete zrušiť objednávku pre stôl ${currentTable}?`);
                 if (confirmed) {
-                    // Vymazanie objednávky pre aktuálny stôl
-                    delete tableOrders[currentTable];
-                    saveOrders();
-
                     // Vymazanie objednávky zo `tableOrders`
                     delete tableOrders[currentTable];
-
+            
                     // Aktualizácia JSONBin.io
                     saveOrdersToJSONBin();
             
@@ -481,11 +474,10 @@
                     alert(`Objednávka pre stôl ${currentTable} bola zrušená.`);
                     $('.current-order h2').text('Vyberte stôl');
                     $('.action-buttons button').prop('disabled', true);
-
-
                     currentTable = null;
                 }
             });
+            
         
             loadMenuData();
         });
