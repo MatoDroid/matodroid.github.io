@@ -70,36 +70,36 @@
             
             let tableOrders = {};
 
-            // Funkcia na uloženie objednávok do JSONBin.io
-            async function saveOrdersToJSONBin() {
-                try {
-                    // Ak `tableOrders` je prázdny objekt, odošleme prázdne pole []
-                    const dataToSave = Object.keys(tableOrders).length === 0 ? [] : tableOrders;
-            
-                    const response = await fetch(ORDERS_API_URL, {
-                        method: "PUT",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-Master-Key": ORDERS_API_KEY,
-                        },
-                        body: JSON.stringify(dataToSave),
-                    });
-            
-                    if (response.ok) {
-                        console.log("Objednávky boli úspešne uložené na JSONBin.io.");
-                    } else {
-                        console.error("Chyba pri ukladaní objednávok:", response.statusText);
-                    }
-                } catch (error) {
-                    console.error("Chyba pri ukladaní objednávok:", error);
-                }
-            }
-            
-            
-            
+async function saveOrdersToJSONBin() {
+    try {
+        // Skontrolujeme, či nie sú v tableOrders neplatné hodnoty (null, undefined, prázdne objekty)
+        const filteredOrders = Object.fromEntries(
+            Object.entries(tableOrders).filter(([key, value]) => value !== null && value !== undefined && Object.keys(value).length !== 0)
+        );
+
+        const response = await fetch(ORDERS_API_URL, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Master-Key": ORDERS_API_KEY,
+            },
+            body: JSON.stringify(filteredOrders), // Ukladáme len platné dáta
+        });
+
+        if (response.ok) {
+            console.log("Objednávky boli úspešne uložené na JSONBin.io.");
+        } else {
+            console.error("Chyba pri ukladaní objednávok:", response.statusText);
+        }
+    } catch (error) {
+        console.error("Chyba pri ukladaní objednávok:", error);
+    }
+}
             
             
-            // Funkcia na načítanie objednávok z JSONBin.io
+            
+            
+            
 async function loadOrdersFromJSONBin() {
     try {
         const response = await fetch(ORDERS_API_URL, {
@@ -111,8 +111,8 @@ async function loadOrdersFromJSONBin() {
 
         if (response.ok) {
             const data = await response.json();
-            // Ak sú dáta null alebo prázdne, nastavíme na prázdny objekt
-            tableOrders = data.record && data.record !== null ? data.record : {};
+            // Odstránime prázdne objekty a null hodnoty z načítaných dát
+            tableOrders = Array.isArray(data.record) ? data.record.filter(order => order !== null && Object.keys(order).length > 0) : [];
             console.log("Objednávky načítané z JSONBin.io:", tableOrders);
         } else {
             console.error("Chyba pri načítaní objednávok:", response.statusText);
