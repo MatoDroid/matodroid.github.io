@@ -92,39 +92,60 @@
     <button onclick="saveMenuData()">Uložiť zmeny</button>
 
     <script>
-        const API_URL = "https://matodroid.onrender.com"; // URL vášho backendu na Render
+// JSONBin.io detaily
+        const BIN_ID = '674dbe2fe41b4d34e45e665b'; // Vložte váš Bin ID
+        const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO'; // Vložte váš API Key
+        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
         let menuData = {};
-
-        // Načítanie dát z backendu
+    
         async function loadMenuData() {
             try {
-                const response = await fetch(`${API_URL}/data`);
-                menuData = await response.json();
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': API_KEY,
+                    },
+                });
+    
+                if (!response.ok) {
+                    throw new Error(`Chyba pri načítaní dát: ${response.status} ${response.statusText}`);
+                }
+    
+                const data = await response.json();
+                menuData = data.record;
                 renderTables();
                 renderCategories();
                 renderMenuItems();
             } catch (error) {
                 alert('Nepodarilo sa načítať menu data: ' + error.message);
+                console.error(error);
             }
         }
-
-        // Uloženie dát na backend
+    
         async function saveMenuData() {
             try {
-                const response = await fetch(`${API_URL}/data`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY,
+                    },
                     body: JSON.stringify(menuData),
                 });
-                if (response.ok) {
-                    alert('Dáta boli úspešne uložené!');
-                } else {
-                    alert('Chyba pri ukladaní dát.');
+    
+                if (!response.ok) {
+                    throw new Error(`Chyba pri ukladaní dát: ${response.status} ${response.statusText}`);
                 }
+    
+                alert('Dáta boli úspešne uložené!');
             } catch (error) {
                 alert('Nepodarilo sa uložiť dáta: ' + error.message);
+                console.error(error);
             }
         }
+    
+        // Ďalšie funkcie na správu stolov, kategóri
+    
 
         // Správa stolov
         function renderTables() {
