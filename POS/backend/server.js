@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // JSONBin.io detaily
-const BIN_ID = 'your-bin-id'; // Vložte váš Bin ID
-const API_KEY = 'your-api-key'; // Vložte váš API Key
+const BIN_ID = '674dbe2fe41b4d34e45e665b'; // Vložte váš Bin ID
+const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO'; // Vložte váš API Key
 const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
 // Middleware
