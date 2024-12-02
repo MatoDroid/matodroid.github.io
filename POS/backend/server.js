@@ -1,47 +1,52 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// JSONBin.io detaily
+const BIN_ID = 'your-bin-id'; // Vložte váš Bin ID
+const API_KEY = 'your-api-key'; // Vložte váš API Key
+const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// URL na obsluhu dát (bude dostupná pre frontend)
-const API_URL = '/data';
-
-// Cesta k JSON súboru
-const DATA_PATH = path.join(__dirname, 'menu-data.json');
-
-// Endpoint: Načítanie dát z menu-data.json
-app.get(API_URL, (req, res) => {
-    fs.readFile(DATA_PATH, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Chyba pri čítaní dát:', err);
-            return res.status(500).json({ message: 'Chyba pri čítaní dát' });
-        }
-        res.json(JSON.parse(data));
-    });
+// Endpoint: Načítanie dát
+app.get('/data', async (req, res) => {
+    try {
+        const response = await axios.get(API_URL, {
+            headers: { 'X-Master-Key': API_KEY },
+        });
+        res.json(response.data.record); // Posiela dáta späť na frontend
+    } catch (error) {
+        console.error('Chyba pri načítaní dát:', error.message);
+        res.status(500).json({ message: 'Chyba pri načítaní dát' });
+    }
 });
 
-// Endpoint: Aktualizácia dát v menu-data.json
-app.post(API_URL, (req, res) => {
+// Endpoint: Aktualizácia dát
+app.post('/data', async (req, res) => {
     const newData = req.body;
 
-    fs.writeFile(DATA_PATH, JSON.stringify(newData, null, 2), 'utf8', (err) => {
-        if (err) {
-            console.error('Chyba pri ukladaní dát:', err);
-            return res.status(500).json({ message: 'Chyba pri ukladaní dát' });
-        }
+    try {
+        await axios.put(API_URL, newData, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY,
+            },
+        });
         res.json({ message: 'Dáta boli úspešne uložené' });
-    });
+    } catch (error) {
+        console.error('Chyba pri ukladaní dát:', error.message);
+        res.status(500).json({ message: 'Chyba pri ukladaní dát' });
+    }
 });
 
 // Spustenie servera
 app.listen(PORT, () => {
     console.log(`Server beží na porte ${PORT}`);
-    console.log(`Endpoint na načítanie a aktualizáciu dát: http://localhost:${PORT}${API_URL}`);
+    console.log(`Endpoint na načítanie a aktualizáciu dát: http://localhost:${PORT}/data`);
 });
