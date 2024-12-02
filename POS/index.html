@@ -57,6 +57,10 @@
             const ORDERS_BIN_ID = "674e18dcad19ca34f8d45308"; // ID Bin pre objednávky
             const ORDERS_API_URL = `https://api.jsonbin.io/v3/b/${ORDERS_BIN_ID}`;
             const ORDERS_API_KEY = "$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO"; // API kľúč pre objednávky
+            const PAID_ORDERS_BIN_ID = "674e1c50acd3cb34a8b2d411"; // ID JSONBin.io pre zaplatené objednávky
+            const PAID_ORDERS_API_URL = `https://api.jsonbin.io/v3/b/${PAID_ORDERS_BIN_ID}`;
+            const PAID_ORDERS_API_KEY = "$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO"; // API kľúč pre zaplatené objednávky
+
             
             let tableOrders = {};
 
@@ -135,6 +139,27 @@
                     console.error(error);
                 }
             }
+
+            async function savePaidOrderToJSONBin(order) {
+                try {
+                    const response = await fetch(PAID_ORDERS_API_URL, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Master-Key": PAID_ORDERS_API_KEY,
+                        },
+                        body: JSON.stringify(order),
+                    });
+                    if (response.ok) {
+                        console.log("Zaplatená objednávka bola uložená.");
+                    } else {
+                        console.error("Chyba pri ukladaní zaplatenej objednávky:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri ukladaní zaplatenej objednávky:", error);
+                }
+            }
+            
         
             function renderMenuData(data) {
                 // Vyčistiť existujúci obsah pred pridaním nových dát
@@ -319,16 +344,30 @@
             }
             
 
-            $('.pay-button').click(function () {
+            $('.pay-button').click(async function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
                 const totalAmount = tableOrders[currentTable].total.toFixed(2); // Celková suma
                 const IBAN = "SK8975000000000012345671"; // IBAN na platbu
                 const beneficiaryName = "Moje Meno"; // Meno príjemcu
-                const variableSymbol = currentTable; // Variabilný symbol = číslo stola
-            
+                // Generovanie unikátneho čísla objednávky
+                const orderNumber = `${Math.floor(Date.now() / 1000).toString().slice(-10)}`; // Napríklad "691156754834"
+                   // Vytvorenie objektu zaplatenej objednávky
+                const paidOrder = {
+                    orderNumber,
+                    table: currentTable,
+                    items: tableOrders[currentTable].items,
+                    total: tableOrders[currentTable].total,
+                    date: new Date().toISOString() // Aktuálny dátum a čas
+                };
+
+                // Uloženie zaplatenej objednávky do JSONBin.io
+                await savePaidOrderToJSONBin(paidOrder);
+
+
+
                 // Dynamická URL pre generovanie QR kódu
-                const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${totalAmount}&currencyCode=EUR&dueDate=20241231&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
+                const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${totalAmount}&currencyCode=EUR&dueDate=20241231&variableSymbol=${orderNumber}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
             
                 // Nastavenie QR kódu a zobrazenie modálu
                 $('#qr-code').attr('src', qrUrl); // Nastaví zdroj obrázka
@@ -348,6 +387,8 @@
                 // Obnovenie stavu zobrazenia
                 updateOrderDisplay();
                 $('#qr-modal').fadeOut();
+
+                
             
                 // Reset aktuálneho stola
                 currentTable = null;
