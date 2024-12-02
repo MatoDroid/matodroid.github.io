@@ -237,7 +237,10 @@
             
         
             function updateTableStyles() {
+                // Odstráni triedu `has-order` zo všetkých tlačidiel stolov
                 $('.table-button').removeClass('has-order');
+            
+                // Pridá triedu `has-order` len stolom, ktoré majú objednávky
                 Object.keys(tableOrders).forEach((table) => {
                     $(`.table-button[data-table="${table}"]`).addClass('has-order');
                 });
