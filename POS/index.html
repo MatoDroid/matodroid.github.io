@@ -402,24 +402,24 @@
     <script>
         $(document).ready(function () {
             // JSONBin.io detaily
-            const BIN_ID = '674dbe2fe41b4d34e45e665b';
-            const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO';
+            const BIN_ID = '674dbe2fe41b4d34e45e665b'; // Nahraďte svojím ID
+            const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO'; // Nahraďte svojím API kľúčom
             const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-
+        
             const tableOrders = loadOrders();
             let currentTable = null;
-    
+        
             // Uloženie objednávok do LocalStorage
             function saveOrders() {
                 localStorage.setItem('tableOrders', JSON.stringify(tableOrders));
             }
-    
+        
             // Načítanie objednávok z LocalStorage
             function loadOrders() {
                 const savedOrders = localStorage.getItem('tableOrders');
                 return savedOrders ? JSON.parse(savedOrders) : {};
             }
-    
+        
             // Načítanie menu dát z JSONBin.io
             async function loadMenuData() {
                 try {
@@ -429,45 +429,20 @@
                             'X-Master-Key': API_KEY, // Autentifikačná hlavička
                         },
                     });
-    
+        
                     if (!response.ok) {
                         throw new Error(`Chyba pri načítaní dát: ${response.status} ${response.statusText}`);
                     }
-    
+        
                     const data = await response.json();
                     const menuData = data.record; // Dáta sú v objekte `record`
-    
-                    // Spracovanie a vykreslenie dát
                     renderMenuData(menuData);
                 } catch (error) {
                     alert('Nepodarilo sa načítať údaje zo servera.');
                     console.error(error);
                 }
             }
-    
-            // Uloženie upravených menu dát do JSONBin.io
-            async function saveMenuData(menuData) {
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': API_KEY, // Autentifikačná hlavička
-                        },
-                        body: JSON.stringify(menuData),
-                    });
-    
-                    if (!response.ok) {
-                        throw new Error(`Chyba pri ukladaní dát: ${response.status} ${response.statusText}`);
-                    }
-    
-                    alert('Dáta boli úspešne uložené!');
-                } catch (error) {
-                    alert('Nepodarilo sa uložiť údaje na server.');
-                    console.error(error);
-                }
-            }
-    
+        
             // Spracovanie a vykreslenie dát
             function renderMenuData(data) {
                 // Načítanie stolov
@@ -475,16 +450,16 @@
                     $('.table-grid').append(
                         `<button class="table-button" data-table="${table.number}">${table.name}</button>`
                     );
-                    updateTableStyles();
                 });
-    
+                updateTableStyles();
+        
                 // Načítanie kategórií
                 data.categories.forEach(category => {
                     $('.menu-categories').append(
                         `<button class="category-button" data-category="${category.id}">${category.name}</button>`
                     );
                 });
-    
+        
                 // Načítanie položiek menu
                 data.menuItems.forEach(item => {
                     $('.menu-items').append(
@@ -494,12 +469,9 @@
                         </div>`
                     );
                 });
-        
-                    bindEvents(); // Pripojenie udalostí
-                }).fail(function () {
-                    alert('Nepodarilo sa načítať údaje zo servera.');
-                });
             }
+
+        
         
             function bindEvents() {
                 $('.category-button').click(function () {
