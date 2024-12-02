@@ -193,7 +193,14 @@
                 }
             }
             
-        
+            function deleteOrder(tableNumber) {
+                if (tableOrders[tableNumber]) {
+                    delete tableOrders[tableNumber];
+                    saveOrdersToJSONBin(); // Uloženie zmien na JSONBin.io
+                }
+            }
+
+
             function renderMenuData(data) {
                 // Vyčistiť existujúci obsah pred pridaním nových dát
                 $('.table-grid').empty();
@@ -379,6 +386,8 @@
 
             $('.pay-button').click(async function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
+
+
             
                 const totalAmount = tableOrders[currentTable].total.toFixed(2); // Celková suma
                 const IBAN = "SK8975000000000012345671"; // IBAN na platbu
@@ -435,11 +444,14 @@
                 $('#qr-modal').fadeOut();
 
                 
-            
+                // Odstránenie objednávky
+               deleteOrder(currentTable);
+
                 // Reset aktuálneho stola
                 currentTable = null;
                 $('.action-buttons button').prop('disabled', true);
                 $('.current-order h2').text('Vyberte stôl');
+
             });
 
             
@@ -452,6 +464,9 @@
                     // Vymazanie objednávky pre aktuálny stôl
                     delete tableOrders[currentTable];
                     saveOrders();
+
+                    // Odstránenie objednávky
+                    deleteOrder(currentTable);
             
                     // Aktualizácia UI
                     updateOrderDisplay();
@@ -459,6 +474,8 @@
                     alert(`Objednávka pre stôl ${currentTable} bola zrušená.`);
                     $('.current-order h2').text('Vyberte stôl');
                     $('.action-buttons button').prop('disabled', true);
+
+
                     currentTable = null;
                 }
             });
