@@ -54,18 +54,65 @@
             const BIN_ID = '674dbe2fe41b4d34e45e665b'; // JSONBin.io Bin ID
             const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO'; // API kľúč
             const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-        
-            const tableOrders = loadOrders();
-            let currentTable = null;
-        
+            const ORDERS_BIN_ID = "674e18dcad19ca34f8d45308"; // ID Bin pre objednávky
+            const ORDERS_API_URL = `https://api.jsonbin.io/v3/b/${ORDERS_BIN_ID}`;
+            const ORDERS_API_KEY = "$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO"; // API kľúč pre objednávky
+            
+            let tableOrders = {};
+
+            // Funkcia na uloženie objednávok do JSONBin.io
+            async function saveOrdersToJSONBin() {
+                try {
+                    const response = await fetch(ORDERS_API_URL, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Master-Key": ORDERS_API_KEY,
+                        },
+                        body: JSON.stringify(tableOrders),
+                    });
+                    if (response.ok) {
+                        console.log("Objednávky boli uložené na JSONBin.io.");
+                    } else {
+                        console.error("Chyba pri ukladaní objednávok:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri ukladaní objednávok:", error);
+                }
+            }
+            
+            // Funkcia na načítanie objednávok z JSONBin.io
+            async function loadOrdersFromJSONBin() {
+                try {
+                    const response = await fetch(ORDERS_API_URL, {
+                        method: "GET",
+                        headers: {
+                            "X-Master-Key": ORDERS_API_KEY,
+                        },
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        tableOrders = data.record || {};
+                        console.log("Objednávky načítané z JSONBin.io:", tableOrders);
+                    } else {
+                        console.error("Chyba pri načítaní objednávok:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri načítaní objednávok:", error);
+                }
+            }
+            
+            // Volanie funkcie na uloženie objednávky po zmene
             function saveOrders() {
-                localStorage.setItem('tableOrders', JSON.stringify(tableOrders));
+                saveOrdersToJSONBin();
             }
-        
-            function loadOrders() {
-                const savedOrders = localStorage.getItem('tableOrders');
-                return savedOrders ? JSON.parse(savedOrders) : {};
-            }
+            
+            // Volanie funkcie na načítanie objednávok pri načítaní stránky
+            $(document).ready(async function () {
+                await loadOrdersFromJSONBin();
+                loadMenuData(); // Načítanie menu dát
+                updateTableStyles(); // Aktualizácia štýlov stolov
+            });
         
             async function loadMenuData() {
                 try {
@@ -90,6 +137,11 @@
             }
         
             function renderMenuData(data) {
+                // Vyčistiť existujúci obsah pred pridaním nových dát
+                $('.table-grid').empty();
+                $('.menu-categories').empty();
+                $('.menu-items').empty();
+            
                 // Načítanie stolov
                 data.tables.forEach(table => {
                     $('.table-grid').append(
@@ -97,14 +149,14 @@
                     );
                 });
                 updateTableStyles();
-        
+            
                 // Načítanie kategórií
                 data.categories.forEach(category => {
                     $('.menu-categories').append(
                         `<button class="category-button" data-category="${category.id}">${category.name}</button>`
                     );
                 });
-        
+            
                 // Načítanie položiek menu
                 data.menuItems.forEach(item => {
                     $('.menu-items').append(
@@ -115,6 +167,7 @@
                     );
                 });
             }
+            
         
             function updateTableStyles() {
                 $('.table-button').removeClass('has-order');
