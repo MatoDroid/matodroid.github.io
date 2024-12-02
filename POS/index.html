@@ -100,25 +100,27 @@
             
             
             // Funkcia na načítanie objednávok z JSONBin.io
-            async function loadOrdersFromJSONBin() {
-                try {
-                    const response = await fetch(ORDERS_API_URL, {
-                        method: "GET",
-                        headers: {
-                            "X-Master-Key": ORDERS_API_KEY,
-                        },
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        tableOrders = data.record || {};
-                        console.log("Objednávky načítané z JSONBin.io:", tableOrders);
-                    } else {
-                        console.error("Chyba pri načítaní objednávok:", response.statusText);
-                    }
-                } catch (error) {
-                    console.error("Chyba pri načítaní objednávok:", error);
-                }
-            }
+async function loadOrdersFromJSONBin() {
+    try {
+        const response = await fetch(ORDERS_API_URL, {
+            method: "GET",
+            headers: {
+                "X-Master-Key": ORDERS_API_KEY,
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            // Ak sú dáta null alebo prázdne, nastavíme na prázdny objekt
+            tableOrders = data.record && data.record !== null ? data.record : {};
+            console.log("Objednávky načítané z JSONBin.io:", tableOrders);
+        } else {
+            console.error("Chyba pri načítaní objednávok:", response.statusText);
+        }
+    } catch (error) {
+        console.error("Chyba pri načítaní objednávok:", error);
+    }
+}
             
             // Volanie funkcie na uloženie objednávky po zmene
             function saveOrders() {
