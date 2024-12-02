@@ -73,7 +73,7 @@
             // Funkcia na uloženie objednávok do JSONBin.io
             async function saveOrdersToJSONBin() {
                 try {
-                    // Ak je `tableOrders` prázdny objekt, nastavíme ho ako prázdne pole
+                    // Ak `tableOrders` je prázdny objekt, odošleme prázdne pole
                     const dataToSave = Object.keys(tableOrders).length === 0 ? [] : tableOrders;
             
                     const response = await fetch(ORDERS_API_URL, {
@@ -86,7 +86,7 @@
                     });
             
                     if (response.ok) {
-                        console.log("Objednávky boli uložené na JSONBin.io.");
+                        console.log("Objednávky boli úspešne uložené na JSONBin.io.");
                     } else {
                         console.error("Chyba pri ukladaní objednávok:", response.statusText);
                     }
@@ -94,6 +94,7 @@
                     console.error("Chyba pri ukladaní objednávok:", error);
                 }
             }
+            
             
             
             
@@ -444,8 +445,11 @@
                 $('#qr-modal').fadeOut();
 
                 
-                // Odstránenie objednávky
-               deleteOrder(currentTable);
+                // Vymazanie objednávky zo `tableOrders`
+                delete tableOrders[currentTable];
+
+                // Aktualizácia JSONBin.io
+                saveOrdersToJSONBin();
 
                 // Reset aktuálneho stola
                 currentTable = null;
@@ -465,8 +469,11 @@
                     delete tableOrders[currentTable];
                     saveOrders();
 
-                    // Odstránenie objednávky
-                    deleteOrder(currentTable);
+                    // Vymazanie objednávky zo `tableOrders`
+                    delete tableOrders[currentTable];
+
+                    // Aktualizácia JSONBin.io
+                    saveOrdersToJSONBin();
             
                     // Aktualizácia UI
                     updateOrderDisplay();
