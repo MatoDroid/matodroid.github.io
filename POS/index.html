@@ -140,20 +140,41 @@
                 }
             }
 
-            async function savePaidOrderToJSONBin(order) {
+            // Funkcia na pridanie zaplatenej objednávky
+            async function savePaidOrderToJSONBin(newOrder) {
                 try {
+                    // Načítanie existujúcich údajov
                     const response = await fetch(PAID_ORDERS_API_URL, {
+                        method: "GET",
+                        headers: {
+                            "X-Master-Key": PAID_ORDERS_API_KEY,
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Chyba pri načítaní údajov: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    const currentOrders = data.record || []; // Existujúce objednávky
+
+                    // Pridanie novej objednávky
+                    currentOrders.push(newOrder);
+
+                    // Uloženie aktualizovaných údajov späť do JSONBin
+                    const saveResponse = await fetch(PAID_ORDERS_API_URL, {
                         method: "PUT",
                         headers: {
                             "Content-Type": "application/json",
                             "X-Master-Key": PAID_ORDERS_API_KEY,
                         },
-                        body: JSON.stringify(order),
+                        body: JSON.stringify(currentOrders),
                     });
-                    if (response.ok) {
-                        console.log("Zaplatená objednávka bola uložená.");
+
+                    if (saveResponse.ok) {
+                        console.log("Nová objednávka bola úspešne uložená do JSONBin.");
                     } else {
-                        console.error("Chyba pri ukladaní zaplatenej objednávky:", response.statusText);
+                        throw new Error(`Chyba pri ukladaní údajov: ${saveResponse.statusText}`);
                     }
                 } catch (error) {
                     console.error("Chyba pri ukladaní zaplatenej objednávky:", error);
