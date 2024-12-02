@@ -449,6 +449,7 @@
                 // Odstránenie objednávky zo `tableOrders`
                 delete tableOrders[currentTable];
                 saveOrdersToJSONBin();
+                updateTableStyles(); // Aktualizácia tlačidiel stolov
 
                 // Aktualizácia UI
                 updateOrderDisplay();
@@ -470,6 +471,7 @@
             
                     // Aktualizácia JSONBin.io
                     saveOrdersToJSONBin();
+                    updateTableStyles(); // Aktualizácia tlačidiel stolov
             
                     // Aktualizácia UI
                     updateOrderDisplay();
