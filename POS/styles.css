@@ -1,0 +1,347 @@
+body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+    height: auto;
+    overflow: visible;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px;
+    height: auto;
+    overflow: visible; /* Odstráni posuvník */
+}
+
+.header {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.header h1 {
+    color: #333;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.tables-section {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.tables-section h2 {
+    margin-bottom: 10px;
+}
+
+.table-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.table-button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #e8f0fe;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+}
+
+.table-button:hover {
+    background-color: #d0e1fd;
+}
+
+.table-button.active {
+    background-color: #1a73e8;
+    color: white;
+}
+
+.table-button.has-order {
+    background-color: #fad2d2;
+}
+
+.table-button.has-order.active {
+    background-color: #e84a4a;
+    color: white;
+}
+
+.order-section {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: auto;
+    overflow: visible;
+}
+
+.menu-categories {
+    display: flex;
+    justify-content: center; /* Zarovná tlačidlá na stred */
+    gap: 8px; /* Medzery medzi tlačidlami */
+    margin-bottom: 15px;
+    flex-wrap: wrap; /* Zalomí tlačidlá na ďalší riadok, ak je málo miesta */
+}
+
+.category-button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    background-color: #e8f0fe;
+    cursor: pointer;
+    white-space: nowrap; /* Zabraňuje lámaniu textu */
+    transition: all 0.3s;
+    font-size: 0.9rem;
+    flex: 0; /* Zabraňuje tlačidlám meniť veľkosť */
+}
+
+
+
+.category-button:hover {
+    background-color: #d0e1fd;
+}
+
+.category-button.active {
+    background-color: #1a73e8;
+    color: white;
+}
+
+.menu-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.menu-item {
+    padding: 12px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: none;
+}
+
+.menu-item.active-category {
+    display: block;
+}
+
+.menu-item:hover {
+    background-color: #e8f0fe;
+    transform: translateY(-2px);
+}
+
+.menu-item h3 {
+    margin-bottom: 5px;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.menu-item p {
+    color: #666;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.current-order {
+    display: flex;
+    flex-direction: column; /* Zarovnáva položky vertikálne */
+    gap: 16px; /* Priestor medzi riadkami */
+    width: 100%; /* Zaberie celú šírku rodičovského prvku */
+    height: auto; /* Automatická výška podľa obsahu */
+    overflow: visible; /* Zabezpečí, že sa nevytvorí posuvník */
+}
+
+
+.current-order h2 {
+    font-size: 1.1rem;
+}
+
+.order-items {
+    margin: 15px 0;
+    overflow-y: auto;
+}
+
+.order-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 0.9rem;
+}
+
+.item-quantity {
+    font-weight: bold;
+    color: #1a73e8;
+    min-width: 35px;
+}
+
+.item-total {
+    min-width: 60px; /* Minimálna šírka pre zarovnanie čísel */
+    text-align: right; /* Zarovná sumy doprava */
+}
+
+button {
+    flex-shrink: 0; /* Tlačidlá sa nezmenšujú, vždy majú rovnakú veľkosť */
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center; /* Vertikálne zarovná obsah */
+    justify-content: space-between; /* Rozloží obsah rovnomerne */
+    width: 100%; /* Zabezpečí rovnakú šírku všetkých riadkov */
+    gap: 8px; /* Zvýši medzeru medzi tlačidlami a sumou */
+}
+
+button {
+    flex-shrink: 0; /* Tlačidlá si zachovajú veľkosť */
+    padding: 8px 12px; /* Zvýrazní tlačidlá */
+}
+
+.quantity-btn {
+    background: #e8e8e8;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.quantity-btn:hover {
+    background: #d8d8d8;
+}
+
+.total-section {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px solid #eee;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.action-button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+    font-size: 0.9rem;
+}
+
+.action-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pay-button {
+    background-color: #34a853;
+    color: white;
+}
+
+.pay-button:hover:not(:disabled) {
+    background-color: #2d9147;
+}
+
+.cancel-button {
+    background-color: #ea4335;
+    color: white;
+}
+
+.cancel-button:hover:not(:disabled) {
+    background-color: #d33426;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 5px;
+    }
+
+    .header {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .header h1 {
+        font-size: 1.2rem;
+    }
+
+    .tables-section, .order-section {
+        padding: 10px;
+    }
+
+    .table-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .menu-items {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+
+    .category-button {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    .menu-item h3 {
+        font-size: 0.9rem;
+    }
+
+    .menu-item p {
+        font-size: 0.85rem;
+    }
+
+    .order-item {
+        font-size: 0.85rem;
+        gap: 5px;
+    }
+
+    .action-buttons {
+        grid-template-columns: 1fr;
+    }
+    #qr-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+    
+    #qr-modal .modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+}
+
