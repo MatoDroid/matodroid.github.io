@@ -73,14 +73,18 @@
             // Funkcia na uloženie objednávok do JSONBin.io
             async function saveOrdersToJSONBin() {
                 try {
+                    // Ak je `tableOrders` prázdny objekt, nastavíme ho ako prázdne pole
+                    const dataToSave = Object.keys(tableOrders).length === 0 ? [] : tableOrders;
+            
                     const response = await fetch(ORDERS_API_URL, {
                         method: "PUT",
                         headers: {
                             "Content-Type": "application/json",
                             "X-Master-Key": ORDERS_API_KEY,
                         },
-                        body: JSON.stringify(tableOrders),
+                        body: JSON.stringify(dataToSave),
                     });
+            
                     if (response.ok) {
                         console.log("Objednávky boli uložené na JSONBin.io.");
                     } else {
@@ -90,6 +94,7 @@
                     console.error("Chyba pri ukladaní objednávok:", error);
                 }
             }
+            
             
             // Funkcia na načítanie objednávok z JSONBin.io
             async function loadOrdersFromJSONBin() {
