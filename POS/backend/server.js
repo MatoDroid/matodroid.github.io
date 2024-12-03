@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 const MENU_BIN_ID = process.env.JSONBIN_MENU_BIN_ID;
 const ORDERS_BIN_ID = process.env.JSONBIN_ORDERS_BIN_ID;
+const PAIDORDERS_BIN_ID = process.env.JSONBIN_PAIDORDERS_BIN_ID;
 const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
 
 // Middleware
