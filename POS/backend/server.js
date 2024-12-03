@@ -4,6 +4,8 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 dotenv.config();
 
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -12,6 +14,11 @@ const API_KEY = process.env.JSONBIN_API_KEY;
 const MENU_BIN_ID = process.env.JSONBIN_MENU_BIN_ID;
 const ORDERS_BIN_ID = process.env.JSONBIN_ORDERS_BIN_ID;
 const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
+
+if (!JSONBIN_API_KEY || !MENU_BIN_ID || !ORDERS_BIN_ID || !PAID_ORDERS_BIN_ID) {
+    console.error("Environment variables are not properly configured.");
+    process.exit(1); // Ukončí server, ak chýbajú potrebné premenné
+}
 
 // Middleware
 app.use(cors());
