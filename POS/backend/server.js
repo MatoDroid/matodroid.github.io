@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // API kľúče a JSONBin konfiguračné údaje
-const JSONBIN_API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO';
+const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 const ORDERS_BIN_ID = '674e18dcad19ca34f8d45308';
 const MENU_BIN_ID = '674dbe2fe41b4d34e45e665b';
 const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
