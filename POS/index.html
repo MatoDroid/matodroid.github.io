@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -33,11 +34,18 @@
                     <button class="action-button pay-button" disabled>Zaplatiť</button>
                     <button class="action-button cancel-button" disabled>Zrušiť</button>
                 </div>
+
+                <!-- loading  menu-data please wait -->
+                <div id="loading-data-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                        <h3>Načítavanie, čakajte prosím...</h3>
+                    </div>
+                </div>
                 
                  <!-- loading please wait -->
                 <div id="loading-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
-                        <h3>Účet sa pripravuje, počkajte prosím...</h3>
+                        <h3>Účet sa pripravuje, čakajte prosím...</h3>
                     </div>
                 </div>
 
@@ -67,60 +75,50 @@
             const PAID_ORDERS_API_URL = `https://api.jsonbin.io/v3/b/${PAID_ORDERS_BIN_ID}`;
             const PAID_ORDERS_API_KEY = "$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO"; // API kľúč pre zaplatené objednávky
 
-            
+            $('#loading-data-modal').fadeIn();
             let tableOrders = {};
 
-async function saveOrdersToJSONBin() {
-    try {
-        // Skontrolujeme, či nie sú v tableOrders neplatné hodnoty (null, undefined, prázdne objekty)
-        const filteredOrders = Object.fromEntries(
-            Object.entries(tableOrders).filter(([key, value]) => value !== null && value !== undefined && Object.keys(value).length !== 0)
-        );
-
-        const response = await fetch(ORDERS_API_URL, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Master-Key": ORDERS_API_KEY,
-            },
-            body: JSON.stringify(filteredOrders), // Ukladáme len platné dáta
-        });
-
-        if (response.ok) {
-            console.log("Objednávky boli úspešne uložené na JSONBin.io.");
-        } else {
-            console.error("Chyba pri ukladaní objednávok:", response.statusText);
-        }
-    } catch (error) {
-        console.error("Chyba pri ukladaní objednávok:", error);
-    }
-}
+            // Funkcia na uloženie objednávok do JSONBin.io
+            async function saveOrdersToJSONBin() {
+                try {
+                    const response = await fetch(ORDERS_API_URL, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Master-Key": ORDERS_API_KEY,
+                        },
+                        body: JSON.stringify(tableOrders),
+                    });
+                    if (response.ok) {
+                        console.log("Objednávky boli uložené na JSONBin.io.");
+                    } else {
+                        console.error("Chyba pri ukladaní objednávok:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri ukladaní objednávok:", error);
+                }
+            }
             
-            
-            
-            
-            
-async function loadOrdersFromJSONBin() {
-    try {
-        const response = await fetch(ORDERS_API_URL, {
-            method: "GET",
-            headers: {
-                "X-Master-Key": ORDERS_API_KEY,
-            },
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            // Odstránime prázdne objekty a null hodnoty z načítaných dát
-            tableOrders = Array.isArray(data.record) ? data.record.filter(order => order !== null && Object.keys(order).length > 0) : [];
-            console.log("Objednávky načítané z JSONBin.io:", tableOrders);
-        } else {
-            console.error("Chyba pri načítaní objednávok:", response.statusText);
-        }
-    } catch (error) {
-        console.error("Chyba pri načítaní objednávok:", error);
-    }
-}
+            // Funkcia na načítanie objednávok z JSONBin.io
+            async function loadOrdersFromJSONBin() {
+                try {
+                    const response = await fetch(ORDERS_API_URL, {
+                        method: "GET",
+                        headers: {
+                            "X-Master-Key": ORDERS_API_KEY,
+                        },
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        tableOrders = data.record || {};
+                        console.log("Objednávky načítané z JSONBin.io:", tableOrders);
+                    } else {
+                        console.error("Chyba pri načítaní objednávok:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri načítaní objednávok:", error);
+                }
+            }
             
             // Volanie funkcie na uloženie objednávky po zmene
             function saveOrders() {
@@ -197,14 +195,7 @@ async function loadOrdersFromJSONBin() {
                 }
             }
             
-            function deleteOrder(tableNumber) {
-                if (tableOrders[tableNumber]) {
-                    delete tableOrders[tableNumber];
-                    saveOrdersToJSONBin(); // Uloženie zmien na JSONBin.io
-                }
-            }
-
-
+        
             function renderMenuData(data) {
                 // Vyčistiť existujúci obsah pred pridaním nových dát
                 $('.table-grid').empty();
@@ -234,19 +225,22 @@ async function loadOrdersFromJSONBin() {
                             <p>${item.price.toFixed(2)} €</p>
                         </div>`
                     );
+                    $('#loading-data-modal').fadeOut();
                 });
             }
-            
+
+
         
             function updateTableStyles() {
-                // Odstráni triedu `has-order` zo všetkých tlačidiel stolov
                 $('.table-button').removeClass('has-order');
-            
-                // Pridá triedu `has-order` len stolom, ktoré majú objednávky
                 Object.keys(tableOrders).forEach((table) => {
                     $(`.table-button[data-table="${table}"]`).addClass('has-order');
+                    
+
                 });
             }
+
+            
         
             function updateOrderDisplay() {
                 const orderItems = $('.order-items');
@@ -393,8 +387,6 @@ async function loadOrdersFromJSONBin() {
 
             $('.pay-button').click(async function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
-
-
             
                 const totalAmount = tableOrders[currentTable].total.toFixed(2); // Celková suma
                 const IBAN = "SK8975000000000012345671"; // IBAN na platbu
@@ -439,6 +431,9 @@ async function loadOrdersFromJSONBin() {
             $('#close-modal').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
+                // Odstránenie objednávky zo stola
+                delete tableOrders[currentTable];
+                saveOrders();
             
                 // Aktualizácia štýlu tlačidla stola
                 $(`.table-button[data-table="${currentTable}"]`).removeClass('has-order');
@@ -448,17 +443,11 @@ async function loadOrdersFromJSONBin() {
                 $('#qr-modal').fadeOut();
 
                 
-                // Odstránenie objednávky zo `tableOrders`
-                delete tableOrders[currentTable];
-                saveOrdersToJSONBin();
-                updateTableStyles(); // Aktualizácia tlačidiel stolov
-
-                // Aktualizácia UI
-                updateOrderDisplay();
-                $('.table-button').filter(`[data-table="${currentTable}"]`).removeClass('has-order');
+            
+                // Reset aktuálneho stola
+                currentTable = null;
                 $('.action-buttons button').prop('disabled', true);
                 $('.current-order h2').text('Vyberte stôl');
-                currentTable = null;
             });
 
             
@@ -466,14 +455,11 @@ async function loadOrdersFromJSONBin() {
             $('.cancel-button').click(function () {
                 if (!currentTable || !tableOrders[currentTable]) return;
             
-                const confirmed = confirm(`Naozaj chcete zrušiť objednávku pre stôl ${currentTable}?`);
+                const confirmed = confirm(`Naozaj chcete zrušiť objednávku pre stôl ${currentTable}? Suma: ${tableOrders[currentTable].total.toFixed(2)} €`);
                 if (confirmed) {
-                    // Vymazanie objednávky zo `tableOrders`
+                    // Vymazanie objednávky pre aktuálny stôl
                     delete tableOrders[currentTable];
-            
-                    // Aktualizácia JSONBin.io
-                    saveOrdersToJSONBin();
-                    updateTableStyles(); // Aktualizácia tlačidiel stolov
+                    saveOrders();
             
                     // Aktualizácia UI
                     updateOrderDisplay();
@@ -484,7 +470,6 @@ async function loadOrdersFromJSONBin() {
                     currentTable = null;
                 }
             });
-            
         
             loadMenuData();
         });
