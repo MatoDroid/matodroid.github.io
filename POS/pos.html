@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant POS System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Restaurant POS System</h1>
+        </header>
+
+        <section class="tables-section">
+            <h2>Stoly</h2>
+            <div class="table-grid"></div>
+        </section>
+
+        <section class="order-section">
+            <div class="menu-categories"></div>
+            <div class="menu-items"></div>
+            <div class="current-order">
+                <h2>Vyberte stôl</h2>
+                <div class="order-items"></div>
+                <div class="total-section">
+                    <span>Spolu:</span>
+                    <span>0.00 €</span>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-button pay-button" disabled>Zaplatiť</button>
+                    <button class="action-button cancel-button" disabled>Zrušiť</button>
+                </div>
+                <div id="qr-modal" style="display:none;">
+                    <h3>Platobný QR kód</h3>
+                    <img id="qr-code" alt="QR kód pre platbu">
+                    <button id="close-modal">Zavrieť</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
