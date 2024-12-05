@@ -71,6 +71,27 @@ app.post('/orders', async (req, res) => {
     }
 });
 
+// Zaplatené objednávky
+app.post('/orders/paid', async (req, res) => {
+    try {
+        const paidOrders = req.body; // Dáta od klienta
+        const response = await fetch(`${JSONBIN_URL}/${PAIDORDERS_BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': JSONBIN_API_KEY,
+            },
+            body: JSON.stringify(paidOrders),
+        });
+
+        res.json(await response.json());
+    } catch (error) {
+        console.error('Chyba pri ukladaní zaplatených objednávok:', error);
+        res.status(500).json({ error: 'Chyba pri ukladaní zaplatených objednávok' });
+    }
+});
+
+
 // Endpoint: Generovanie QR kódu
 app.get('/generate-qr', async (req, res) => {
     const { amount, table } = req.query;
