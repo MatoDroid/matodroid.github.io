@@ -32,11 +32,31 @@
                     <button class="action-button pay-button" disabled>Zaplatiť</button>
                     <button class="action-button cancel-button" disabled>Zrušiť</button>
                 </div>
-                <div id="qr-modal" style="display:none;">
-                    <h3>Platobný QR kód</h3>
-                    <img id="qr-code" alt="QR kód pre platbu">
-                    <button id="close-modal">Zavrieť</button>
+
+                <!-- loading  menu-data please wait -->
+                <div id="loading-data-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                        <h3>Načítavanie, čakajte prosím...</h3>
+                    </div>
                 </div>
+                
+                 <!-- loading please wait -->
+                <div id="loading-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                        <h3>Účet sa pripravuje, čakajte prosím...</h3>
+                    </div>
+                </div>
+
+                <!-- QR Code Modal -->
+                <div id="qr-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                        <h3>Platobný QR kód</h3>
+                        <img id="qr-code" alt="QR kód pre platbu" style="margin-bottom:15px;">
+                        <br>
+                        <button id="close-modal" style="padding:10px 20px; background:#ea4335; color:white; border:none; border-radius:5px; cursor:pointer;">Zavrieť</button>
+                    </div>
+                </div>
+             
             </div>
         </section>
     </div>
