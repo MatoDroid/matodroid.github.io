@@ -102,7 +102,15 @@ app.get('/generate-qr', async (req, res) => {
 
     const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
 
-    res.redirect(qrUrl);
+    try {
+        // Vytvoriť URL pre generovanie QR kódu
+    const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
+
+        res.redirect(qrUrl); // Presmerovanie na URL s QR kódom
+    } catch (error) {
+        console.error('Chyba pri generovaní QR kódu:', error);
+        res.status(500).json({ error: 'Chyba pri generovaní QR kódu' });
+    }
 });
 
 // Spustenie servera
