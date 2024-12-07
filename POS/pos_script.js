@@ -41,6 +41,8 @@ $(document).ready(function () {
             );
         });
 
+        updateTableStyles(); // 
+        
         // Pridanie kategórií
         data.categories.forEach((category) => {
             $(".menu-categories").append(
