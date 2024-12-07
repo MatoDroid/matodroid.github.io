@@ -107,6 +107,14 @@ $(document).ready(function () {
         updateOrderDisplay();
     });
 
+    function updateTableStyles() {
+        $(".table-button").removeClass("has-order");
+        Object.keys(tableOrders).forEach((table) => {
+            $(`.table-button[data-table="${table}"]`).addClass("has-order");
+        });
+    }
+    
+
     // Zobrazenie objednávok vrátane tlačidiel + a -
     function updateOrderDisplay() {
         const orderItems = $(".order-items");
@@ -169,25 +177,81 @@ $(document).ready(function () {
             updateOrderDisplay();
     }
 
-    async function saveOrdersToBackend() {
-        try {
-            const response = await fetch('https://matodroid.onrender.com/orders', {
-                method: 'POST', // Zmeňte na POST
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(tableOrders),
-            });
-    
-            if (!response.ok) {
-                throw new Error(`Chyba pri ukladaní objednávok: ${response.statusText}`);
+
+
+
+
+        //Upravený kód z povodneho scriptu
+        let saveTimeout = null; // Timeout identifikátor pre oneskorené ukladanie
+
+        // Funkcia na uloženie objednávok na backend
+        async function saveOrdersToBackend() {
+            if (saveTimeout) {
+                clearTimeout(saveTimeout); // Vyčistenie predchádzajúceho timeoutu
             }
-    
-            console.log('Objednávky úspešne uložené na backend.');
-        } catch (error) {
-            console.error('Chyba pri ukladaní objednávok na backend:', error);
+        
+            saveTimeout = setTimeout(async () => {
+                try {
+                    const cleanedOrders = Object.fromEntries(
+                        Object.entries(tableOrders).filter(([key, value]) => value && Object.keys(value.items || {}).length > 0)
+                    );
+        
+                    const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
+        
+                    console.log("Odosielané údaje na backend:", JSON.stringify(dataToSave));
+        
+                    const response = await fetch("https://matodroid.onrender.com/orders", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(dataToSave),
+                    });
+        
+                    if (response.ok) {
+                        console.log("Objednávky úspešne uložené na backend.");
+                    } else {
+                        console.error("Chyba pri ukladaní objednávok na backend:", response.statusText);
+                    }
+                } catch (error) {
+                    console.error("Chyba pri ukladaní objednávok na backend:", error);
+                }
+            }, 2500); // Oneskorenie 2500 ms = 2.5 sekundy
         }
-    }
+        
+        // Volanie funkcie na uloženie objednávky po zmene
+        function saveOrders() {
+            saveOrdersToBackend();
+        }
+        
+        // Funkcia na načítanie objednávok z backendu
+        async function loadOrdersFromBackend() {
+            try {
+                const response = await fetch("https://matodroid.onrender.com/orders", {
+                    method: "GET",
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    tableOrders = data || {};
+                    console.log("Objednávky načítané z backendu:", tableOrders);
+                } else {
+                    console.error("Chyba pri načítaní objednávok z backendu:", response.statusText);
+                }
+            } catch (error) {
+                console.error("Chyba pri načítaní objednávok z backendu:", error);
+            }
+        }
+        
+        // Volanie funkcie na načítanie objednávok pri načítaní stránky
+        $(document).ready(async function () {
+            await loadOrdersFromBackend();
+            loadMenuData(); // Načítanie menu dát
+            updateTableStyles(); // Aktualizácia štýlov stolov
+        });
+        
+
+        
+        
     
     
 
