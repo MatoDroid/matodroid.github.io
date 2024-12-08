@@ -4,8 +4,6 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 dotenv.config();
 
-
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -40,8 +38,13 @@ app.get('/orders', async (req, res) => {
         const response = await fetch(`${JSONBIN_URL}/${ORDERS_BIN_ID}`, {
             headers: { 'X-Master-Key': JSONBIN_API_KEY },
         });
+
+        if (!response.ok) {
+            throw new Error('Chyba pri načítaní objednávok');
+        }
+
         const data = await response.json();
-        res.json(data.record || {});
+        res.json(data.record || {}); // Vráti prázdny objekt, ak sú údaje prázdne
     } catch (error) {
         console.error('Chyba pri načítaní objednávok:', error);
         res.status(500).json({ error: 'Chyba pri načítaní objednávok' });
@@ -51,9 +54,17 @@ app.get('/orders', async (req, res) => {
 // Endpoint: Ukladanie objednávok
 app.post('/orders', async (req, res) => {
     try {
-        const cleanedOrders = Object.fromEntries(
-            Object.entries(req.body).filter(([_, value]) => value && Object.keys(value.items || {}).length > 0)
-        );
+        let dataToSave = req.body;
+
+        // Spracovanie prázdnych objednávok
+        if (dataToSave.empty) {
+            dataToSave = {}; // Ak `empty: true`, uloží sa prázdny objekt
+        } else {
+            // Filtrovanie neplatných položiek
+            dataToSave = Object.fromEntries(
+                Object.entries(dataToSave).filter(([_, value]) => value && Object.keys(value.items || {}).length > 0)
+            );
+        }
 
         const response = await fetch(`${JSONBIN_URL}/${ORDERS_BIN_ID}`, {
             method: 'PUT',
@@ -61,8 +72,12 @@ app.post('/orders', async (req, res) => {
                 'Content-Type': 'application/json',
                 'X-Master-Key': JSONBIN_API_KEY,
             },
-            body: JSON.stringify(cleanedOrders),
+            body: JSON.stringify(dataToSave),
         });
+
+        if (!response.ok) {
+            throw new Error('Chyba pri ukladaní objednávok');
+        }
 
         res.json(await response.json());
     } catch (error) {
@@ -84,13 +99,16 @@ app.post('/orders/paid', async (req, res) => {
             body: JSON.stringify(paidOrders),
         });
 
+        if (!response.ok) {
+            throw new Error('Chyba pri ukladaní zaplatených objednávok');
+        }
+
         res.json(await response.json());
     } catch (error) {
         console.error('Chyba pri ukladaní zaplatených objednávok:', error);
         res.status(500).json({ error: 'Chyba pri ukladaní zaplatených objednávok' });
     }
 });
-
 
 // Endpoint: Generovanie QR kódu
 app.get('/generate-qr', async (req, res) => {
@@ -100,11 +118,8 @@ app.get('/generate-qr', async (req, res) => {
     const dueDate = '20241231';
     const variableSymbol = table;
 
-    const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
-
     try {
-        // Vytvoriť URL pre generovanie QR kódu
-    const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
+        const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
 
         res.redirect(qrUrl); // Presmerovanie na URL s QR kódom
     } catch (error) {
