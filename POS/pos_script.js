@@ -176,7 +176,7 @@ $(document).ready(function () {
             $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
         }
             
-
+            saveOrders();
             updateOrderDisplay();
     }
 
