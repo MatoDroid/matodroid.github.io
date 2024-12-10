@@ -106,7 +106,7 @@ $(document).ready(function () {
         }
 
         $(`.table-button[data-table="${currentTable}"]`).addClass("has-order");
-        saveOrders();
+        saveOrders(); // Uloženie stavu na backend
         updateOrderDisplay();
     });
 
@@ -176,52 +176,57 @@ $(document).ready(function () {
             $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
         }
             
-            saveOrders();
-            updateOrderDisplay();
+        saveOrders(); // Uloženie stavu na backend
+        updateOrderDisplay();
+
     }
 
 
 
 
 
-        //Upravený kód z povodneho scriptu
-        let saveTimeout = null; // Timeout identifikátor pre oneskorené ukladanie
+    let saveTimeout = null; // Timeout identifikátor pre oneskorené uloženie
 
-        // Funkcia na uloženie objednávok na backend
-         async function saveOrdersToBackend() {
-            if (saveTimeout) {
-                clearTimeout(saveTimeout); // Vyčistenie predchádzajúceho timeoutu
-            }
-        
-            saveTimeout = setTimeout(async () => {
-                try {
-                    const cleanedOrders = Object.fromEntries(
-                        Object.entries(tableOrders).filter(([_, value]) => value && Object.keys(value.items || {}).length > 0)
-                    );
-        
-                    const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
-        
-                    console.log("Odosielané údaje na backend:", JSON.stringify(dataToSave));
-        
-                    const response = await fetch("https://matodroid.onrender.com/orders", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(dataToSave),
-                    });
-        
-                    if (response.ok) {
-                        console.log("Objednávky úspešne uložené na backend.");
-                    } else {
-                        console.error("Chyba pri ukladaní objednávok na backend:", response.statusText);
-                    }
-                } catch (error) {
-                    console.error("Chyba pri ukladaní objednávok na backend:", error);
-                }
-            }, 2500); // Oneskorenie 2500 ms = 2.5 sekundy
+    async function saveOrdersToBackend() {
+        // Vyčistenie predchádzajúceho timeoutu
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
         }
-
+    
+        // Nastavenie nového timeoutu
+        saveTimeout = setTimeout(async () => {
+            try {
+                // Filtrovanie prázdnych objednávok
+                const cleanedOrders = Object.fromEntries(
+                    Object.entries(tableOrders).filter(([key, value]) => value && Object.keys(value.items || {}).length > 0)
+                );
+    
+                // Ak nie sú objednávky, odoslať minimálny validný objekt
+                const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
+    
+                console.log("Odosielané údaje na backend:", JSON.stringify(dataToSave)); // Na debugovanie
+    
+                const response = await fetch(`${BACKEND_URL}/orders`, {
+                    method: "POST", // Používame POST pre ukladanie
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(dataToSave),
+                });
+    
+                if (response.ok) {
+                    console.log("Objednávky úspešne uložené na backend.");
+                } else {
+                    const errorText = await response.text();
+                    console.error("Chyba pri ukladaní objednávok na backend:", response.statusText, errorText);
+                }
+            } catch (error) {
+                console.error("Chyba pri ukladaní objednávok na backend:", error);
+            }
+        }, 2500); // Oneskorenie 2500 ms = 2.5 sek
+    }
+    
+        
         
         // Volanie funkcie na uloženie objednávky po zmene
         function saveOrders() {
