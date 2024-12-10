@@ -53,9 +53,9 @@ app.post('/orders', async (req, res) => {
     try {
         let dataToSave = req.body;
 
-        // Spracovanie prázdnych objednávok
+        // Ak je `empty`, ulož prázdny objekt
         if (dataToSave.empty) {
-            dataToSave = { empty: true }; // Ak `empty: true`, uloží sa prázdny objekt
+            dataToSave = { empty: true }; // Prázdny objekt
         } else {
             // Filtrovanie neplatných položiek
             dataToSave = Object.fromEntries(
@@ -69,8 +69,14 @@ app.post('/orders', async (req, res) => {
                 'Content-Type': 'application/json',
                 'X-Master-Key': JSONBIN_API_KEY,
             },
-            body: JSON.stringify(cleanedOrders),
+            body: JSON.stringify(dataToSave),
         });
+
+        if (!response.ok) {
+            const errorDetails = await response.text();
+            console.error('Chyba pri ukladaní objednávok na JSONBin:', errorDetails);
+            return res.status(500).json({ error: 'Chyba pri ukladaní objednávok na JSONBin', details: errorDetails });
+        }
 
         res.json(await response.json());
     } catch (error) {
@@ -78,6 +84,7 @@ app.post('/orders', async (req, res) => {
         res.status(500).json({ error: 'Chyba pri ukladaní objednávok' });
     }
 });
+
 
 // Zaplatené objednávky
 app.post('/orders/paid', async (req, res) => {
