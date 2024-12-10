@@ -106,6 +106,7 @@ $(document).ready(function () {
         }
 
         $(`.table-button[data-table="${currentTable}"]`).addClass("has-order");
+        saveOrders();
         updateOrderDisplay();
     });
 
