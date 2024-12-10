@@ -56,9 +56,9 @@ app.post('/orders', async (req, res) => {
     try {
         let dataToSave = req.body;
 
-        // Spracovanie prázdnych objednávok
-        if (dataToSave.empty) {
-            dataToSave = {}; // Ak `empty: true`, uloží sa prázdny objekt
+        // Ak je prázdny objekt alebo obsahuje `empty: true`, nastavíme ho na {}
+        if (!dataToSave || dataToSave.empty || Object.keys(dataToSave).length === 0) {
+            dataToSave = {}; // Vyčistenie objednávok
         } else {
             // Filtrovanie neplatných položiek
             dataToSave = Object.fromEntries(
@@ -85,6 +85,7 @@ app.post('/orders', async (req, res) => {
         res.status(500).json({ error: 'Chyba pri ukladaní objednávok' });
     }
 });
+
 
 // Zaplatené objednávky
 app.post('/orders/paid', async (req, res) => {
