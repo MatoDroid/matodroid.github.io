@@ -54,13 +54,11 @@ app.get('/orders', async (req, res) => {
 // Endpoint: Ukladanie objednávok
 app.post('/orders', async (req, res) => {
     try {
-        console.log("Prijaté dáta od klienta:", req.body);
-
         let dataToSave = req.body;
 
         // Spracovanie prázdnych objednávok
         if (dataToSave.empty) {
-            dataToSave = {}; // Ak `empty: true`, uloží sa prázdny objekt
+            dataToSave = { empty: true }; // Minimálny platný objekt
         } else {
             // Filtrovanie neplatných položiek
             dataToSave = Object.fromEntries(
@@ -68,6 +66,7 @@ app.post('/orders', async (req, res) => {
             );
         }
 
+        console.log("Prijaté dáta od klienta:", req.body);
         console.log("Dáta na uloženie do JSONBin:", dataToSave);
 
         const response = await fetch(`${JSONBIN_URL}/${ORDERS_BIN_ID}`, {
@@ -78,6 +77,19 @@ app.post('/orders', async (req, res) => {
             },
             body: JSON.stringify(dataToSave),
         });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Chyba pri volaní JSONBin API: ${response.status} ${errorText}`);
+        }
+
+        res.json(await response.json());
+    } catch (error) {
+        console.error('Chyba pri ukladaní objednávok:', error);
+        res.status(500).json({ error: 'Chyba pri ukladaní objednávok' });
+    }
+});
+
 
         if (!response.ok) {
             const errorDetails = await response.text();
