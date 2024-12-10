@@ -187,7 +187,7 @@ $(document).ready(function () {
         let saveTimeout = null; // Timeout identifikátor pre oneskorené ukladanie
 
         // Funkcia na uloženie objednávok na backend
-        async function saveOrdersToBackend() {
+         async function saveOrdersToBackend() {
             if (saveTimeout) {
                 clearTimeout(saveTimeout); // Vyčistenie predchádzajúceho timeoutu
             }
@@ -195,7 +195,7 @@ $(document).ready(function () {
             saveTimeout = setTimeout(async () => {
                 try {
                     const cleanedOrders = Object.fromEntries(
-                        Object.entries(tableOrders).filter(([key, value]) => value && Object.keys(value.items || {}).length > 0)
+                        Object.entries(tableOrders).filter(([_, value]) => value && Object.keys(value.items || {}).length > 0)
                     );
         
                     const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
@@ -220,6 +220,7 @@ $(document).ready(function () {
                 }
             }, 2500); // Oneskorenie 2500 ms = 2.5 sekundy
         }
+
         
         // Volanie funkcie na uloženie objednávky po zmene
         function saveOrders() {
