@@ -34,6 +34,38 @@ app.get('/menu', async (req, res) => {
     }
 });
 
+// Endpoint: Ukladanie menu
+app.post('/menu', async (req, res) => {
+    try {
+        const updatedMenu = req.body; // Dáta od klienta (nové menu)
+
+        // Validácia dát
+        if (!updatedMenu || typeof updatedMenu !== 'object') {
+            return res.status(400).json({ error: 'Nesprávny formát dát' });
+        }
+
+        const response = await fetch(`${JSONBIN_URL}/${MENU_BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': JSONBIN_API_KEY,
+            },
+            body: JSON.stringify(updatedMenu),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await response.text();
+            console.error('Chyba pri ukladaní menu na JSONBin:', errorDetails);
+            return res.status(500).json({ error: 'Chyba pri ukladaní menu na JSONBin', details: errorDetails });
+        }
+
+        res.json(await response.json());
+    } catch (error) {
+        console.error('Chyba pri ukladaní menu:', error);
+        res.status(500).json({ error: 'Chyba pri ukladaní menu' });
+    }
+});
+
 // Endpoint: Načítanie objednávok
 app.get('/orders', async (req, res) => {
     try {
@@ -53,9 +85,9 @@ app.post('/orders', async (req, res) => {
     try {
         let dataToSave = req.body;
 
-        // Ak je `empty`, ulož prázdny objekt
+        // Spracovanie prázdnych objednávok
         if (dataToSave.empty) {
-            dataToSave = { empty: true }; // Prázdny objekt
+            dataToSave = { empty: true }; // Ak `empty: true`, uloží sa prázdny objekt
         } else {
             // Filtrovanie neplatných položiek
             dataToSave = Object.fromEntries(
@@ -69,14 +101,8 @@ app.post('/orders', async (req, res) => {
                 'Content-Type': 'application/json',
                 'X-Master-Key': JSONBIN_API_KEY,
             },
-            body: JSON.stringify(dataToSave),
+            body: JSON.stringify(cleanedOrders),
         });
-
-        if (!response.ok) {
-            const errorDetails = await response.text();
-            console.error('Chyba pri ukladaní objednávok na JSONBin:', errorDetails);
-            return res.status(500).json({ error: 'Chyba pri ukladaní objednávok na JSONBin', details: errorDetails });
-        }
 
         res.json(await response.json());
     } catch (error) {
@@ -84,7 +110,6 @@ app.post('/orders', async (req, res) => {
         res.status(500).json({ error: 'Chyba pri ukladaní objednávok' });
     }
 });
-
 
 // Zaplatené objednávky
 app.post('/orders/paid', async (req, res) => {
