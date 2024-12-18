@@ -92,27 +92,22 @@
     <button onclick="saveMenuData()">Uložiť zmeny</button>
 
     <script>
-// JSONBin.io detaily
-        const BIN_ID = '674dbe2fe41b4d34e45e665b'; // Vložte váš Bin ID
-        const API_KEY = '$2a$10$IjFgvnWw7GPM8c7XwMuwrOg9lOL5VBfRwBctn2lvMfgiNgOKrs6EO'; // Vložte váš API Key
-        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+        const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
         let menuData = {};
-    
+        
+        // Funkcia na načítanie menu z backendu
         async function loadMenuData() {
             try {
-                const response = await fetch(API_URL, {
+                const response = await fetch(`${BACKEND_URL}/menu`, {
                     method: 'GET',
-                    headers: {
-                        'X-Master-Key': API_KEY,
-                    },
                 });
-    
+        
                 if (!response.ok) {
                     throw new Error(`Chyba pri načítaní dát: ${response.status} ${response.statusText}`);
                 }
-    
+        
                 const data = await response.json();
-                menuData = data.record;
+                menuData = data;
                 renderTables();
                 renderCategories();
                 renderMenuItems();
@@ -121,38 +116,34 @@
                 console.error(error);
             }
         }
-    
+        
+        // Funkcia na uloženie menu do backendu
         async function saveMenuData() {
             try {
-                const response = await fetch(API_URL, {
-                    method: 'PUT',
+                const response = await fetch(`${BACKEND_URL}/menu`, {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Master-Key': API_KEY,
                     },
                     body: JSON.stringify(menuData),
                 });
-    
+        
                 if (!response.ok) {
                     throw new Error(`Chyba pri ukladaní dát: ${response.status} ${response.statusText}`);
                 }
-    
+        
                 alert('Dáta boli úspešne uložené!');
             } catch (error) {
                 alert('Nepodarilo sa uložiť dáta: ' + error.message);
                 console.error(error);
             }
         }
-    
-        // Ďalšie funkcie na správu stolov, kategóri
-    
-
+        
         // Správa stolov
         function renderTables() {
             const tableBody = document.querySelector("#tablesTable tbody");
             tableBody.innerHTML = ''; // Vyčistenie tabuľky
         
-            // Iterujeme cez stoly a zobrazujeme ich správne
             menuData.tables.forEach((table, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -164,23 +155,25 @@
             });
         }
         
-        // Funkcia na aktualizáciu informácií o stoloch
-        function updateTable(index, key, value) {
-            menuData.tables[index][key] = value;
-            console.log(menuData.tables);  // Skontrolujte, či sa údaje aktualizujú správne
+        function addTable() {
+            menuData.tables.push({ number: '', name: '' });
+            renderTables();
         }
         
-        // Funkcia na odstránenie stola
-        function deleteTable(index) {
-            menuData.tables.splice(index, 1); // Odstránenie stola zo zoznamu
-            renderTables();  // Prekreslenie tabuľky po odstránení
+        function updateTable(index, key, value) {
+            menuData.tables[index][key] = value;
         }
-
+        
+        function deleteTable(index) {
+            menuData.tables.splice(index, 1);
+            renderTables();
+        }
+        
         // Správa kategórií
         function renderCategories() {
             const tableBody = document.querySelector("#categoriesTable tbody");
             tableBody.innerHTML = ''; // Vyčistenie tabuľky
-
+        
             menuData.categories.forEach((category, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -191,26 +184,26 @@
                 tableBody.appendChild(row);
             });
         }
-
-        function updateCategory(index, key, value) {
-            menuData.categories[index][key] = value;
-        }
-
+        
         function addCategory() {
             menuData.categories.push({ id: '', name: '' });
             renderCategories();
         }
-
+        
+        function updateCategory(index, key, value) {
+            menuData.categories[index][key] = value;
+        }
+        
         function deleteCategory(index) {
             menuData.categories.splice(index, 1);
             renderCategories();
         }
-
+        
         // Správa položiek menu
         function renderMenuItems() {
             const tableBody = document.querySelector("#menuTable tbody");
             tableBody.innerHTML = ''; // Vyčistenie tabuľky
-
+        
             menuData.menuItems.forEach((item, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -230,23 +223,24 @@
                 tableBody.appendChild(row);
             });
         }
-
-        function updateMenuItem(index, key, value) {
-            menuData.menuItems[index][key] = value;
-        }
-
+        
         function addMenuItem() {
             menuData.menuItems.push({ category: '', name: '', price: 0 });
             renderMenuItems();
         }
-
+        
+        function updateMenuItem(index, key, value) {
+            menuData.menuItems[index][key] = value;
+        }
+        
         function deleteMenuItem(index) {
             menuData.menuItems.splice(index, 1);
             renderMenuItems();
         }
-
+        
         // Načítanie dát pri spustení
         loadMenuData();
+        
     </script>
 </body>
 </html>
