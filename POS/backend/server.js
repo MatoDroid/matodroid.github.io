@@ -56,7 +56,7 @@ app.post('/login', (req, res) => {
 
 app.post("/logout", (req, res) => {
     res.clearCookie("authToken"); // Vymaže token (ak používate cookies)
-    res.redirect("/login.html"); // Presmerovanie na login
+    res.redirect("/POS/login.html"); // Presmerovanie na login
 });
 
 app.get('/verify-token', authenticateToken, (req, res) => {
