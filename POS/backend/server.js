@@ -29,7 +29,7 @@ const JSONBIN_URL = 'https://api.jsonbin.io/v3/b';
 app.use(cors());
 app.use(express.json());
 app.use((req, res, next) => {
-    console.log("Prijaté hlavičky:", req.headers);
+//    console.log("Prijaté hlavičky:", req.headers);
     next();
 });
 
@@ -69,10 +69,10 @@ app.get('/verify-token', authenticateToken, (req, res) => {
 // Middleware na overenie JWT tokenu
 function authenticateToken(req, res, next) {
     const authHeader = req.headers["authorization"];
-    console.log("Hlavička Authorization:", authHeader);
+//    console.log("Hlavička Authorization:", authHeader);
 
     const token = authHeader && authHeader.split(" ")[1];
-    console.log("Token extrahovaný z hlavičky:", token);
+//    console.log("Token extrahovaný z hlavičky:", token);
 
     if (!token) {
         return res.status(401).json({ message: "Token nebol poskytnutý." });
@@ -84,7 +84,7 @@ function authenticateToken(req, res, next) {
             return res.status(403).json({ message: "Neplatný alebo expirovaný token." });
         }
 
-        console.log("Údaje z tokenu:", user);
+  //      console.log("Údaje z tokenu:", user);
         req.user = user;
         next();
     });
