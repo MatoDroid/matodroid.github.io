@@ -27,9 +27,9 @@ document.getElementById("login-button").addEventListener("click", async () => {
 
             // Presmerovanie podľa role
             if (result.role === "admin") {
-                window.location.href = "/admin.html";
+                window.location.href = "/POS/admin.html";
             } else if (result.role === "user") {
-                window.location.href = "/pos.html";
+                window.location.href = "/POS/pos.html";
             }
         } else {
             document.getElementById("error-message").textContent = result.message || "Neplatné údaje.";
