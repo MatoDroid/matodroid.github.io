@@ -1,4 +1,9 @@
+body.hidden {
+    display: none;
+}
+
 body {
+    
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -265,6 +270,15 @@ button {
     background-color: #2d9147;
 }
 
+.split-order-button {
+    background-color: #e3fa64;
+    color: white;
+}
+
+.split-order-button:hover:not(:disabled) {
+    background-color: #d9ff00;
+}
+
 .cancel-button {
     background-color: #ea4335;
     color: white;
@@ -272,6 +286,15 @@ button {
 
 .cancel-button:hover:not(:disabled) {
     background-color: #d33426;
+}
+
+.logout-button {
+    background-color: #5d50ca;
+    color: white;
+}
+
+.logout-button:hover:not(:disabled) {
+    background-color: #1100ff;
 }
 
 @media (max-width: 600px) {
@@ -342,6 +365,37 @@ button {
         border-radius: 8px;
         text-align: center;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    #select-table-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .table-selection button {
+        margin: 5px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        background-color: #f4f4f4;
+        cursor: pointer;
+    }
+
+    .table-selection button:hover {
+        background-color: #ddd;
     }
 }
 
