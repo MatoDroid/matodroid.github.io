@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="hidden">
     <div class="container">
         <header class="header">
             <h1>Restaurant POS System</h1>
@@ -30,7 +30,9 @@
                 </div>
                 <div class="action-buttons">
                     <button class="action-button pay-button" disabled>Zaplatiť</button>
+                    <button class="action-button split-order-button">Rozdeliť objednávku</button>
                     <button class="action-button cancel-button" disabled>Zrušiť</button>
+                    <button id="logout-button">Odhlásiť sa</button>
                 </div>
 
                 <!-- loading  menu-data please wait -->
@@ -56,12 +58,27 @@
                         <button id="close-modal" style="padding:10px 20px; background:#ea4335; color:white; border:none; border-radius:5px; cursor:pointer;">Zavrieť</button>
                     </div>
                 </div>
+
+                
+
+                <!-- Modálne okno na výber cieľového stola -->
+                <div id="select-table-modal" style="display: none;">
+                    <div class="modal-content">
+                        <h3>Vyberte cieľový stôl</h3>
+                        <div class="table-selection">
+                            <!-- Tu sa dynamicky načítajú tlačidlá stolov -->
+                        </div>
+                        <button id="close-modal">Zavrieť</button>
+                    </div>
+                </div>
              
             </div>
         </section>
     </div>
 
-    <script src="pos_script.js"></script>
+
+
+    <script src="script.js"></script>
 
 </body>
 </html>
