@@ -4,41 +4,167 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Administrácia Menu</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        input, select {
-            padding: 5px;
-            margin: 5px;
-        }
-        button {
-            padding: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
+<style>
+
+    body.hidden {
+        display: none;
+    }
+    
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f9fafb;
+        color: #333;
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+    }
+
+    h1, h2 {
+        color: #444;
+        font-weight: 600;
+    }
+
+    h1 {
+        margin-bottom: 15px;
+    }
+
+    h2 {
+        margin: 20px 0 10px;
+    }
+
+    /* Globálny štýl pre divy */
+    div {
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        color: #333;
+    }
+
+    /* Farebné pozadia jednotlivých divov */
+    div:nth-child(1) {
+        background-color: #e3f2fd; /* Svetlomodrá */
+    }
+
+    div:nth-child(2) {
+        background-color: #fbe9e7; /* Svetločervená */
+    }
+
+    div:nth-child(3) {
+        background-color: #e8f5e9; /* Svetlozelená */
+    }
+
+    div:nth-child(4) {
+        background-color: #fffde7; /* Svetložltá */
+    }
+
+    div:nth-child(5) {
+        background-color: #ede7f6; /* Svetlofialová */
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 14px;
+    }
+
+    th {
+        background-color: #ffffff;
+        color: #444;
+        font-weight: 600;
+        border: none;
+    }
+
+    td {
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    input, select {
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 14px;
+        background-color: #fdfdfd;
+    }
+
+    input:focus, select:focus {
+        border-color: #90caf9;
+        outline: none;
+    }
+
+    button {
+        padding: 10px 20px;
+        background-color: #64b5f6;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+        background-color: #42a5f5;
+        transform: scale(1.03);
+    }
+
+    button:active {
+        transform: scale(1);
+    }
+
+    form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+        flex: 1 0 100%;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #555;
+    }
+
+    form input, form select {
+        flex: 1 0 calc(33.33% - 10px);
+    }
+
+    form button {
+        flex: 1 0 100%;
+        margin-top: 10px;
+    }
+</style>
+
+            
 </head>
-<body>
+<body class="hidden">
     <h1>Administrácia Menu</h1>
+
 
     <!-- Správa stolov -->
     <div>
@@ -89,11 +215,96 @@
         <button onclick="addMenuItem()">Pridať novú položku</button>
     </div>
 
+    <div>
+        <h2>Pridať nového používateľa</h2>
+        <form id="addUserForm">
+            <label for="username">Používateľské meno:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">Heslo:</label>
+            <input type="password" id="password" name="password" required>
+            <label for="role">Rola:</label>
+            <select id="role" name="role" required>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+            </select>
+            <button type="submit">Pridať používateľa</button>
+        </form>
+    </div>
+    
+    <button id="logout-button">Odhlásiť sa</button>
+
     <button onclick="saveMenuData()">Uložiť zmeny</button>
 
     <script>
         const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
         let menuData = {};
+
+        // Kontrola tokenu pri načítaní stránky
+        document.addEventListener("DOMContentLoaded", async () => {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                alert("Neautorizovaný prístup. Prihláste sa.");
+                window.location.href = "/login.html";
+                return;
+            }
+        
+            try {
+                // Overenie tokenu
+                const response = await fetch(`${BACKEND_URL}/verify-token`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                });
+        
+                if (!response.ok) {
+                    throw new Error("Neplatný token");
+                }
+        
+                const tokenPayload = await response.json();
+        
+                // Overenie role
+                if (tokenPayload.role !== "admin") {
+                    alert("Nemáte oprávnenie na prístup. Presmerovanie na prihlásenie.");
+                    window.location.href = "/login.html";
+                    return;
+                }
+        
+                // Ak je token platný, zobrazte obsah stránky
+                document.body.classList.remove("hidden");
+            } catch (error) {
+                alert("Nemáte oprávnenie na prístup. Presmerovanie na prihlásenie.");
+                window.location.href = "/login.html";
+            }
+        });
+        
+
+
+        document.getElementById("addUserForm").addEventListener("submit", async function (event) {
+            event.preventDefault();
+    
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const role = document.getElementById("role").value;
+    
+            try {
+                const response = await fetch(`${BACKEND_URL}/add-user`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password, role }),
+                });
+    
+                if (response.ok) {
+                    alert("Používateľ bol úspešne pridaný.");
+                    document.getElementById("addUserForm").reset();
+                } else {
+                    const errorData = await response.json();
+                    alert("Chyba: " + errorData.error);
+                }
+            } catch (error) {
+                console.error("Chyba pri pridávaní používateľa:", error);
+            }
+        });
         
         // Funkcia na načítanie menu z backendu
         async function loadMenuData() {
@@ -107,6 +318,13 @@
                 }
         
                 const data = await response.json();
+
+                // Ošetrenie prázdnych dát
+                if (!data.tables) data.tables = [];
+                if (!data.categories) data.categories = [];
+                if (!data.menuItems) data.menuItems = [];
+
+                //Uloženie dát
                 menuData = data;
                 renderTables();
                 renderCategories();
@@ -240,6 +458,16 @@
         
         // Načítanie dát pri spustení
         loadMenuData();
+
+        document.getElementById("logout-button").addEventListener("click", () => {
+            if (!localStorage.getItem("authToken")) {
+                alert("Nie ste prihlásený.");
+                return;
+            }
+            localStorage.removeItem("authToken");
+            window.location.href = "/login.html";
+        });
+    
         
     </script>
 </body>
