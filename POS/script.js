@@ -1,21 +1,73 @@
+document.addEventListener("DOMContentLoaded", async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+        alert("Neautorizovaný prístup. Prihláste sa.");
+        window.location.href = "/login.html";
+        return;
+    }
+
+    try {
+        // Overenie tokenu a role
+        const response = await fetch(`${BACKEND_URL}/verify-token`, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 403) {
+                alert("Neplatný alebo expirovaný token.");
+            } else {
+                throw new Error("Nemáte prístup na túto stránku.");
+            }
+            window.location.href = "/login.html";
+            return;
+        }
+
+        const tokenPayload = await response.json();
+
+        // Overenie role
+        if (tokenPayload.role !== "user") {
+            alert("Nemáte oprávnenie na prístup k tejto stránke.");
+            window.location.href = "/login.html";
+            return;
+        }
+
+        // Ak je token platný, zobrazte obsah stránky
+        document.body.classList.remove("hidden");
+
+        // Načítajte údaje zo servera až po overení tokenu
+        await loadMenuData();
+    } catch (error) {
+
+    }
+});
+
 $(document).ready(function () {
     const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
 
     let currentTable = null; // Vybraný stôl
     let tableOrders = {}; // Objednávky pre jednotlivé stoly
 
-    // Funkcia na načítanie menu z backendu
+    // Funkcia na načítanie údajov zo servera
     async function loadMenuData() {
         try {
-            const response = await fetch(`${BACKEND_URL}/menu`);
+            const response = await fetch(`${BACKEND_URL}/menu`, {
+                method: "GET",
+                // Odstránená hlavička Authorization
+            });
+    
             if (!response.ok) {
-                throw new Error(`Chyba pri načítaní dát: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Chyba pri načítaní dát: ${response.status} ${response.statusText} - ${errorText}`);
             }
+    
             const data = await response.json();
-            renderMenuData(data);
+            renderMenuData(data); // Načítanie menu dát
         } catch (error) {
-            console.error("Chyba pri načítaní menu:", error);
-            alert("Nepodarilo sa načítať menu. Skúste to neskôr.");
+            console.error("Chyba načítania údajov:", error);
+            alert("Nepodarilo sa načítať údaje zo servera. Skontrolujte pripojenie a skúste znova.");
         }
     }
 
@@ -31,6 +83,8 @@ $(document).ready(function () {
                 `<button class="table-button" data-table="${table.number}">${table.name}</button>`
             );
         });
+
+        updateTableStyles();
 
         // Pridanie kategórií
         data.categories.forEach((category) => {
@@ -95,8 +149,16 @@ $(document).ready(function () {
         }
 
         $(`.table-button[data-table="${currentTable}"]`).addClass("has-order");
+        saveOrders(); // Uloženie stavu na backend
         updateOrderDisplay();
     });
+
+    function updateTableStyles() {
+        $(".table-button").removeClass("has-order");
+        Object.keys(tableOrders).forEach((table) => {
+            $(`.table-button[data-table="${table}"]`).addClass("has-order");
+        });
+    }
 
     // Zobrazenie objednávok vrátane tlačidiel + a -
     function updateOrderDisplay() {
@@ -155,89 +217,255 @@ $(document).ready(function () {
             delete tableOrders[currentTable];
             $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
         }
-            
 
-            updateOrderDisplay();
+        saveOrders(); // Uloženie stavu na backend
+        updateOrderDisplay();
     }
+
+    let saveTimeout = null; // Timeout identifikátor pre oneskorené uloženie
 
     async function saveOrdersToBackend() {
-        try {
-            const response = await fetch('https://matodroid.onrender.com/orders', {
-                method: 'POST', // Zmeňte na POST
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(tableOrders),
-            });
-    
-            if (!response.ok) {
-                throw new Error(`Chyba pri ukladaní objednávok: ${response.statusText}`);
-            }
-    
-            console.log('Objednávky úspešne uložené na backend.');
-        } catch (error) {
-            console.error('Chyba pri ukladaní objednávok na backend:', error);
+        // Vyčistenie predchádzajúceho timeoutu
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
         }
-    }
-    
-    
 
-        // Tlačidlo Zaplatiť
-        $(".pay-button").click(async function () {
-            if (!currentTable || !tableOrders[currentTable]) return;
-    
-            const totalAmount = tableOrders[currentTable].total.toFixed(2);
-            const paidOrder = {
-                table: currentTable,
-                items: tableOrders[currentTable].items,
-                total: totalAmount,
-                date: new Date().toISOString(),
-            };
-    
+        // Nastavenie nového timeoutu
+        saveTimeout = setTimeout(async () => {
             try {
-                const response = await fetch(`${BACKEND_URL}/orders/paid`, {
-                    method: "POST",
+                // Filtrovanie prázdnych objednávok
+                const cleanedOrders = Object.fromEntries(
+                    Object.entries(tableOrders).filter(([key, value]) => value && Object.keys(value.items || {}).length > 0)
+                );
+
+                // Ak nie sú objednávky, odoslať minimálny validný objekt
+                const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
+
+                console.log("Odosielané údaje na backend:", JSON.stringify(dataToSave)); // Na debugovanie
+
+                const response = await fetch(`${BACKEND_URL}/orders`, {
+                    method: "POST", // Používame POST pre ukladanie
                     headers: {
                         "Content-Type": "application/json",
                     },
-                    body: JSON.stringify(paidOrder),
+                    body: JSON.stringify(dataToSave),
                 });
-    
-                if (!response.ok) {
-                    throw new Error(`Chyba pri ukladaní platby: ${response.statusText}`);
+
+                if (response.ok) {
+                    console.log("Objednávky úspešne uložené na backend.");
+                } else {
+                    const errorText = await response.text();
+                    console.error("Chyba pri ukladaní objednávok na backend:", response.statusText, errorText);
                 }
-    
-                delete tableOrders[currentTable];
-                saveOrdersToBackend();
-                $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
-                $(".current-order h2").text("Vyberte stôl");
-                $(".action-buttons button").prop("disabled", true);
-                alert("Platba úspešne spracovaná.");
             } catch (error) {
-                console.error("Chyba pri spracovaní platby:", error);
-                alert("Chyba pri spracovaní platby.");
+                console.error("Chyba pri ukladaní objednávok na backend:", error);
             }
-        });
-    
-        // Tlačidlo Zrušiť
-        $(".cancel-button").click(function () {
-            if (!currentTable || !tableOrders[currentTable]) return;
-    
-            const confirmed = confirm(
-                `Naozaj chcete zrušiť objednávku pre stôl ${currentTable}?`
+        }, 2500); // Oneskorenie 2500 ms = 2.5 sek
+    }
+
+    // Volanie funkcie na uloženie objednávky po zmene
+    function saveOrders() {
+        saveOrdersToBackend();
+    }
+
+    // Funkcia na načítanie objednávok z backendu
+    async function loadOrdersFromBackend() {
+        try {
+            const response = await fetch(`${BACKEND_URL}/orders`, {
+                method: "GET",
+            });
+            if (response.ok) {
+                const data = await response.json();
+                tableOrders = data || {};
+                console.log("Objednávky načítané z backendu:", tableOrders);
+            } else {
+                console.error("Chyba pri načítaní objednávok z backendu:", response.statusText);
+            }
+        } catch (error) {
+            console.error("Chyba pri načítaní objednávok z backendu:", error);
+        }
+    }
+
+    // Volanie funkcie na načítanie objednávok pri načítaní stránky
+    $(document).ready(async function () {
+        await loadOrdersFromBackend();
+        loadMenuData(); // Načítanie menu dát
+        updateTableStyles(); // Aktualizácia štýlov stolov
+    });
+
+    // Tlačidlo Zaplatiť
+    $(".pay-button").click(async function () {
+        if (!currentTable || !tableOrders[currentTable]) {
+            alert("Najprv vyberte stôl a pridajte položky do objednávky!");
+            return;
+        }
+
+        const totalAmount = tableOrders[currentTable].total.toFixed(2);
+        const paidOrder = {
+            table: currentTable,
+            items: tableOrders[currentTable].items,
+            total: totalAmount,
+            date: new Date().toISOString(), // Aktuálny čas
+        };
+
+        try {
+            $('#loading-modal').fadeIn(); // Zobrazenie modálneho okna
+
+            // Odoslanie platby na backend
+            const response = await fetch(`${BACKEND_URL}/orders/paid`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(paidOrder),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Chyba pri ukladaní platby: ${response.statusText}`);
+            }
+
+            // Úspešná platba - odstránenie objednávky
+            delete tableOrders[currentTable];
+            saveOrdersToBackend(); // Uloženie aktuálnych objednávok na backend
+            $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
+
+            // Aktualizácia UI
+            $(".current-order h2").text("Vyberte stôl");
+            $(".action-buttons button").prop("disabled", true);
+            updateOrderDisplay();
+
+            // Načítanie a zobrazenie QR kódu
+            const qrResponse = await fetch(
+                `${BACKEND_URL}/generate-qr?amount=${totalAmount}&table=${currentTable}`
             );
-            if (confirmed) {
-                delete tableOrders[currentTable];
-                saveOrdersToBackend();
-                updateOrderDisplay();
-                $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
-                $(".current-order h2").text("Vyberte stôl");
-                $(".action-buttons button").prop("disabled", true);
-                alert(`Objednávka pre stôl ${currentTable} bola zrušená.`);
+
+            if (!qrResponse.ok) {
+                throw new Error("Chyba pri generovaní QR kódu.");
+            }
+
+            const qrUrl = qrResponse.url;
+            $("#qr-code").attr("src", qrUrl); // Nastavenie QR kódu
+            $('#loading-modal').fadeOut(); // Zobrazenie modálneho okna
+            $("#qr-modal").fadeIn(); // Zobrazenie modálneho okna s QR kódom
+        } catch (error) {
+            console.error("Chyba pri spracovaní platby:", error);
+            alert("Chyba pri spracovaní platby.");
+        }
+    });
+
+    // Tlačidlo pre zavretie modálneho okna s QR kódom
+    $("#close-modal").click(function () {
+        if (currentTable) {
+            $(".action-buttons button").prop("disabled", true);
+            $(".current-order h2").text("Vyberte stôl");
+            currentTable = null;
+            $("#qr-modal").fadeOut(); // Skrytie modálneho okna
+        }
+    });
+
+    // Tlačidlo Zrušiť
+    $(".cancel-button").click(function () {
+        if (!currentTable || !tableOrders[currentTable]) return;
+
+        const confirmed = confirm(
+            `Naozaj chcete zrušiť objednávku pre stôl ${currentTable}?`
+        );
+        if (confirmed) {
+            delete tableOrders[currentTable];
+            saveOrdersToBackend();
+            updateOrderDisplay();
+            $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
+            $(".current-order h2").text("Vyberte stôl");
+            $(".action-buttons button").prop("disabled", true);
+            alert(`Objednávka pre stôl ${currentTable} bola zrušená.`);
+        }
+    });
+
+    // Funkcia na rozdelenie objednávky
+    async function splitOrder(targetTable, itemsToMove) {
+        if (!currentTable || !tableOrders[currentTable]) {
+            alert("Najprv vyberte stôl!");
+            return;
+        }
+
+        if (!tableOrders[targetTable]) {
+            tableOrders[targetTable] = { items: {}, total: 0 };
+        }
+
+        // Presun položiek na cieľový stôl
+        itemsToMove.forEach((itemName) => {
+            const item = tableOrders[currentTable].items[itemName];
+            if (item) {
+                // Pridanie položky na cieľový stôl
+                if (tableOrders[targetTable].items[itemName]) {
+                    tableOrders[targetTable].items[itemName].quantity += item.quantity;
+                } else {
+                    tableOrders[targetTable].items[itemName] = { ...item };
+                }
+                tableOrders[targetTable].total += item.price * item.quantity;
+
+                // Odstránenie položky z aktuálneho stola
+                tableOrders[currentTable].total -= item.price * item.quantity;
+                delete tableOrders[currentTable].items[itemName];
             }
         });
-    
+
+        // Odstránenie stola, ak je prázdny
+        if (Object.keys(tableOrders[currentTable].items).length === 0) {
+            delete tableOrders[currentTable];
+            $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
+        }
+
+        // Aktualizácia štýlov a uloženie na backend
+        updateOrderDisplay();
+        updateTableStyles();
+        saveOrders();
+    }
+
+    // Tlačidlo na rozdelenie objednávky
+    $(".split-order-button").click(function () {
+        if (!currentTable || !tableOrders[currentTable]) {
+            alert("Najprv vyberte stôl s objednávkou!");
+            return;
+        }
+
+        // Získanie zoznamu dostupných stolov okrem aktuálneho
+        const availableTables = Object.keys(tableOrders)
+            .filter((table) => parseInt(table) !== currentTable)
+            .map((table) => parseInt(table));
+
+        let targetTable = parseInt(prompt(`Zadajte číslo cieľového stola (${availableTables.join(", ")})`));
+
+        // Overenie, či cieľový stôl existuje alebo je platný
+        if (isNaN(targetTable) || targetTable < 0) {
+            alert("Neplatné číslo cieľového stola.");
+            return;
+        }
+
+        // Ak cieľový stôl ešte nemá objednávku, inicializujeme ho
+        if (!tableOrders[targetTable]) {
+            tableOrders[targetTable] = { items: {}, total: 0 };
+        }
+
+        const itemsToMove = Object.keys(tableOrders[currentTable].items);
+        if (itemsToMove.length === 0) {
+            alert("Aktuálny stôl nemá žiadne položky na presun.");
+            return;
+        }
+
+        // Potvrdenie a presun objednávok
+        const confirmed = confirm(`Naozaj chcete presunúť všetky položky na stôl ${targetTable}?`);
+        if (confirmed) {
+            splitOrder(targetTable, itemsToMove);
+            alert(`Objednávka bola presunutá na stôl ${targetTable}.`);
+        }
+    });
 
     // Načítanie menu po načítaní stránky
     loadMenuData();
+});
+
+document.getElementById("logout-button").addEventListener("click", () => {
+    localStorage.removeItem("authToken"); // Zmaže token
+    window.location.href = "/login.html"; // Presmerovanie na login
 });
