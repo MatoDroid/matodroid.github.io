@@ -102,7 +102,7 @@ app.get("/admin.html", authenticateToken, (req, res) => {
     if (req.user.role !== "admin") {
         return res.status(403).json({ message: "Nemáte oprávnenie na prístup k tejto stránke." });
     }
-    res.sendFile(path.join(__dirname, "admin.html"));
+    res.sendFile(path.join(__dirname, "/POS/admin.html"));
 });
 
 // Chránený endpoint pre pos.html (iba pre používateľov s rolou 'user')
@@ -110,7 +110,7 @@ app.get("/pos.html", authenticateToken, (req, res) => {
     if (req.user.role !== "user") {
         return res.status(403).json({ message: "Nemáte oprávnenie na prístup k tejto stránke." });
     }
-    res.sendFile(path.join(__dirname, "pos.html"));
+    res.sendFile(path.join(__dirname, "/POS/pos.html"));
 });
 
 
