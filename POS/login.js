@@ -40,3 +40,11 @@ document.getElementById("login-button").addEventListener("click", async () => {
     }
 });
 
+        // Pridaná podpora pre stlačenie ENTER
+        document.getElementById("password").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault(); // Zabrániť predvolenému správaniu (odoslaniu formulára)
+                document.getElementById("login-button").click(); // Simulácia kliknutia na tlačidlo
+            }
+        });
+
