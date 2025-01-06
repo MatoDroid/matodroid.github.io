@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             } else {
                 throw new Error("Nemáte prístup na túto stránku.");
             }
-            window.location.href = "/login.html";
+            window.location.href = "/POS/login.html";
             return;
         }
 
@@ -30,12 +30,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Overenie role
         if (tokenPayload.role !== "user") {
             alert("Nemáte oprávnenie na prístup k tejto stránke.");
-            window.location.href = "/login.html";
+            window.location.href = "/POS/login.html";
             return;
         }
 
         // Ak je token platný, zobrazte obsah stránky
+        console.log("Token platný. Odstraňujem triedu hidden..."); // Log úspešného overenia
         document.body.classList.remove("hidden");
+
 
         // Načítajte údaje zo servera až po overení tokenu
         await loadMenuData();
@@ -467,5 +469,5 @@ $(document).ready(function () {
 
 document.getElementById("logout-button").addEventListener("click", () => {
     localStorage.removeItem("authToken"); // Zmaže token
-    window.location.href = "/login.html"; // Presmerovanie na login
+    window.location.href = "/POS/login.html"; // Presmerovanie na login
 });
