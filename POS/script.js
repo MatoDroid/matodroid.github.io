@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const token = localStorage.getItem("authToken");
     if (!token) {
         alert("Neautorizovaný prístup. Prihláste sa.");
-        window.location.href = "/login.html";
+        window.location.href = "/POS/login.html";
         return;
     }
 
