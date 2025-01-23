@@ -414,19 +414,14 @@ button {
 }
 
 #split-order-modal .modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    width: 90%; /* Šírka modálneho okna */
-    max-width: 800px;
-    max-height: 90vh; /* Maximálna výška modálneho okna */
-    overflow-y: auto; /* Pridá posuvník pre obsah */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Tien */
-    position: absolute;
+    overflow: auto;
+    position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%); /* Centrovanie */
-}
+    transform: translate(-50%, -50%);
+    backface-visibility: hidden;
+    perspective: 1000px;
+
 
 /* Štýly pre stĺpce v modálnom okne */
 .split-order-columns {
