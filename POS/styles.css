@@ -401,15 +401,14 @@ button {
 
 /* Štýly pre modálne okno */
 #split-order-modal {
-    display: none;
+    display: none; /* Skryté pred zobrazením */
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    justify-content: center;
-    align-items: center;
+    background: rgba(0, 0, 0, 0.5); /* Polopriehľadné pozadie */
+    z-index: 1000; /* Zabezpečí, že modálne okno bude nad ostatným obsahom */
 }
 
 #split-order-modal .modal-content {
@@ -418,15 +417,25 @@ button {
     border-radius: 10px;
     width: 80%;
     max-width: 800px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Pridáva tien */
+    position: absolute; /* Absolútna pozícia pre centrovanie */
+    top: 50%; /* Posunie okno o 50% zhora */
+    left: 50%; /* Posunie okno o 50% zľava */
+    transform: translate(-50%, -50%); /* Centrovanie */
 }
 
 .split-order-columns {
     display: flex;
     justify-content: space-between;
+    gap: 20px; /* Pridáva medzeru medzi stĺpcami */
 }
 
 .current-items-column, .moved-items-column {
-    width: 48%;
+    width: 48%; /* Rozdelenie na dva stĺpce */
+    background: #f8f9fa; /* Svetlý pozadie pre stĺpce */
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Pridáva tien */
 }
 
 .split-order-item {
@@ -434,6 +443,45 @@ button {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Pridáva tien */
+}
+
+/* Štýly pre tlačidlá výberu cieľového stola */
+.target-table-buttons {
+    display: flex;
+    flex-wrap: wrap; /* Umožňuje zalomenie tlačidiel na ďalší riadok */
+    gap: 10px; /* Medzery medzi tlačidlami */
+    margin-bottom: 15px; /* Odstup od nasledujúceho obsahu */
+}
+
+.target-table-button {
+    padding: 12px; /* Rovnaké padding ako tlačidlá v table-grid */
+    border: none;
+    border-radius: 8px; /* Rovnaké zaoblené rohy ako tlačidlá v table-grid */
+    background-color: #e8f0fe; /* Rovnaké pozadie ako tlačidlá v table-grid */
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.9rem; /* Rovnaká veľkosť textu ako tlačidlá v table-grid */
+    color: #333; /* Rovnaká farba textu ako tlačidlá v table-grid */
+    text-align: center;
+    flex: 1 1 140px; /* Každé tlačidlo má rovnakú šírku (140px) */
+    min-width: 140px; /* Zabezpečí, že tlačidlá nebudú menšie ako 140px */
+    height: 50px; /* Rovnaká výška pre všetky tlačidlá */
+    display: flex;
+    align-items: center; /* Vertikálne centrovanie textu */
+    justify-content: center; /* Horizontálne centrovanie textu */
+}
+
+.target-table-button:hover {
+    background-color: #d0e1fd; /* Rovnaký hover efekt ako tlačidlá v table-grid */
+}
+
+.target-table-button.active {
+    background-color: #1a73e8; /* Rovnaký aktívny štýl ako tlačidlá v table-grid */
+    color: white;
 }
 
 .move-buttons {
@@ -447,15 +495,56 @@ button {
     border: none;
     padding: 5px 10px;
     cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s;
 }
 
 .move-item-button:hover, .move-all-button:hover, .move-back-button:hover, .move-all-back-button:hover {
     background: #0056b3;
 }
 
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.cancel-split-button, .confirm-split-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.cancel-split-button {
+    background: #ea4335;
+    color: white;
+}
+
+.cancel-split-button:hover {
+    background: #d33426;
+}
+
+.confirm-split-button {
+    background: #34a853;
+    color: white;
+}
+
+.confirm-split-button:hover {
+    background: #2d9147;
+}
+
 .close-modal {
     cursor: pointer;
     float: right;
     font-size: 24px;
+    color: #333;
+}
+
+.close-modal:hover {
+    color: #000;
 }
 
