@@ -147,8 +147,6 @@ async function saveOrdersToBackend() {
             // Ak nie sú objednávky, odoslať minimálny validný objekt
             const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
 
-            console.log("Odosielané údaje na backend:", JSON.stringify(dataToSave)); // Na debugovanie
-
             const response = await fetch(`${BACKEND_URL}/orders`, {
                 method: "POST", // Používame POST pre ukladanie
                 headers: {
@@ -158,7 +156,7 @@ async function saveOrdersToBackend() {
             });
 
             if (response.ok) {
-                console.log("Objednávky úspešne uložené na backend.");
+                
             } else {
                 const errorText = await response.text();
                 console.error("Chyba pri ukladaní objednávok na backend:", response.statusText, errorText);
@@ -184,7 +182,6 @@ async function loadOrdersFromBackend() {
         if (response.ok) {
             const data = await response.json();
             tableOrders = data || {};
-            console.log("Objednávky načítané z backendu:", tableOrders);
         } else {
             console.error("Chyba pri načítaní objednávok z backendu:", response.statusText);
         }
