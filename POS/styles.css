@@ -414,6 +414,9 @@ button {
 }
 
 #split-order-modal .modal-content {
+    width: 80%; /* Dynamická šírka */
+    max-width: 800px; /* Maximálna šírka */
+    min-width: 400px; /* Minimálna šírka */
     overflow: auto;
     position: fixed;
     top: 50%;
