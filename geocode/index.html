@@ -87,19 +87,20 @@
     }).addTo(map);
     
     $(document).ready(function() {
-      $('#geocodeForm').on('submit', function(event) {
-        event.preventDefault();
-        
-        var addressesText = $('#addresses').val();
-        var addresses = addressesText.split('\n');
-        
-        addresses.forEach(function(address) {
-          if (address.trim() !== '') {
-            geocodeAddress(address.trim());
-          }
-        });
-      });
+  $('#geocodeForm').on('submit', function(event) {
+    event.preventDefault();
+
+    var addressesText = $('#addresses').val();
+    var addresses = addressesText.split('\n').map(addr => addr.trim()).filter(addr => addr !== '');
+
+    var delay = 1000; // 1 sekunda medzi požiadavkami
+    addresses.forEach((address, index) => {
+      setTimeout(() => {
+        geocodeAddress(address);
+      }, index * delay);
     });
+  });
+});
     
     function geocodeAddress(address) {
       var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(address);
