@@ -12,22 +12,18 @@
       margin: 0;
       padding: 20px;
     }
-
     h1 {
       color: #333;
     }
-
     form {
       margin-bottom: 20px;
     }
-
     textarea {
       width: 100%;
       height: 100px;
       resize: vertical;
       padding: 5px;
     }
-
     button {
       padding: 10px 20px;
       background-color: #333;
@@ -36,26 +32,21 @@
       cursor: pointer;
       margin-top: 10px;
     }
-
     button:hover {
       background-color: #555;
     }
-
     #results {
       background-color: #fff;
       padding: 10px;
     }
-
     #results p {
       margin: 0;
       padding: 5px;
       border-bottom: 1px solid #ccc;
     }
-
     #results p:last-child {
       border-bottom: none;
     }
-
     #map {
       height: 400px;
       margin-top: 20px;
@@ -63,13 +54,12 @@
   </style>
 </head>
 <body>
-  <h1>Geokódovanie adries</h1>
+  <h1>Geokódovanie adries (OpenCage API)</h1>
   
   <form id="geocodeForm">
     <label for="addresses">Adresy:</label>
     <textarea id="addresses" placeholder="Zadajte adresy, každú na nový riadok"></textarea>
     <button type="submit">Geokódovať</button>
-    <button type="button" onclick="exportToGPX()">Exportovať GPX</button>
     <button type="button" onclick="clearForm()">Vymazať</button>
   </form>
   
@@ -79,84 +69,59 @@
   <div id="map"></div>
   
   <script>
-    var gpxData = '';
-    var map = L.map('map').setView([0, 0], 2);
+    var map = L.map('map').setView([48.669, 19.699], 7); // Stred Slovenska
     var markers = L.featureGroup().addTo(map);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
-    
+
+    const API_KEY = '88fd9de6031a4153802fbc7184d947c9'; // Sem vložte svoj OpenCage API kľúč
+
     $(document).ready(function() {
-  $('#geocodeForm').on('submit', function(event) {
-    event.preventDefault();
+      $('#geocodeForm').on('submit', function(event) {
+        event.preventDefault();
+        var addressesText = $('#addresses').val();
+        var addresses = addressesText.split('\n').map(addr => addr.trim()).filter(addr => addr !== '');
+        var delay = 1000; // 1 sekunda medzi požiadavkami
 
-    var addressesText = $('#addresses').val();
-    var addresses = addressesText.split('\n').map(addr => addr.trim()).filter(addr => addr !== '');
-
-    var delay = 1000; // 1 sekunda medzi požiadavkami
-    addresses.forEach((address, index) => {
-      setTimeout(() => {
-        geocodeAddress(address);
-      }, index * delay);
+        addresses.forEach((address, index) => {
+          setTimeout(() => {
+            geocodeAddress(address);
+          }, index * delay);
+        });
+      });
     });
-  });
-});
-    
+
     function geocodeAddress(address) {
-      var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(address);
-      
+      var geocodeUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${API_KEY}`;
+
       $.getJSON(geocodeUrl, function(data) {
-        if (data.length > 0) {
-          var latitude = data[0].lat;
-          var longitude = data[0].lon;
-          
-          var result = '<p>' + address + ': ' + latitude + ', ' + longitude + '</p>';
+        if (data.results.length > 0) {
+          var latitude = data.results[0].geometry.lat;
+          var longitude = data.results[0].geometry.lng;
+
+          var result = `<p>${address}: ${latitude}, ${longitude}</p>`;
           $('#results').append(result);
-          
-          gpxData += generateGPXWaypoint(address, latitude, longitude);
-          
+
           var marker = L.marker([latitude, longitude]).addTo(markers);
           marker.bindPopup(address).openPopup();
         } else {
-          $('#results').append('<p>Nepodarilo sa geokódovať adresu: ' + address + '</p>');
+          $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${address}</p>`);
         }
-        
-        map.fitBounds(markers.getBounds());
+
+        if (markers.getLayers().length > 0) {
+          map.fitBounds(markers.getBounds());
+        }
+      }).fail(function() {
+        $('#results').append(`<p>Chyba pri geokódovaní adresy: ${address}</p>`);
       });
-    }
-    
-    function generateGPXWaypoint(name, latitude, longitude) {
-      var waypoint = '<wpt lat="' + latitude + '" lon="' + longitude + '">\n';
-      waypoint += '  <name>' + name + '</name>\n';
-      waypoint += '</wpt>\n';
-      
-      return waypoint;
-    }
-    
-    function exportToGPX() {
-      var gpxContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
-      gpxContent += '<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">\n';
-      gpxContent += '<metadata>\n';
-      gpxContent += '  <name>Geocoded Addresses</name>\n';
-      gpxContent += '</metadata>\n';
-      gpxContent += '<wpt>\n';
-      gpxContent += gpxData;
-      gpxContent += '</wpt>\n';
-      gpxContent += '</gpx>\n';
-      
-      var element = document.createElement('a');
-      element.setAttribute('href', 'data:text/xml;charset=utf-8,' + encodeURIComponent(gpxContent));
-      element.setAttribute('download', 'geocoded_addresses.gpx');
-      element.style.display = 'none';
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
     }
 
     function clearForm() {
-      $('#addresses').val(''); // Vymaže obsah textového poľa s adresami
-      $('#results').empty(); // Vymaže obsah divu s výsledkami
-      markers.clearLayers(); // Vymaže všetky markery z mapy
+      $('#addresses').val('');
+      $('#results').empty();
+      markers.clearLayers();
     }
   </script>
 </body>
