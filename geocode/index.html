@@ -78,8 +78,23 @@
           var latitude = resultData.geometry.lat;
           var longitude = resultData.geometry.lng;
           var formattedAddress = resultData.formatted;
-          var accuracy = resultData.annotations ? (resultData.annotations.gps_accuracy || "Neznáma") : "Neznáma";
-          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
+          var accuracy = "Neznáma presnosť";
+
+if (resultData.annotations) {
+    if (resultData.annotations.gps_accuracy) {
+        accuracy = resultData.annotations.gps_accuracy + " m";
+    } else if (resultData.components) {
+        if (resultData.components.building) {
+            accuracy = "Budova";
+        } else if (resultData.components.road) {
+            accuracy = "Ulica";
+        } else if (resultData.components.village || resultData.components.town) {
+            accuracy = "Obec";
+        } else if (resultData.components.state) {
+            accuracy = "Krajina";
+        }
+    }
+}          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
           $('#results').append(result);
 
           gpxData += generateGPXWaypoint(name, latitude, longitude, formattedAddress, accuracy);
