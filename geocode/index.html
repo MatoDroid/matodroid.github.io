@@ -80,13 +80,10 @@
           var formattedAddress = resultData.formatted;
           var accuracy = "Neznáma presnosť";
 
-if (resultData.annotations) {
-    if (resultData.annotations.gps_accuracy) {
-        accuracy = resultData.annotations.gps_accuracy + " m";
-    } else if (resultData.annotations.confidence) {
-        accuracy = "Confidence skóre: " + resultData.annotations.confidence + "/10";
-    }
-}          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
+if (resultData.annotations && resultData.annotations.confidence) {
+    accuracy = "Confidence skóre: " + resultData.annotations.confidence + "/10";
+}
+          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
           $('#results').append(result);
 
           gpxData += generateGPXWaypoint(name, latitude, longitude, formattedAddress, accuracy);
