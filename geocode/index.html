@@ -78,8 +78,7 @@
           var latitude = resultData.geometry.lat;
           var longitude = resultData.geometry.lng;
           var formattedAddress = resultData.formatted;
-          var accuracy = resultData.annotations ? (resultData.annotations.geohash || "Neznáma") : "Neznáma";
-
+          var accuracy = resultData.annotations ? (resultData.annotations.gps_accuracy || "Neznáma") : "Neznáma";
           var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
           $('#results').append(result);
 
