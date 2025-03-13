@@ -13,8 +13,6 @@
     button { padding: 10px 20px; background-color: #333; color: #fff; border: none; cursor: pointer; margin-top: 10px; }
     button:hover { background-color: #555; }
     #results { background-color: #fff; padding: 10px; }
-    #results p { margin: 0; padding: 5px; border-bottom: 1px solid #ccc; }
-    #results p:last-child { border-bottom: none; }
     #map { height: 400px; margin-top: 20px; }
   </style>
 </head>
@@ -22,8 +20,8 @@
   <h1>Geokódovanie adries (OpenCage API)</h1>
   
   <form id="geocodeForm">
-    <label for="addresses">Adresy (názov bodu, adresa):</label>
-    <textarea id="addresses" placeholder="Názov bodu, adresa (každý riadok)"></textarea>
+    <label for="addresses">Adresy:</label>
+    <textarea id="addresses" placeholder="Zadajte názov bodu a adresu, oddelené tabulátorom (napr. 'Dom	Hlavná 1, Bratislava')"></textarea>
     <button type="submit">Geokódovať</button>
     <button type="button" onclick="exportToGPX()">Exportovať GPX</button>
     <button type="button" onclick="clearForm()">Vymazať</button>
@@ -31,7 +29,6 @@
   
   <h2>Výsledky:</h2>
   <div id="results"></div>
-  
   <div id="map"></div>
   
   <script>
@@ -44,52 +41,71 @@
 
     const API_KEY = '88fd9de6031a4153802fbc7184d947c9'; // SEM vložte svoj OpenCage API kľúč
     var gpxData = '';
+    var centerLat = null, centerLng = null;
+    var seenLocations = [];
 
     $(document).ready(function() {
       $('#geocodeForm').on('submit', function(event) {
         event.preventDefault();
         var addressesText = $('#addresses').val();
-        var entries = addressesText.split('\n').map(entry => entry.trim()).filter(entry => entry !== '');
-        var delay = 1000; // 1 sekunda medzi požiadavkami
+        var addresses = addressesText.split('\n').map(line => line.trim()).filter(line => line !== '');
 
         gpxData = ''; // Vymaže predchádzajúce GPX údaje
+        seenLocations = []; // Reset polôh
+        centerLat = null;
+        centerLng = null;
 
-        entries.forEach((entry, index) => {
+        addresses.forEach((line, index) => {
           setTimeout(() => {
-            let parts = entry.split(',');
-            if (parts.length >= 2) {
-              let name = parts[0].trim();
-              let address = parts.slice(1).join(',').trim();
-              geocodeAddress(name, address);
-            } else {
-              $('#results').append(`<p>Chybný formát riadku: ${entry}</p>`);
+            var parts = line.split('\t'); // Rozdelenie tabulátorom
+            if (parts.length < 2) {
+              $('#results').append(`<p>Chybný formát riadku: ${line}</p>`);
+              return;
             }
-          }, index * delay);
+            var name = parts[0].trim();
+            var address = parts.slice(1).join(' ').trim();
+            geocodeAddress(name, address);
+          }, index * 1000); // Po 1 sekunde
         });
       });
     });
+
+    function getRandomOffset() {
+      var radius = 3; // 3 metre
+      var angle = Math.random() * 2 * Math.PI;
+      var offsetLat = radius * Math.cos(angle) / 111320;
+      var offsetLng = radius * Math.sin(angle) / (111320 * Math.cos(centerLat));
+      return { offsetLat: offsetLat, offsetLng: offsetLng };
+    }
+
+    function adjustCoordinates(latitude, longitude) {
+      if (centerLat === null || centerLng === null) {
+        centerLat = latitude;
+        centerLng = longitude;
+        return { lat: latitude, lng: longitude };
+      }
+      var { offsetLat, offsetLng } = getRandomOffset();
+      return { lat: centerLat + offsetLat, lng: centerLng + offsetLng };
+    }
 
     function geocodeAddress(name, address) {
       var geocodeUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${API_KEY}`;
 
       $.getJSON(geocodeUrl, function(data) {
         if (data.results.length > 0) {
-          var resultData = data.results[0];
-          var latitude = resultData.geometry.lat;
-          var longitude = resultData.geometry.lng;
-          var formattedAddress = resultData.formatted;
-          var accuracy = "Neznáma presnosť";
+          var latitude = data.results[0].geometry.lat;
+          var longitude = data.results[0].geometry.lng;
+          var confidence = data.results[0].confidence || "Neznáme";
 
-if (resultData.annotations && resultData.annotations.confidence) {
-    accuracy = "Confidence skóre: " + resultData.annotations.confidence + "/10";
-}
-          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
+          var adjusted = adjustCoordinates(latitude, longitude);
+
+          var result = `<p>${name} (${address}): ${adjusted.lat}, ${adjusted.lng} [Confidence: ${confidence}]</p>`;
           $('#results').append(result);
 
-          gpxData += generateGPXWaypoint(name, latitude, longitude, formattedAddress, accuracy);
+          gpxData += generateGPXWaypoint(name, address, adjusted.lat, adjusted.lng, confidence);
 
-          var marker = L.marker([latitude, longitude]).addTo(markers);
-          marker.bindPopup(`<strong>${name}</strong><br>${formattedAddress}<br>Presnosť: ${accuracy}`).openPopup();
+          var marker = L.marker([adjusted.lat, adjusted.lng]).addTo(markers);
+          marker.bindPopup(`<b>${name}</b><br>${address}<br>Confidence: ${confidence}`).openPopup();
         } else {
           $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${address}</p>`);
         }
@@ -102,8 +118,8 @@ if (resultData.annotations && resultData.annotations.confidence) {
       });
     }
 
-    function generateGPXWaypoint(name, latitude, longitude, address, accuracy) {
-      return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${address} (Presnosť: ${accuracy})</desc>\n</wpt>\n`;
+    function generateGPXWaypoint(name, address, latitude, longitude, confidence) {
+      return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${address} (Confidence: ${confidence})</desc>\n</wpt>\n`;
     }
 
     function exportToGPX() {
