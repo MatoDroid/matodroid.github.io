@@ -32,16 +32,16 @@
   <div id="map"></div>
   
   <script>
-    var map = L.map('map').setView([48.669, 19.699], 7); // Stred Slovenska
+    var map = L.map('map').setView([48.669, 19.699], 7);
     var markers = L.featureGroup().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    const API_KEY = '88fd9de6031a4153802fbc7184d947c9'; // SEM vložte svoj OpenCage API kľúč
+    const API_KEY = '88fd9de6031a4153802fbc7184d947c9';
     var gpxData = '';
-    var knownLocations = {}; // Ukladá známe súradnice
+    var locationCounts = {};
 
     $(document).ready(function() {
       $('#geocodeForm').on('submit', function(event) {
@@ -49,14 +49,14 @@
         var addressesText = $('#addresses').val();
         var addresses = addressesText.split('\n').map(line => line.trim()).filter(line => line !== '');
 
-        gpxData = ''; // Vymaže predchádzajúce GPX údaje
-        knownLocations = {}; // Resetovanie
+        gpxData = ''; 
+        locationCounts = {}; 
 
         addresses.forEach((line, index) => {
           setTimeout(() => {
-            var parts = line.split('\t'); // Skúsime tabulátor
+            var parts = line.split('\t');
             if (parts.length < 2) {
-              parts = line.split(','); // Ak nie je tabulátor, skúsime čiarku
+              parts = line.split(',');
             }
             if (parts.length < 2) {
               $('#results').append(`<p>Chybný formát riadku: ${line}</p>`);
@@ -65,28 +65,16 @@
             var name = parts[0].trim();
             var address = parts.slice(1).join(' ').trim();
             geocodeAddress(name, address);
-          }, index * 1000); // Po 1 sekunde
+          }, index * 1000);
         });
       });
     });
 
-    function getOffset(radius) {
-      var angle = Math.random() * 2 * Math.PI;
-      var offsetLat = radius * Math.cos(angle) / 111320;
-      var offsetLng = radius * Math.sin(angle) / (111320 * Math.cos(48.669));
+    function getOffset(radius, count) {
+      var angle = (count * 137.508) % 360; // Zlatý uhol pre rovnomerné rozmiestnenie
+      var offsetLat = radius * Math.cos(angle * (Math.PI / 180)) / 111320;
+      var offsetLng = radius * Math.sin(angle * (Math.PI / 180)) / (111320 * Math.cos(48.669));
       return { lat: offsetLat, lng: offsetLng };
-    }
-
-    function adjustCoordinates(lat, lng) {
-      var key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-      if (!(key in knownLocations)) {
-        knownLocations[key] = 0; // Prvý bod ostáva na mieste
-        return { lat, lng };
-      }
-      
-      knownLocations[key]++;
-      var offset = getOffset(3 * knownLocations[key]); // Každý ďalší posunieme do kruhu o 3m ďalej
-      return { lat: lat + offset.lat, lng: lng + offset.lng };
     }
 
     function geocodeAddress(name, address) {
@@ -98,14 +86,22 @@
           var longitude = data.results[0].geometry.lng;
           var confidence = data.results[0].confidence || "Neznáme";
 
-          var adjusted = adjustCoordinates(latitude, longitude);
+          var key = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+          if (!(key in locationCounts)) {
+            locationCounts[key] = 0; 
+          } else {
+            locationCounts[key]++;
+            var offset = getOffset(3, locationCounts[key]);
+            latitude += offset.lat;
+            longitude += offset.lng;
+          }
 
-          var result = `<p>${name} (${address}): ${adjusted.lat}, ${adjusted.lng} [Confidence: ${confidence}]</p>`;
+          var result = `<p>${name} (${address}): ${latitude}, ${longitude} [Confidence: ${confidence}]</p>`;
           $('#results').append(result);
 
-          gpxData += generateGPXWaypoint(name, address, adjusted.lat, adjusted.lng, confidence);
+          gpxData += generateGPXWaypoint(name, address, latitude, longitude, confidence);
 
-          var marker = L.marker([adjusted.lat, adjusted.lng]).addTo(markers);
+          var marker = L.marker([latitude, longitude]).addTo(markers);
           marker.bindPopup(`<b>${name}</b><br>${address}<br>Confidence: ${confidence}`).openPopup();
         } else {
           $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${address}</p>`);
@@ -149,7 +145,7 @@
       $('#results').empty();
       markers.clearLayers();
       gpxData = '';
-      knownLocations = {};
+      locationCounts = {};
     }
   </script>
 </body>
