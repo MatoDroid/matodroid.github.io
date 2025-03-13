@@ -21,7 +21,7 @@
   
   <form id="geocodeForm">
     <label for="addresses">Adresy:</label>
-    <textarea id="addresses" placeholder="Zadajte názov bodu a adresu, oddelené tabulátorom (napr. 'Dom	Hlavná 1, Bratislava')"></textarea>
+    <textarea id="addresses" placeholder="Zadajte názov bodu a adresu, oddelené tabulátorom alebo čiarkou (napr. 'Dom,Hlavná 1, Bratislava')"></textarea>
     <button type="submit">Geokódovať</button>
     <button type="button" onclick="exportToGPX()">Exportovať GPX</button>
     <button type="button" onclick="clearForm()">Vymazať</button>
@@ -42,7 +42,6 @@
     const API_KEY = '88fd9de6031a4153802fbc7184d947c9'; // SEM vložte svoj OpenCage API kľúč
     var gpxData = '';
     var centerLat = null, centerLng = null;
-    var seenLocations = [];
 
     $(document).ready(function() {
       $('#geocodeForm').on('submit', function(event) {
@@ -51,13 +50,15 @@
         var addresses = addressesText.split('\n').map(line => line.trim()).filter(line => line !== '');
 
         gpxData = ''; // Vymaže predchádzajúce GPX údaje
-        seenLocations = []; // Reset polôh
         centerLat = null;
         centerLng = null;
 
         addresses.forEach((line, index) => {
           setTimeout(() => {
-            var parts = line.split(','); // Rozdelenie tabulátorom
+            var parts = line.split('\t'); // Skúsime najskôr tabulátor
+            if (parts.length < 2) {
+              parts = line.split(','); // Ak tabulátor nie je, skúsime čiarku
+            }
             if (parts.length < 2) {
               $('#results').append(`<p>Chybný formát riadku: ${line}</p>`);
               return;
@@ -99,7 +100,7 @@
 
           var adjusted = adjustCoordinates(latitude, longitude);
 
-          var result = `<p>${name} (${address}): ${adjusted.lat}, ${adjusted.lng} [Confidence: ${confidence}]</p>`;
+          var result = `<p>${name} (${address}): ${adjusted.lat}, ${adjusted.lng} [Presnosť: ${confidence}]</p>`;
           $('#results').append(result);
 
           gpxData += generateGPXWaypoint(name, address, adjusted.lat, adjusted.lng, confidence);
