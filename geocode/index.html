@@ -78,7 +78,26 @@
           var latitude = resultData.geometry.lat;
           var longitude = resultData.geometry.lng;
           var formattedAddress = resultData.formatted;
-          var confidence = data.results[0].confidence || "Neznáme";
+          var accuracy = data.results[0].confidence || "Neznáme";
+
+          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
+          $('#results').append(result);
+
+          gpxData += generateGPXWaypoint(name, latitude, longitude, formattedAddress, accuracy);
+
+          var marker = L.marker([latitude, longitude]).addTo(markers);
+          marker.bindPopup(`<strong>${name}</strong><br>${formattedAddress}<br>Presnosť: ${accuracy}`).openPopup();
+        } else {
+          $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${address}</p>`);
+        }
+
+        if (markers.getLayers().length > 0) {
+          map.fitBounds(markers.getBounds());
+        }
+      }).fail(function() {
+        $('#results').append(`<p>Chyba pri geokódovaní adresy: ${address}</p>`);
+      });
+    }
 
     function generateGPXWaypoint(name, latitude, longitude, address, accuracy) {
       return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${address} (Presnosť: ${accuracy})</desc>\n</wpt>\n`;
@@ -92,7 +111,7 @@
 
       var gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       gpxContent += `<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-      gpxContent += `<metadata>\n  <name>Geokodovane adresy</name>\n</metadata>\n`;
+      gpxContent += `<metadata>\n  <name>Geocoded Addresses</name>\n</metadata>\n`;
       gpxContent += gpxData;
       gpxContent += `</gpx>\n`;
 
