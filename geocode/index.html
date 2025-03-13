@@ -57,7 +57,7 @@
 
         addresses.forEach((line, index) => {
           setTimeout(() => {
-            var parts = line.split('\t'); // Rozdelenie tabulátorom
+            var parts = line.split(','); // Rozdelenie tabulátorom
             if (parts.length < 2) {
               $('#results').append(`<p>Chybný formát riadku: ${line}</p>`);
               return;
