@@ -69,8 +69,8 @@
       });
     });
 
-    function geocodeAddress(name, address) {
-      var geocodeUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${API_KEY}`;
+    function geocodeAddress(name, originalAddress) {
+      var geocodeUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(originalAddress)}&key=${API_KEY}`;
 
       $.getJSON(geocodeUrl, function(data) {
         if (data.results.length > 0) {
@@ -102,7 +102,7 @@
     function generateGPXWaypoint(name, latitude, longitude, originalAddress, accuracy) {
   return `<wpt lat="${latitude}" lon="${longitude}">
   <name>${name}</name>
-  <desc>${originalAddress} (Presnosť: ${accuracy})</desc>
+  <desc>${originalAddress} - ${formattedAddress} - (Presnosť: ${accuracy})</desc>
   </wpt>\n`;
     }
 
@@ -114,13 +114,13 @@
 
       var gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       gpxContent += `<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-      gpxContent += `<metadata>\n  <name>Geocoded Addresses</name>\n</metadata>\n`;
+      gpxContent += `<metadata>\n  <name>Geokodovane adresy</name>\n</metadata>\n`;
       gpxContent += gpxData;
       gpxContent += `</gpx>\n`;
 
       var element = document.createElement('a');
       element.setAttribute('href', 'data:text/xml;charset=utf-8,' + encodeURIComponent(gpxContent));
-      element.setAttribute('download', 'geocoded_addresses.gpx');
+      element.setAttribute('download', 'geokodovane_adresy.gpx');
       element.style.display = 'none';
       document.body.appendChild(element);
       element.click();
