@@ -56,7 +56,7 @@
 
         entries.forEach((entry, index) => {
           setTimeout(() => {
-            let parts = entry.split(',');
+            let parts = entry.split(/\t|,/);
             if (parts.length >= 2) {
               let name = parts[0].trim();
               let originalAddress = parts.slice(1).join(',').trim();
@@ -99,8 +99,11 @@
       });
     }
 
-    function generateGPXWaypoint(name, latitude, longitude, address, accuracy) {
-      return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${originalAddress} (Presnosť: ${accuracy})</desc>\n</wpt>\n`;
+    function generateGPXWaypoint(name, latitude, longitude, originalAddress, accuracy) {
+  return `<wpt lat="${latitude}" lon="${longitude}">
+  <name>${name}</name>
+  <desc>${originalAddress} (Presnosť: ${accuracy})</desc>
+  </wpt>\n`;
     }
 
     function exportToGPX() {
