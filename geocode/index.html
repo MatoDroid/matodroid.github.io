@@ -59,7 +59,7 @@
             let parts = entry.split(',');
             if (parts.length >= 2) {
               let name = parts[0].trim();
-              let address = parts.slice(1).join(',').trim();
+              let originalAddress = parts.slice(1).join(',').trim();
               geocodeAddress(name, originalAddress);
             } else {
               $('#results').append(`<p>Chybný formát riadku: ${entry}</p>`);
