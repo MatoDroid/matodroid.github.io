@@ -60,7 +60,7 @@
             if (parts.length >= 2) {
               let name = parts[0].trim();
               let address = parts.slice(1).join(',').trim();
-              geocodeAddress(name, address);
+              geocodeAddress(name, originalAddress);
             } else {
               $('#results').append(`<p>Chybný formát riadku: ${entry}</p>`);
             }
@@ -80,27 +80,27 @@
           var formattedAddress = resultData.formatted;
           var accuracy = data.results[0].confidence || "Neznáme";
 
-          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Adresa: ${formattedAddress}</p>`;
+          var result = `<p><strong>${name}</strong>: ${latitude}, ${longitude} (Presnosť: ${accuracy})<br>Pôvodná adresa:${originalAddress}<br>Nájdená adresa: ${formattedAddress}</p>`;
           $('#results').append(result);
 
-          gpxData += generateGPXWaypoint(name, latitude, longitude, formattedAddress, accuracy);
+          gpxData += generateGPXWaypoint(name, latitude, longitude, originalAddress, accuracy);
 
           var marker = L.marker([latitude, longitude]).addTo(markers);
-          marker.bindPopup(`<strong>${name}</strong><br>${formattedAddress}<br>Presnosť: ${accuracy}`).openPopup();
+          marker.bindPopup(`<strong>${name}</strong><br>Pôvodná adresa:${originalAddress}<br>${formattedAddress}<br>Presnosť: ${accuracy}`).openPopup();
         } else {
-          $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${address}</p>`);
+          $('#results').append(`<p>Nepodarilo sa geokódovať adresu: ${originalAddress}</p>`);
         }
 
         if (markers.getLayers().length > 0) {
           map.fitBounds(markers.getBounds());
         }
       }).fail(function() {
-        $('#results').append(`<p>Chyba pri geokódovaní adresy: ${address}</p>`);
+        $('#results').append(`<p>Chyba pri geokódovaní adresy: ${originalAdress}</p>`);
       });
     }
 
     function generateGPXWaypoint(name, latitude, longitude, address, accuracy) {
-      return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${address} (Presnosť: ${accuracy})</desc>\n</wpt>\n`;
+      return `<wpt lat="${latitude}" lon="${longitude}">\n  <name>${name}</name>\n  <desc>${originalAddress} (Presnosť: ${accuracy})</desc>\n</wpt>\n`;
     }
 
     function exportToGPX() {
