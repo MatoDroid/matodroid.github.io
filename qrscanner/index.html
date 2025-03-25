@@ -36,13 +36,17 @@
         function getAccessTokenFromUrl() {
             let hash = window.location.hash.substring(1);
             let params = new URLSearchParams(hash);
-            accessToken = params.get("access_token");
+            let token = params.get("access_token");
 
-            if (accessToken) {
-                document.getElementById("auth-status").innerText = "Prihlásený";
+            if (token) {
+                sessionStorage.setItem("accessToken", token);
+                accessToken = token;
+                window.location.hash = "";
             } else {
-                document.getElementById("auth-status").innerText = "Neprihlásený";
+                accessToken = sessionStorage.getItem("accessToken");
             }
+
+            document.getElementById("auth-status").innerText = accessToken ? "Prihlásený" : "Neprihlásený";
         }
 
         function startScanner() {
@@ -97,14 +101,13 @@
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
             .then(() => {
                 alert("Dáta uložené do Google Sheets!");
                 statusText.innerText = "Pripravené na ďalšie skenovanie...";
                 scanData = { battery: null, user: null, cart: null };
                 saveButton.disabled = true;
                 scanStep = 0;
-                setTimeout(startScanner, 1000);
+                setTimeout(() => startScanner(), 1500);
             })
             .catch(error => {
                 alert("Chyba pri odosielaní: " + error);
