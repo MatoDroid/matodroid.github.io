@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Skenovanie</title>
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
         #reader { width: 300px; margin: auto; }
@@ -30,18 +30,11 @@
         let scanData = { battery: "", user: "", cart: "" };
 
         function startScanner() {
-            let scanner = new Html5Qrcode("reader");
-            scanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
-                (decodedText) => {
-                    handleScan(decodedText, scanner);
-                },
-                (errorMessage) => {}
-            );
+            let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+            scanner.render(handleScan);
         }
 
-        function handleScan(qrText, scanner) {
+        function handleScan(qrText) {
             if (scanStep === 0) {
                 scanData.battery = qrText;
                 document.getElementById("battery-code").innerText = qrText;
@@ -57,7 +50,6 @@
                 document.getElementById("cart-code").innerText = qrText;
                 document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
                 document.getElementById("save-data").classList.remove("hidden");
-                scanner.stop();
             }
         }
 
