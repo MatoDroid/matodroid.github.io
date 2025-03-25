@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR skenovanie a Google Sheets</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
     <h1>QR skenovanie</h1>
+    <button onclick="authorize()">Prihlásiť sa cez Google</button>
+    <p id="auth-status">Neprihlásený</p>
     <div id="reader" style="width: 300px;"></div>
     <p id="status">Pripravené na skenovanie...</p>
     <button id="save-data" disabled>Uložiť do Google Sheets</button>
@@ -18,9 +20,31 @@
         let html5QrCode = new Html5Qrcode("reader");
         const statusText = document.getElementById("status");
         const saveButton = document.getElementById("save-data");
-        const googleSheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
-        const googleApiKey = "AIzaSyCC2OtN99kPr7dysbA3BZjBvNchWwLgsbs";
-        
+        let accessToken = '';
+
+        const clientId = "869845897277-85cfoic93ehg75heesflbc5u5o16pqdg.apps.googleusercontent.com";
+        const redirectUri = "https://matodroid.github.io/qrscanner/";
+        const sheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
+        const sheetName = "QRData";
+
+        function authorize() {
+            let scope = "https://www.googleapis.com/auth/spreadsheets";
+            let authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
+            window.location.href = authUrl;
+        }
+
+        function getAccessTokenFromUrl() {
+            let hash = window.location.hash.substring(1);
+            let params = new URLSearchParams(hash);
+            accessToken = params.get("access_token");
+
+            if (accessToken) {
+                document.getElementById("auth-status").innerText = "Prihlásený";
+            } else {
+                document.getElementById("auth-status").innerText = "Neprihlásený";
+            }
+        }
+
         function startScanner() {
             html5QrCode.start(
                 { facingMode: "environment" },
@@ -45,24 +69,33 @@
                 scanData.cart = decodedText;
                 statusText.innerText = "Všetky údaje naskenované! Kliknite na 'Uložiť'";
                 saveButton.disabled = false;
-                return; // Skenovanie zastavené, čaká na uloženie
+                return;
             }
-            setTimeout(startScanner, 1000); // Po 1 sekunde pokračuje ďalšie skenovanie
+            setTimeout(startScanner, 1000);
         }
 
         saveButton.addEventListener("click", () => {
+            if (!accessToken) {
+                alert("Najprv sa prihlás!");
+                return;
+            }
+
             saveButton.disabled = true;
             statusText.innerText = "Ukladám do Google Sheets...";
 
-            let url = `https://sheets.googleapis.com/v4/spreadsheets/${googleSheetId}/values/QRData:append?valueInputOption=USER_ENTERED&key=${googleApiKey}`;
+            let url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}:append?valueInputOption=USER_ENTERED`;
+
             let data = {
                 values: [[new Date().toISOString(), scanData.battery, scanData.user, scanData.cart]]
             };
 
             fetch(url, {
                 method: "POST",
-                body: JSON.stringify(data),
-                headers: { "Content-Type": "application/json" }
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(() => {
@@ -71,7 +104,7 @@
                 scanData = { battery: null, user: null, cart: null };
                 saveButton.disabled = true;
                 scanStep = 0;
-                setTimeout(startScanner, 1000); // Reštart skenovania po uložení
+                setTimeout(startScanner, 1000);
             })
             .catch(error => {
                 alert("Chyba pri odosielaní: " + error);
@@ -80,6 +113,7 @@
             });
         });
 
+        window.onload = getAccessTokenFromUrl;
         startScanner();
     </script>
 </body>
