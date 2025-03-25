@@ -23,7 +23,7 @@
     <p><strong>Používateľ:</strong> <span id="user-code">-</span></p>
     <p><strong>Vozík:</strong> <span id="cart-code">-</span></p>
 
-    <button id="save-data" class="hidden">Uložiť dáta</button>
+    <button id="save-data" class="hidden" onclick="saveData()">Uložiť dáta</button>
 
     <script>
         let scanStep = 0;
@@ -32,13 +32,22 @@
 
         function startScanner() {
             scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-
-            scanner.render(handleScan, handleError);
+            scanner.render(handleScan);
         }
 
         function handleScan(qrText) {
-            if (scanStep >= 3) return; // Ak už máme všetky skeny, ignoruj nové
+            scanner.clear(); // Dočasne vypni skener
+            updateScanStep(qrText);
 
+            // Počkajte 1 sekundu a znova spustite skener (iba ak ešte nie sme na konci)
+            if (scanStep < 3) {
+                setTimeout(() => {
+                    scanner.render(handleScan);
+                }, 1000);
+            }
+        }
+
+        function updateScanStep(qrText) {
             if (scanStep === 0) {
                 scanData.battery = qrText;
                 document.getElementById("battery-code").innerText = qrText;
@@ -52,14 +61,19 @@
                 document.getElementById("cart-code").innerText = qrText;
                 document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
                 document.getElementById("save-data").classList.remove("hidden");
-                scanner.clear(); // Zastav skenovanie po dokončení
             }
-
             scanStep++;
         }
 
-        function handleError(errorMessage) {
-            console.warn("Chyba skenovania:", errorMessage);
+        function saveData() {
+            fetch("https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(scanData)
+            })
+            .then(response => response.text())
+            .then(data => alert(data))
+            .catch(error => alert("Chyba pri ukladaní: " + error));
         }
 
         startScanner();
