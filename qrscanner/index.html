@@ -31,14 +31,9 @@
         let scanner;
 
         function startScanner() {
-            scanner = new Html5Qrcode("reader");
+            scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
 
-            scanner.start(
-                { facingMode: "environment" }, // Použitie zadnej kamery
-                { fps: 10, qrbox: 250 },
-                handleScan,
-                handleError
-            );
+            scanner.render(handleScan, handleError);
         }
 
         function handleScan(qrText) {
@@ -57,7 +52,7 @@
                 document.getElementById("cart-code").innerText = qrText;
                 document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
                 document.getElementById("save-data").classList.remove("hidden");
-                scanner.stop(); // Zastav skenovanie po dokončení
+                scanner.clear(); // Zastav skenovanie po dokončení
             }
 
             scanStep++;
