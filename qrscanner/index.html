@@ -65,16 +65,22 @@
             scanStep++;
         }
             
-        function saveData() {
-            fetch("https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(scanData)
-            })
-            .then(response => response.text())
-            .then(data => alert("Odpoveď servera: " + data))
-            .catch(error => alert("Chyba pri ukladaní: " + error));
-        }
+function saveData() {
+    const data = {
+        battery: document.getElementById("battery-code").innerText,
+        user: document.getElementById("user-code").innerText,
+        cart: document.getElementById("cart-code").innerText
+    };
+
+    fetch("PASTE_YOUR_WEB_APP_URL_HERE", { // Sem vlož URL Web Appu
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => console.log("Odpoveď:", data))
+    .catch(error => console.error("Chyba:", error));
+}
 
 
         startScanner();
