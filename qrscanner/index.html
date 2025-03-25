@@ -20,33 +20,68 @@
         let html5QrCode = new Html5Qrcode("reader");
         const statusText = document.getElementById("status");
         const saveButton = document.getElementById("save-data");
-        let accessToken = '';
 
+        // OAuth 2.0 PKCE Flow
         const clientId = "869845897277-85cfoic93ehg75heesflbc5u5o16pqdg.apps.googleusercontent.com";
         const redirectUri = "https://matodroid.github.io/qrscanner/";
         const sheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
         const sheetName = "QRData";
+        let codeVerifier = localStorage.getItem("code_verifier");
+        let accessToken = sessionStorage.getItem("access_token");
 
-        function authorize() {
-            let scope = "https://www.googleapis.com/auth/spreadsheets";
-            let authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
+        async function generateCodeChallenge(verifier) {
+            const data = new TextEncoder().encode(verifier);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        }
+
+        async function authorize() {
+            codeVerifier = btoa(crypto.getRandomValues(new Uint8Array(32))).substring(0, 43);
+            localStorage.setItem("code_verifier", codeVerifier);
+            
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+            const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=https://www.googleapis.com/auth/spreadsheets&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+            
             window.location.href = authUrl;
         }
 
-        function getAccessTokenFromUrl() {
-            let hash = window.location.hash.substring(1);
-            let params = new URLSearchParams(hash);
-            let token = params.get("access_token");
+        async function exchangeCodeForToken(code) {
+            const tokenUrl = "https://oauth2.googleapis.com/token";
+            const data = new URLSearchParams({
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                grant_type: "authorization_code",
+                code: code,
+                code_verifier: codeVerifier
+            });
 
-            if (token) {
-                sessionStorage.setItem("accessToken", token);
-                accessToken = token;
-                window.location.hash = "";
+            const response = await fetch(tokenUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: data
+            });
+
+            const result = await response.json();
+            if (result.access_token) {
+                sessionStorage.setItem("access_token", result.access_token);
+                document.getElementById("auth-status").innerText = "Prihlásený";
+                accessToken = result.access_token;
             } else {
-                accessToken = sessionStorage.getItem("accessToken");
+                document.getElementById("auth-status").innerText = "Neprihlásený";
             }
+        }
 
-            document.getElementById("auth-status").innerText = accessToken ? "Prihlásený" : "Neprihlásený";
+        function getAccessTokenFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get("code");
+
+            if (code) {
+                exchangeCodeForToken(code);
+                window.history.replaceState({}, document.title, redirectUri);
+            }
         }
 
         function startScanner() {
@@ -101,13 +136,14 @@
                 },
                 body: JSON.stringify(data)
             })
+            .then(response => response.json())
             .then(() => {
                 alert("Dáta uložené do Google Sheets!");
                 statusText.innerText = "Pripravené na ďalšie skenovanie...";
                 scanData = { battery: null, user: null, cart: null };
                 saveButton.disabled = true;
                 scanStep = 0;
-                setTimeout(() => startScanner(), 1500);
+                setTimeout(startScanner, 1000);
             })
             .catch(error => {
                 alert("Chyba pri odosielaní: " + error);
