@@ -1,112 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="sk">
 <head>
-  <title>QR Code Scanner & Google Sheets</title>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Skenovanie</title>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        #reader { width: 300px; margin: auto; }
+        .hidden { display: none; }
+        button { margin: 10px; padding: 10px; font-size: 16px; }
+    </style>
 </head>
 <body>
-  <h1>QR Code Scanner & Google Sheets Integration</h1>
-  <button id="authorize_button" style="display: none;">Prihlásiť sa Google účtom</button>
-  <button id="signout_button" style="display: none;">Odhlásiť sa</button>
 
-  <video id="video" width="300" height="200" style="border: 1px solid black"></video>
-  <canvas id="canvas" width="300" height="200" style="display:none;"></canvas>
+    <h2>QR skenovanie</h2>
+    <p id="scan-status">Skenuj kód batérie</p>
+    
+    <div id="reader"></div>
 
-  <script>
-    let CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';  // Nahraď vlastným CLIENT_ID
-    let API_KEY = 'YOUR_API_KEY';  // Nahraď vlastným API_KEY
-    let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
-    let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+    <p><strong>Batéria:</strong> <span id="battery-code">-</span></p>
+    <p><strong>Používateľ:</strong> <span id="user-code">-</span></p>
+    <p><strong>Vozík:</strong> <span id="cart-code">-</span></p>
 
-    let authorizeButton = document.getElementById('authorize_button');
-    let signoutButton = document.getElementById('signout_button');
+    <button id="save-data" class="hidden">Uložiť dáta</button>
 
-    function handleClientLoad() {
-      gapi.load('client:auth2', initClient);
-    }
+    <script>
+        let scanStep = 0; 
+        let scanData = { battery: "", user: "", cart: "" };
 
-    function initClient() {
-      gapi.client.init({
-        apiKey: API_KEY,
-        clientId: CLIENT_ID,
-        discoveryDocs: DISCOVERY_DOCS,
-        scope: SCOPES
-      }).then(() => {
-        // Prihlásenie stavu
-        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-        authorizeButton.onclick = handleAuthClick;
-        signoutButton.onclick = handleSignoutClick;
-      });
-    }
-
-    function updateSigninStatus(isSignedIn) {
-      if (isSignedIn) {
-        authorizeButton.style.display = 'none';
-        signoutButton.style.display = 'block';
-        startScanner();
-      } else {
-        authorizeButton.style.display = 'block';
-        signoutButton.style.display = 'none';
-      }
-    }
-
-    function handleAuthClick(event) {
-      gapi.auth2.getAuthInstance().signIn();
-    }
-
-    function handleSignoutClick(event) {
-      gapi.auth2.getAuthInstance().signOut();
-    }
-
-    function startScanner() {
-      let video = document.getElementById('video');
-      let canvas = document.getElementById('canvas');
-      let ctx = canvas.getContext('2d');
-      let constraints = { video: { facingMode: 'environment' } };
-
-      navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-        video.srcObject = stream;
-        video.play();
-        scanQRCode();
-      });
-
-      function scanQRCode() {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code) {
-          console.log("Naskenovaný QR kód:", code.data);
-          appendToSheet(code.data);
+        function startScanner() {
+            let scanner = new Html5Qrcode("reader");
+            scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                (decodedText) => {
+                    handleScan(decodedText, scanner);
+                },
+                (errorMessage) => {}
+            );
         }
-        requestAnimationFrame(scanQRCode);
-      }
-    }
 
-    function appendToSheet(qrData) {
-      let spreadsheetId = 'YOUR_SPREADSHEET_ID';  // Nahraď vlastným Spreadsheet ID
-      let range = 'Sheet1!A1';  // Prispôsob podľa potreby
-      let values = [
-        [qrData]  // Údaje QR kódu
-      ];
-      let body = {
-        values: values
-      };
-      gapi.client.sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId,
-        range: range,
-        valueInputOption: 'RAW',
-        resource: body
-      }).then((response) => {
-        let result = response.result;
-        console.log(`${result.updates.updatedCells} bunky boli aktualizované.`);
-      });
-    }
+        function handleScan(qrText, scanner) {
+            if (scanStep === 0) {
+                scanData.battery = qrText;
+                document.getElementById("battery-code").innerText = qrText;
+                document.getElementById("scan-status").innerText = "Skenuj kód používateľa";
+                scanStep++;
+            } else if (scanStep === 1) {
+                scanData.user = qrText;
+                document.getElementById("user-code").innerText = qrText;
+                document.getElementById("scan-status").innerText = "Skenuj kód vozíka";
+                scanStep++;
+            } else if (scanStep === 2) {
+                scanData.cart = qrText;
+                document.getElementById("cart-code").innerText = qrText;
+                document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
+                document.getElementById("save-data").classList.remove("hidden");
+                scanner.stop();
+            }
+        }
 
-    // Načítanie klienta a autentifikácie po načítaní stránky
-    handleClientLoad();
-  </script>
+        document.getElementById("save-data").addEventListener("click", () => {
+            let timestamp = new Date().toISOString();
+            let finalData = { ...scanData, timestamp };
+            localStorage.setItem("qrScanData", JSON.stringify(finalData));
+            alert("Dáta uložené!\n" + JSON.stringify(finalData, null, 2));
+        });
+
+        startScanner();
+    </script>
+
 </body>
 </html>
