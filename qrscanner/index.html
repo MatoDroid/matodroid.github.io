@@ -60,6 +60,18 @@
             );
         }
 
+        function getFormattedTimestamp() {
+            return new Intl.DateTimeFormat("sk-SK", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false
+            }).format(new Date()).replace(",", "");
+        }
+
         function handleScan(decodedText) {
             if (scanStep === 0) {
                 scanData.battery = decodedText;
@@ -90,7 +102,7 @@
             let url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}:append?valueInputOption=USER_ENTERED`;
 
             let data = {
-                values: [[new Date().toISOString(), scanData.battery, scanData.user, scanData.cart]]
+                values: [[getFormattedTimestamp(), scanData.battery, scanData.user, scanData.cart]]
             };
 
             fetch(url, {
