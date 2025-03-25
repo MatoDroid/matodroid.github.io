@@ -3,88 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Skenovanie</title>
+    <title>QR Scanner & Google Sheets</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-        #reader { width: 300px; margin: auto; }
-        .hidden { display: none; }
-        button { margin: 10px; padding: 10px; font-size: 16px; }
-    </style>
 </head>
 <body>
-
-    <h2>QR skenovanie</h2>
-    <p id="scan-status">Skenuj kód batérie</p>
-    
-    <div id="reader"></div>
-
-    <p><strong>Batéria:</strong> <span id="battery-code">-</span></p>
-    <p><strong>Používateľ:</strong> <span id="user-code">-</span></p>
-    <p><strong>Vozík:</strong> <span id="cart-code">-</span></p>
-
-    <button id="save-data" class="hidden" onclick="saveData()">Uložiť dáta</button>
+    <h1>QR skenovanie</h1>
+    <div id="reader" style="width: 300px;"></div>
+    <p id="status">Pripravené na skenovanie...</p>
+    <button id="save-data" disabled>Uložiť do Google Sheets</button>
 
     <script>
+        let scanData = { battery: null, user: null, cart: null };
         let scanStep = 0;
-        let scanData = { battery: "", user: "", cart: "" };
-        let scanner;
+        const statusText = document.getElementById("status");
+        const saveButton = document.getElementById("save-data");
+        const googleSheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
+        const googleApiKey = "AIzaSyCC2OtN99kPr7dysbA3BZjBvNchWwLgsbs";
 
         function startScanner() {
-            scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            scanner.render(handleScan);
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                (decodedText) => {
+                    handleScan(decodedText);
+                    html5QrCode.stop();
+                    setTimeout(() => startScanner(), 1000); // Počkám 1 sekundu pred ďalším skenom
+                },
+                (errorMessage) => {}
+            );
         }
 
-        function handleScan(qrText) {
-            scanner.clear(); // Dočasne vypni skener
-            updateScanStep(qrText);
-
-            // Počkajte 1 sekundu a znova spustite skener (iba ak ešte nie sme na konci)
-            if (scanStep < 3) {
-                setTimeout(() => {
-                    scanner.render(handleScan);
-                }, 1000);
-            }
-        }
-
-        function updateScanStep(qrText) {
+        function handleScan(decodedText) {
             if (scanStep === 0) {
-                scanData.battery = qrText;
-                document.getElementById("battery-code").innerText = qrText;
-                document.getElementById("scan-status").innerText = "Počkajte... Skenuj kód používateľa";
+                scanData.battery = decodedText;
+                statusText.innerText = "Naskenujte QR kód používateľa...";
+                scanStep++;
             } else if (scanStep === 1) {
-                scanData.user = qrText;
-                document.getElementById("user-code").innerText = qrText;
-                document.getElementById("scan-status").innerText = "Počkajte... Skenuj kód vozíka";
+                scanData.user = decodedText;
+                statusText.innerText = "Naskenujte QR kód vozíka...";
+                scanStep++;
             } else if (scanStep === 2) {
-                scanData.cart = qrText;
-                document.getElementById("cart-code").innerText = qrText;
-                document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
-                document.getElementById("save-data").classList.remove("hidden");
+                scanData.cart = decodedText;
+                statusText.innerText = "Všetky údaje naskenované! Kliknite na 'Uložiť'";
+                saveButton.disabled = false;
+                scanStep = 0;
             }
-            scanStep++;
         }
-            
-function saveData() {
-    const data = {
-        battery: document.getElementById("battery-code").innerText,
-        user: document.getElementById("user-code").innerText,
-        cart: document.getElementById("cart-code").innerText
-    };
 
-    fetch("PASTE_YOUR_WEB_APP_URL_HERE", { // Sem vlož URL Web Appu
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => console.log("Odpoveď:", data))
-    .catch(error => console.error("Chyba:", error));
-}
+        saveButton.addEventListener("click", () => {
+            let url = `https://sheets.googleapis.com/v4/spreadsheets/${googleSheetId}/values/QRData:append?valueInputOption=USER_ENTERED&key=${googleApiKey}`;
+            let data = {
+                values: [[new Date().toISOString(), scanData.battery, scanData.user, scanData.cart]]
+            };
 
+            fetch(url, {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => response.json())
+            .then(data => alert("Dáta uložené do Google Sheets!"))
+            .catch(error => alert("Chyba pri odosielaní: " + error));
+
+            saveButton.disabled = true;
+            statusText.innerText = "Pripravené na ďalšie skenovanie...";
+        });
 
         startScanner();
     </script>
-
 </body>
 </html>
