@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR skenovanie a ukladanie do Google Sheets</title>
+    <title>QR skenovanie a Google Sheets</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -15,23 +15,18 @@
     <script>
         let scanData = { battery: null, user: null, cart: null };
         let scanStep = 0;
-        let html5QrCode;
+        let html5QrCode = new Html5Qrcode("reader");
         const statusText = document.getElementById("status");
         const saveButton = document.getElementById("save-data");
         const googleSheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
         const googleApiKey = "AIzaSyCC2OtN99kPr7dysbA3BZjBvNchWwLgsbs";
-
+        
         function startScanner() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => console.log("Scanner stopped"));
-            }
-            html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText) => {
-                    handleScan(decodedText);
-                    html5QrCode.stop();
+                    html5QrCode.stop().then(() => handleScan(decodedText));
                 },
                 (errorMessage) => {}
             );
@@ -42,18 +37,17 @@
                 scanData.battery = decodedText;
                 statusText.innerText = "Naskenujte QR kód používateľa...";
                 scanStep++;
-                setTimeout(startScanner, 1000);
             } else if (scanStep === 1) {
                 scanData.user = decodedText;
                 statusText.innerText = "Naskenujte QR kód vozíka...";
                 scanStep++;
-                setTimeout(startScanner, 1000);
             } else if (scanStep === 2) {
                 scanData.cart = decodedText;
                 statusText.innerText = "Všetky údaje naskenované! Kliknite na 'Uložiť'";
                 saveButton.disabled = false;
-                scanStep = 0;
+                return; // Skenovanie zastavené, čaká na uloženie
             }
+            setTimeout(startScanner, 1000); // Po 1 sekunde pokračuje ďalšie skenovanie
         }
 
         saveButton.addEventListener("click", () => {
@@ -76,7 +70,8 @@
                 statusText.innerText = "Pripravené na ďalšie skenovanie...";
                 scanData = { battery: null, user: null, cart: null };
                 saveButton.disabled = true;
-                setTimeout(startScanner, 1000);
+                scanStep = 0;
+                setTimeout(startScanner, 1000); // Reštart skenovania po uložení
             })
             .catch(error => {
                 alert("Chyba pri odosielaní: " + error);
