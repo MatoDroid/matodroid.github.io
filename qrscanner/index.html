@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Skenovanie</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
         #reader { width: 300px; margin: auto; }
@@ -26,28 +26,24 @@
     <button id="save-data" class="hidden">Uložiť dáta</button>
 
     <script>
-        let scanStep = 0; 
+        let scanStep = 0;
         let scanData = { battery: "", user: "", cart: "" };
         let scanner;
 
         function startScanner() {
-            scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            scanner.render(handleScan);
+            scanner = new Html5Qrcode("reader");
+
+            scanner.start(
+                { facingMode: "environment" }, // Použitie zadnej kamery
+                { fps: 10, qrbox: 250 },
+                handleScan,
+                handleError
+            );
         }
 
         function handleScan(qrText) {
-            scanner.clear(); // Dočasne vypni skener
-            updateScanStep(qrText);
+            if (scanStep >= 3) return; // Ak už máme všetky skeny, ignoruj nové
 
-            // Počkajte 1 sekundu a znova spustite skener (iba ak ešte nie sme na konci)
-            if (scanStep < 3) {
-                setTimeout(() => {
-                    scanner.render(handleScan);
-                }, 1000);
-            }
-        }
-
-        function updateScanStep(qrText) {
             if (scanStep === 0) {
                 scanData.battery = qrText;
                 document.getElementById("battery-code").innerText = qrText;
@@ -61,11 +57,15 @@
                 document.getElementById("cart-code").innerText = qrText;
                 document.getElementById("scan-status").innerText = "Všetky kódy naskenované!";
                 document.getElementById("save-data").classList.remove("hidden");
+                scanner.stop(); // Zastav skenovanie po dokončení
             }
+
             scanStep++;
         }
 
-        
+        function handleError(errorMessage) {
+            console.warn("Chyba skenovania:", errorMessage);
+        }
 
         startScanner();
     </script>
