@@ -65,12 +65,7 @@
             scanStep++;
         }
 
-        document.getElementById("save-data").addEventListener("click", () => {
-            let timestamp = new Date().toISOString();
-            let finalData = { ...scanData, timestamp };
-            localStorage.setItem("qrScanData", JSON.stringify(finalData));
-            alert("Dáta uložené!\n" + JSON.stringify(finalData, null, 2));
-        });
+        
 
         startScanner();
     </script>
