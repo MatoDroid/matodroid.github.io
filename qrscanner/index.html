@@ -3,51 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR skenovanie a Google Sheets</title>
+    <title>QR skenovanie a SeaTable</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
     <h1>QR skenovanie</h1>
-    <button onclick="authorize()">Prihlásiť sa cez Google</button>
-    <p id="auth-status">Neprihlásený</p>
-    <div id="reader" style="width: 300px;"></div>
     <p id="status">Pripravené na skenovanie...</p>
-    <button id="save-data" disabled>Uložiť do Google Sheets</button>
+    <div id="reader" style="width: 300px;"></div>
+    <button id="save-data" disabled>Uložiť do SeaTable</button>
 
     <script>
+        const seatableUrl = "https://cloud.seatable.io";  // Alebo vlastný self-hosted server
+        const apiToken = "bd8357bd95fe5fef27fa77de0b33692f30f866e2";  // <- Sem vlož svoj SeaTable API kľúč
+        const baseName = "QRData";  // Názov tabuľky
+
         let scanData = { battery: null, user: null, cart: null };
         let scanStep = 0;
         let html5QrCode = new Html5Qrcode("reader");
         const statusText = document.getElementById("status");
         const saveButton = document.getElementById("save-data");
-        let accessToken = '';
-
-        const clientId = "";
-        const redirectUri = "https://matodroid.github.io/qrscanner/";
-        const sheetId = "1DjUo4NK0_gbSuRCEyHxMg1m_8h12244B-ObQO4nWgDQ";
-        const sheetName = "QRData";
-
-        function authorize() {
-            let scope = "https://www.googleapis.com/auth/spreadsheets";
-            let authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
-            window.location.href = authUrl;
-        }
-
-        function getAccessTokenFromUrl() {
-            let hash = window.location.hash.substring(1);
-            let params = new URLSearchParams(hash);
-            let token = params.get("access_token");
-
-            if (token) {
-                sessionStorage.setItem("accessToken", token);
-                accessToken = token;
-                window.location.hash = "";
-            } else {
-                accessToken = sessionStorage.getItem("accessToken");
-            }
-
-            document.getElementById("auth-status").innerText = accessToken ? "Prihlásený" : "Neprihlásený";
-        }
 
         function startScanner() {
             html5QrCode.start(
@@ -58,18 +32,6 @@
                 },
                 (errorMessage) => {}
             );
-        }
-
-        function getFormattedTimestamp() {
-            return new Intl.DateTimeFormat("sk-SK", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false
-            }).format(new Date()).replace(",", "");
         }
 
         function handleScan(decodedText) {
@@ -90,45 +52,53 @@
             setTimeout(startScanner, 1000);
         }
 
-        saveButton.addEventListener("click", () => {
-            if (!accessToken) {
-                alert("Najprv sa prihlás!");
+        async function saveToSeaTable() {
+            saveButton.disabled = true;
+            statusText.innerText = "Ukladám do SeaTable...";
+
+            const timestamp = new Date().toLocaleString("sk-SK", { timeZone: "Europe/Bratislava" });
+
+            const response = await fetch(`${seatableUrl}/api/v2.1/dtable/app-access-token/`, {
+                method: "POST",
+                headers: { "Authorization": `Token ${apiToken}` }
+            });
+
+            const result = await response.json();
+            if (!result.app_access_token) {
+                alert("Chyba pri získavaní prístupu k SeaTable!");
+                saveButton.disabled = false;
                 return;
             }
 
-            saveButton.disabled = true;
-            statusText.innerText = "Ukladám do Google Sheets...";
+            const accessToken = result.app_access_token;
 
-            let url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}:append?valueInputOption=USER_ENTERED`;
-
-            let data = {
-                values: [[getFormattedTimestamp(), scanData.battery, scanData.user, scanData.cart]]
-            };
-
-            fetch(url, {
+            const { error } = await fetch(`${seatableUrl}/api/v2.1/dtable/db-rows/`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(data)
-            })
-            .then(() => {
-                alert("Dáta uložené do Google Sheets!");
+                body: JSON.stringify({
+                    table_name: baseName,
+                    rows: [{ timestamp, battery: scanData.battery, user: scanData.user, cart: scanData.cart }]
+                })
+            }).then(res => res.json());
+
+            if (error) {
+                alert("Chyba pri odosielaní: " + error);
+                statusText.innerText = "Chyba! Skúste znova.";
+                saveButton.disabled = false;
+            } else {
+                alert("Dáta uložené do SeaTable!");
                 statusText.innerText = "Pripravené na ďalšie skenovanie...";
                 scanData = { battery: null, user: null, cart: null };
                 saveButton.disabled = true;
                 scanStep = 0;
-                setTimeout(() => startScanner(), 1500);
-            })
-            .catch(error => {
-                alert("Chyba pri odosielaní: " + error);
-                statusText.innerText = "Chyba! Skúste znova.";
-                saveButton.disabled = false;
-            });
-        });
+                setTimeout(startScanner, 1000);
+            }
+        }
 
-        window.onload = getAccessTokenFromUrl;
+        saveButton.addEventListener("click", saveToSeaTable);
         startScanner();
     </script>
 </body>
