@@ -13,10 +13,11 @@
     <button id="save-data" disabled>Uložiť do SeaTable</button>
 
     <script>
+        // 🔹 SeaTable API nastavenia
         const seatableUrl = "https://cloud.seatable.io";  // Alebo vlastný self-hosted SeaTable
-        const apiToken = "bd8357bd95fe5fef27fa77de0b33692f30f866e2";  // <- Sem vlož svoj SeaTable API kľúč
-        const baseName = "QRData";  // <- Sem vlož názov svojej základne
-        const tableName = "Table1";  // <- Sem vlož názov tabuľky
+        const apiToken = "bd8357bd95fe5fef27fa77de0b33692f30f866e2";  // Vlož svoj API token
+        const baseName = "QRData";  // Názov základne
+        const tableName = "Table1";  // Názov tabuľky
 
         let scanData = { battery: null, user: null, cart: null };
         let scanStep = 0;
@@ -59,31 +60,40 @@
 
             const timestamp = new Date().toLocaleString("sk-SK", { timeZone: "Europe/Bratislava" });
 
-            const response = await fetch(`${seatableUrl}/api/v2.1/dtable-server/api/v2.1/dtables/${baseName}/rows/`, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Token ${apiToken}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    table_name: tableName,
-                    rows: [{ timestamp, battery: scanData.battery, user: scanData.user, cart: scanData.cart }]
-                })
-            });
+            try {
+                const response = await fetch(`${seatableUrl}/api/v2.1/dtable-server/api/v1/dtables/${baseName}/rows/`, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Token ${apiToken}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        table_name: tableName,
+                        rows: [{ 
+                            timestamp, 
+                            battery: scanData.battery, 
+                            user: scanData.user, 
+                            cart: scanData.cart 
+                        }]
+                    })
+                });
 
-            if (!response.ok) {
-                alert("Chyba pri odosielaní: " + (await response.text()));
+                if (!response.ok) {
+                    throw new Error(`Chyba: ${response.status} - ${await response.text()}`);
+                }
+
+                alert("Dáta uložené do SeaTable!");
+                statusText.innerText = "Pripravené na ďalšie skenovanie...";
+                scanData = { battery: null, user: null, cart: null };
+                saveButton.disabled = true;
+                scanStep = 0;
+                setTimeout(startScanner, 1000);
+
+            } catch (error) {
+                alert("Chyba pri odosielaní: " + error.message);
                 statusText.innerText = "Chyba! Skúste znova.";
                 saveButton.disabled = false;
-                return;
             }
-
-            alert("Dáta uložené do SeaTable!");
-            statusText.innerText = "Pripravené na ďalšie skenovanie...";
-            scanData = { battery: null, user: null, cart: null };
-            saveButton.disabled = true;
-            scanStep = 0;
-            setTimeout(startScanner, 1000);
         }
 
         saveButton.addEventListener("click", saveToSeaTable);
