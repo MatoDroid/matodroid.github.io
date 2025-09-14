@@ -417,12 +417,15 @@ button {
     width: 80%; /* Dynamická šírka */
     max-width: 800px; /* Maximálna šírka */
     min-width: 400px; /* Minimálna šírka */
-    overflow: auto;
+
+    max-height: 90vh;  /* modal nikdy nepresiahne 90% výšky obrazovky */
+    overflow-y: auto;  /* ak je obsahu veľa, objaví sa scrollbar */
+    
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    backface-visibility: hiden;
+    backface-visibility: hidden;
     perspective: 1000px
 }
 
@@ -623,3 +626,4 @@ button {
         font-size: 20px; /* Zmenšíme veľkosť ikony na zatvorenie */
     }
 }
+
