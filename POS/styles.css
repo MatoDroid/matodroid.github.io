@@ -424,7 +424,7 @@ button {
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     backface-visibility: hidden;
     perspective: 1000px
 }
@@ -569,7 +569,7 @@ button {
         max-width: 100%; /* Zabráni prekročeniu šírky obrazovky */
         max-height: 80vh; /* Zmenšíme maximálnu výšku */
         top: 10%; /* Posunieme okno nižšie */
-        transform: translate(-50%, 0); /* Centrovanie horizontálne */
+        transform: translateX(-50%); /* Centrovanie horizontálne */
     }
 
     .split-order-columns {
@@ -626,4 +626,5 @@ button {
         font-size: 20px; /* Zmenšíme veľkosť ikony na zatvorenie */
     }
 }
+
 
