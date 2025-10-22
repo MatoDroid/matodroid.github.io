@@ -1,474 +1,365 @@
 <!DOCTYPE html>
 <html lang="sk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administrácia Menu</title>
-<style>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administrácia Menu</title>
+  <style>
     body.hidden {
-        display: none;
+      display: none;
     }
-    
     body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #f9fafb;
-        color: #333;
-        margin: 0;
-        padding: 20px;
-        line-height: 1.6;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9fafb;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
     }
-
     h1, h2 {
-        color: #444;
-        font-weight: 600;
+      color: #444;
+      font-weight: 600;
     }
-
-    h1 {
-        margin-bottom: 15px;
-    }
-
-    h2 {
-        margin: 20px 0 10px;
-    }
-
-    /* Globálny štýl pre divy */
     div {
-        padding: 20px;
-        margin-bottom: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        color: #333;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      background-color: #fff;
     }
-
-    /* Farebné pozadia jednotlivých divov */
-    div:nth-child(1) {
-        background-color: #e3f2fd; /* Svetlomodrá */
-    }
-
-    div:nth-child(2) {
-        background-color: #fbe9e7; /* Svetločervená */
-    }
-
-    div:nth-child(3) {
-        background-color: #e8f5e9; /* Svetlozelená */
-    }
-
-    div:nth-child(4) {
-        background-color: #fffde7; /* Svetložltá */
-    }
-
-    div:nth-child(5) {
-        background-color: #ede7f6; /* Svetlofialová */
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #fff;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border-radius: 6px;
-        overflow: hidden;
-    }
-
-    th, td {
-        padding: 12px 15px;
-        text-align: left;
-        font-size: 14px;
-    }
-
-    th {
-        background-color: #ffffff;
-        color: #444;
-        font-weight: 600;
-        border: none;
-    }
-
-    td {
-        border-bottom: 1px solid #f1f1f1;
-    }
-
-    tr:last-child td {
-        border-bottom: none;
-    }
-
-    tr:hover {
-        background-color: #f8f9fa;
-    }
-
-    input, select {
-        padding: 10px;
-        margin: 5px 0;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 14px;
-        background-color: #fdfdfd;
-    }
-
-    input:focus, select:focus {
-        border-color: #90caf9;
-        outline: none;
-    }
-
     button {
-        padding: 10px 20px;
-        background-color: #64b5f6;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.3s ease, transform 0.2s ease;
+      padding: 10px 20px;
+      background-color: #64b5f6;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
     }
-
-    button:hover {
-        background-color: #42a5f5;
-        transform: scale(1.03);
+    button:hover { background-color: #42a5f5; }
+    input, select {
+      padding: 8px;
+      margin: 4px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 100%;
+      box-sizing: border-box;
     }
-
-    button:active {
-        transform: scale(1);
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
     }
-
-    form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 6px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    th, td { padding: 10px; border-bottom: 1px solid #eee; }
+    th { text-align: left; background: #f0f0f0; }
+    #import-export input[type=file] {
+      margin-top: 5px;
     }
-
-    label {
-        flex: 1 0 100%;
-        font-weight: 600;
-        margin-bottom: 5px;
-        color: #555;
-    }
-
-    form input, form select {
-        flex: 1 0 calc(33.33% - 10px);
-    }
-
-    form button {
-        flex: 1 0 100%;
-        margin-top: 10px;
-    }
-</style>
-
-            
+  </style>
 </head>
 <body class="hidden">
-    <h1>Administrácia Menu</h1>
+  <h1>Administrácia Menu</h1>
 
+  <!-- Správa stolov -->
+  <div>
+    <h2>Stoly</h2>
+    <table id="tablesTable">
+      <thead>
+        <tr><th>Číslo</th><th>Názov</th><th>Akcia</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addTable()">Pridať nový stôl</button>
+  </div>
 
-    <!-- Správa stolov -->
+  <!-- Správa kategórií -->
+  <div>
+    <h2>Kategórie</h2>
+    <table id="categoriesTable">
+      <thead>
+        <tr><th>ID</th><th>Názov</th><th>Akcia</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addCategory()">Pridať novú kategóriu</button>
+  </div>
+
+  <!-- Správa položiek menu -->
+  <div>
+    <h2>Položky Menu</h2>
+    <table id="menuTable">
+      <thead>
+        <tr><th>Kategória</th><th>Názov</th><th>Cena</th><th>Akcia</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addMenuItem()">Pridať novú položku</button>
+  </div>
+
+  <!-- 🟢 NOVÁ SEKCIA: Import / Export -->
+  <div id="import-export">
+    <h2>Import / Export</h2>
+
+    <h3>Stoly</h3>
+    <button onclick="exportEntity('tables','csv')">Export CSV</button>
+    <button onclick="exportEntity('tables','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'tables','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'tables','json')" />
+
+    <h3>Kategórie</h3>
+    <button onclick="exportEntity('categories','csv')">Export CSV</button>
+    <button onclick="exportEntity('categories','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'categories','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'categories','json')" />
+
+    <h3>Položky</h3>
+    <button onclick="exportEntity('items','csv')">Export CSV</button>
+    <button onclick="exportEntity('items','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'items','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'items','json')" />
+  </div>
+
+        <!-- Import / Export sekcia -->
     <div>
-        <h2>Stoly</h2>
-        <table id="tablesTable">
-            <thead>
-                <tr>
-                    <th>Číslo</th>
-                    <th>Názov</th>
-                    <th>Akcia</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-        <button onclick="addTable()">Pridať nový stôl</button>
-    </div>
-
-    <!-- Správa kategórií -->
-    <div>
-        <h2>Kategórie</h2>
-        <table id="categoriesTable">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Názov</th>
-                    <th>Akcia</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-        <button onclick="addCategory()">Pridať novú kategóriu</button>
-    </div>
-
-    <!-- Správa položiek menu -->
-    <div>
-        <h2>Položky Menu</h2>
-        <table id="menuTable">
-            <thead>
-                <tr>
-                    <th>Kategória</th>
-                    <th>Názov</th>
-                    <th>Cena</th>
-                    <th>Akcia</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-        <button onclick="addMenuItem()">Pridať novú položku</button>
-    </div>
-
-    <div>
-        <h2>Pridať nového používateľa</h2>
-        <form id="addUserForm">
-            <label for="username">Používateľské meno:</label>
-            <input type="text" id="username" name="username" required>
-            <label for="password">Heslo:</label>
-            <input type="password" id="password" name="password" required>
-            <label for="role">Rola:</label>
-            <select id="role" name="role" required>
-                <option value="admin">Admin</option>
-                <option value="user">User</option>
-            </select>
-            <button type="submit">Pridať používateľa</button>
-        </form>
-    </div>
+        <h2>Import / Export</h2>
     
-    <button id="logout-button">Odhlásiť sa</button>
+        <h3>Stoly</h3>
+        <button onclick="exportEntity('tables','csv')">Export CSV</button>
+        <button onclick="exportEntity('tables','json')">Export JSON</button>
+        <input type="file" accept=".csv" onchange="importEntity(event,'tables','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'tables','json')" />
+    
+        <h3>Kategórie</h3>
+        <button onclick="exportEntity('categories','csv')">Export CSV</button>
+        <button onclick="exportEntity('categories','json')">Export JSON</button>
+        <input type="file" accept=".csv" onchange="importEntity(event,'categories','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'categories','json')" />
+    
+        <h3>Položky</h3>
+        <button onclick="exportEntity('items','csv')">Export CSV</button>
+        <button onclick="exportEntity('items','json')">Export JSON</button>
+        <input type="file" accept=".csv" onchange="importEntity(event,'items','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'items','json')" />
+    </div>
 
-    <button onclick="saveMenuData()">Uložiť zmeny</button>
 
-    <script>
-        const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
-        let menuData = {};
+  <!-- Správa používateľov -->
+  <div>
+    <h2>Pridať nového používateľa</h2>
+    <form id="addUserForm">
+      <label for="username">Používateľské meno:</label>
+      <input type="text" id="username" name="username" required>
+      <label for="password">Heslo:</label>
+      <input type="password" id="password" name="password" required>
+      <label for="role">Rola:</label>
+      <select id="role" name="role" required>
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+      </select>
+      <button type="submit">Pridať používateľa</button>
+    </form>
+  </div>
 
-        // Kontrola tokenu pri načítaní stránky
-        document.addEventListener("DOMContentLoaded", async () => {
-            const token = localStorage.getItem("authToken");
-            if (!token) {
-                alert("Neautorizovaný prístup. Prihláste sa.");
-                window.location.href = "/login.html";
-                return;
-            }
-        
-            try {
-                // Overenie tokenu
-                const response = await fetch(`${BACKEND_URL}/verify-token`, {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Bearer ${token}`,
-                    },
-                });
-        
-                if (!response.ok) {
-                    throw new Error("Neplatný token");
-                }
-        
-                const tokenPayload = await response.json();
-        
-                // Overenie role
-                if (tokenPayload.role !== "admin") {
-                    alert("Nemáte oprávnenie na prístup. Presmerovanie na prihlásenie.");
-                    window.location.href = "/login.html";
-                    return;
-                }
-        
-                // Ak je token platný, zobrazte obsah stránky
-                document.body.classList.remove("hidden");
-            } catch (error) {
-                alert("Nemáte oprávnenie na prístup. Presmerovanie na prihlásenie.");
-                window.location.href = "/login.html";
-            }
+  <button id="logout-button">Odhlásiť sa</button>
+  <button onclick="saveMenuData()">Uložiť zmeny</button>
+
+  <script>
+    const BACKEND_URL = "https://matodroid.onrender.com";
+    let menuData = {};
+
+    // Overenie tokenu
+    document.addEventListener("DOMContentLoaded", async () => {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Neautorizovaný prístup. Prihláste sa.");
+        return (window.location.href = "/login.html");
+      }
+      try {
+        const res = await fetch(`${BACKEND_URL}/verify-token`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        
-
-
-        document.getElementById("addUserForm").addEventListener("submit", async function (event) {
-            event.preventDefault();
-    
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-            const role = document.getElementById("role").value;
-    
-            try {
-                const response = await fetch(`${BACKEND_URL}/add-user`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username, password, role }),
-                });
-    
-                if (response.ok) {
-                    alert("Používateľ bol úspešne pridaný.");
-                    document.getElementById("addUserForm").reset();
-                } else {
-                    const errorData = await response.json();
-                    alert("Chyba: " + errorData.error);
-                }
-            } catch (error) {
-                console.error("Chyba pri pridávaní používateľa:", error);
-            }
-        });
-        
-        // Funkcia na načítanie menu z backendu
-        async function loadMenuData() {
-            try {
-                const response = await fetch(`${BACKEND_URL}/menu`, {
-                    method: 'GET',
-                });
-        
-                if (!response.ok) {
-                    throw new Error(`Chyba pri načítaní dát: ${response.status} ${response.statusText}`);
-                }
-        
-                const data = await response.json();
-
-                // Ošetrenie prázdnych dát
-                if (!data.tables) data.tables = [];
-                if (!data.categories) data.categories = [];
-                if (!data.menuItems) data.menuItems = [];
-
-                //Uloženie dát
-                menuData = data;
-                renderTables();
-                renderCategories();
-                renderMenuItems();
-            } catch (error) {
-                alert('Nepodarilo sa načítať menu data: ' + error.message);
-                console.error(error);
-            }
-        }
-        
-        // Funkcia na uloženie menu do backendu
-        async function saveMenuData() {
-            try {
-                const response = await fetch(`${BACKEND_URL}/menu`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(menuData),
-                });
-        
-                if (!response.ok) {
-                    throw new Error(`Chyba pri ukladaní dát: ${response.status} ${response.statusText}`);
-                }
-        
-                alert('Dáta boli úspešne uložené!');
-            } catch (error) {
-                alert('Nepodarilo sa uložiť dáta: ' + error.message);
-                console.error(error);
-            }
-        }
-        
-        // Správa stolov
-        function renderTables() {
-            const tableBody = document.querySelector("#tablesTable tbody");
-            tableBody.innerHTML = ''; // Vyčistenie tabuľky
-        
-            menuData.tables.forEach((table, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><input type="number" value="${table.number}" onchange="updateTable(${index}, 'number', parseInt(this.value))"></td>
-                    <td><input type="text" value="${table.name}" onchange="updateTable(${index}, 'name', this.value)"></td>
-                    <td><button onclick="deleteTable(${index})">Odstrániť</button></td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-        
-        function addTable() {
-            menuData.tables.push({ number: '', name: '' });
-            renderTables();
-        }
-        
-        function updateTable(index, key, value) {
-            menuData.tables[index][key] = value;
-        }
-        
-        function deleteTable(index) {
-            menuData.tables.splice(index, 1);
-            renderTables();
-        }
-        
-        // Správa kategórií
-        function renderCategories() {
-            const tableBody = document.querySelector("#categoriesTable tbody");
-            tableBody.innerHTML = ''; // Vyčistenie tabuľky
-        
-            menuData.categories.forEach((category, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><input type="text" value="${category.id}" onchange="updateCategory(${index}, 'id', this.value)"></td>
-                    <td><input type="text" value="${category.name}" onchange="updateCategory(${index}, 'name', this.value)"></td>
-                    <td><button onclick="deleteCategory(${index})">Odstrániť</button></td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-        
-        function addCategory() {
-            menuData.categories.push({ id: '', name: '' });
-            renderCategories();
-        }
-        
-        function updateCategory(index, key, value) {
-            menuData.categories[index][key] = value;
-        }
-        
-        function deleteCategory(index) {
-            menuData.categories.splice(index, 1);
-            renderCategories();
-        }
-        
-        // Správa položiek menu
-        function renderMenuItems() {
-            const tableBody = document.querySelector("#menuTable tbody");
-            tableBody.innerHTML = ''; // Vyčistenie tabuľky
-        
-            menuData.menuItems.forEach((item, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>
-                        <select onchange="updateMenuItem(${index}, 'category', this.value)">
-                            ${menuData.categories.map(category => `
-                                <option value="${category.id}" ${item.category === category.id ? 'selected' : ''}>
-                                    ${category.name}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </td>
-                    <td><input type="text" value="${item.name}" onchange="updateMenuItem(${index}, 'name', this.value)"></td>
-                    <td><input type="number" step="0.01" value="${item.price}" onchange="updateMenuItem(${index}, 'price', parseFloat(this.value))"></td>
-                    <td><button onclick="deleteMenuItem(${index})">Odstrániť</button></td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-        
-        function addMenuItem() {
-            menuData.menuItems.push({ category: '', name: '', price: 0 });
-            renderMenuItems();
-        }
-        
-        function updateMenuItem(index, key, value) {
-            menuData.menuItems[index][key] = value;
-        }
-        
-        function deleteMenuItem(index) {
-            menuData.menuItems.splice(index, 1);
-            renderMenuItems();
-        }
-        
-        // Načítanie dát pri spustení
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.role !== "admin") throw new Error();
+        document.body.classList.remove("hidden");
         loadMenuData();
+      } catch {
+        alert("Neplatný token. Prihláste sa znova.");
+        window.location.href = "/login.html";
+      }
+    });
 
-        document.getElementById("logout-button").addEventListener("click", () => {
-            if (!localStorage.getItem("authToken")) {
-                alert("Nie ste prihlásený.");
-                return;
-            }
-            localStorage.removeItem("authToken");
-            window.location.href = "/POS/login.html";
-        });
-    
-        
-    </script>
+    // ---------------- MENU CRUD ----------------
+    async function loadMenuData() {
+      const res = await fetch(`${BACKEND_URL}/menu`);
+      menuData = await res.json();
+      if (!menuData.tables) menuData.tables = [];
+      if (!menuData.categories) menuData.categories = [];
+      if (!menuData.menuItems) menuData.menuItems = [];
+      renderTables(); renderCategories(); renderMenuItems();
+    }
+
+    async function saveMenuData() {
+      const res = await fetch(`${BACKEND_URL}/menu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(menuData),
+      });
+      if (res.ok) alert("Dáta uložené!");
+      else alert("Chyba pri ukladaní.");
+    }
+
+    // --- Tables ---
+    function renderTables() {
+      const tbody = document.querySelector("#tablesTable tbody");
+      tbody.innerHTML = "";
+      menuData.tables.forEach((t, i) => {
+        const r = document.createElement("tr");
+        r.innerHTML = `
+          <td><input type="number" value="${t.number ?? ""}" onchange="menuData.tables[${i}].number=this.value"></td>
+          <td><input type="text" value="${t.name ?? ""}" onchange="menuData.tables[${i}].name=this.value"></td>
+          <td><button onclick="menuData.tables.splice(${i},1);renderTables()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addTable(){menuData.tables.push({number:"",name:""});renderTables();}
+
+    // --- Categories ---
+    function renderCategories() {
+      const tbody = document.querySelector("#categoriesTable tbody");
+      tbody.innerHTML = "";
+      menuData.categories.forEach((c,i)=>{
+        const r=document.createElement("tr");
+        r.innerHTML=`<td><input value="${c.id??""}" onchange="menuData.categories[${i}].id=this.value"></td>
+          <td><input value="${c.name??""}" onchange="menuData.categories[${i}].name=this.value"></td>
+          <td><button onclick="menuData.categories.splice(${i},1);renderCategories()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addCategory(){menuData.categories.push({id:"",name:""});renderCategories();}
+
+    // --- Items ---
+    function renderMenuItems() {
+      const tbody=document.querySelector("#menuTable tbody");
+      tbody.innerHTML="";
+      menuData.menuItems.forEach((it,i)=>{
+        const r=document.createElement("tr");
+        r.innerHTML=`
+          <td><select onchange="menuData.menuItems[${i}].category=this.value">
+            ${menuData.categories.map(c=>`<option value="${c.id}" ${c.id===it.category?"selected":""}>${c.name}</option>`).join("")}
+          </select></td>
+          <td><input value="${it.name??""}" onchange="menuData.menuItems[${i}].name=this.value"></td>
+          <td><input type="number" value="${it.price??0}" onchange="menuData.menuItems[${i}].price=parseFloat(this.value)"></td>
+          <td><button onclick="menuData.menuItems.splice(${i},1);renderMenuItems()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addMenuItem(){menuData.menuItems.push({category:"",name:"",price:0});renderMenuItems();}
+
+    // ---------------- IMPORT / EXPORT ----------------
+    function getToken(){ return localStorage.getItem("authToken"); }
+
+    async function exportEntity(entity, format="csv") {
+      const token = getToken();
+      const url = `${BACKEND_URL}/export/${entity}?format=${format}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return alert("Chyba exportu");
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${entity}-${new Date().toISOString().slice(0,10)}.${format}`;
+      a.click();
+    }
+
+    async function importEntity(ev, entity, format) {
+      const token = getToken();
+      const f = ev.target.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      const body = format==="json" ? {format:"json",data:JSON.parse(text)} : {format:"csv",data:text};
+      const r = await fetch(`${BACKEND_URL}/import/${entity}?format=${format}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+        body:JSON.stringify(body)
+      });
+      if (!r.ok) return alert("Import zlyhal");
+      const j=await r.json();
+      alert(`Import OK (${j.imported} záznamov).`);
+      loadMenuData();
+    }
+
+    // ---------------- Logout ----------------
+    document.getElementById("logout-button").addEventListener("click",()=>{
+      localStorage.removeItem("authToken");
+      window.location.href="/POS/login.html";
+    });
+
+        // === Import / Export funkcie ===
+    function getToken() {
+        return localStorage.getItem("authToken");
+    }
+
+    async function exportEntity(entity, format = "csv") {
+        const token = getToken();
+        if (!token) {
+            alert("Chýba token – prihláste sa znova.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/export/${entity}?format=${format}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!response.ok) throw new Error("Export zlyhal");
+
+            const blob = await response.blob();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `${entity}-${new Date().toISOString().slice(0, 10)}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (error) {
+            alert("Chyba pri exporte: " + error.message);
+        }
+    }
+
+    async function importEntity(event, entity, format) {
+        const token = getToken();
+        if (!token) {
+            alert("Chýba token – prihláste sa znova.");
+            return;
+        }
+
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const body = format === "json"
+                ? { format: "json", data: JSON.parse(text) }
+                : { format: "csv", data: text };
+
+            const response = await fetch(`${BACKEND_URL}/import/${entity}?format=${format}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) throw new Error("Import zlyhal");
+
+            const result = await response.json();
+            alert(`Import úspešný (${result.imported} záznamov).`);
+            await loadMenuData(); // obnov dáta po importe
+        } catch (error) {
+            alert("Chyba pri importe: " + error.message);
+        }
+    }
+
+  </script>
 </body>
 </html>
