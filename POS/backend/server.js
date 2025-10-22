@@ -275,6 +275,159 @@ app.get('/generate-qr', async (req, res) => {
     }
 });
 
+
+// ================== IMPORT / EXPORT (ADMIN ONLY) ==================
+function requireAdmin(req, res, next) {
+    if (!req.user || req.user.role !== "admin") {
+        return res.status(403).json({ message: "Len pre adminov." });
+    }
+    next();
+}
+
+function stringifyCSV(rows) {
+    if (!rows || !rows.length) return "";
+    const headers = Array.from(rows.reduce((set, o) => {
+        Object.keys(o || {}).forEach(k => set.add(k));
+        return set;
+    }, new Set()));
+    const esc = v => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    return [headers.join(","), ...rows.map(o => headers.map(h => esc(o?.[h])).join(","))].join("\n");
+}
+
+function parseCSV(text) {
+    const rows = [];
+    let i = 0, field = "", row = [], inQ = false;
+    const pushF = () => { row.push(field); field = ""; };
+    const pushR = () => { rows.push(row); row = []; };
+    while (i < text.length) {
+        const c = text[i];
+        if (inQ) {
+            if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+            else if (c === '"') inQ = false;
+            else field += c;
+        } else {
+            if (c === '"') inQ = true;
+            else if (c === ",") pushF();
+            else if (c === "\r") {}
+            else if (c === "\n") { pushF(); pushR(); }
+            else field += c;
+        }
+        i++;
+    }
+    if (field.length || row.length) { pushF(); pushR(); }
+    if (!rows.length) return { headers: [], data: [] };
+    const headers = rows[0];
+    const data = rows.slice(1).map(r => Object.fromEntries(headers.map((h, idx) => [h, r[idx] ?? ""])));
+    return { headers, data };
+}
+
+function normalizeEntity(entity, o) {
+    const toBool = v => ["1", "true", "yes"].includes(String(v).toLowerCase());
+    const toNum = v => (v === "" || v == null ? null : Number(v));
+    const trim = v => (v == null ? "" : String(v).trim());
+
+    if (entity === "tables")
+        return { id: trim(o.id), name: trim(o.name ?? o.nazov), capacity: toNum(o.capacity), active: toBool(o.active), order: toNum(o.order) };
+    if (entity === "categories")
+        return { id: trim(o.id), name: trim(o.name ?? o.nazov), order: toNum(o.order), active: toBool(o.active) };
+    if (entity === "items")
+        return { id: trim(o.id), category: trim(o.category ?? o.categoryId), name: trim(o.name ?? o.nazov), price: toNum(o.price ?? o.cena), vat: toNum(o.vat ?? o.dph), sku: trim(o.sku ?? o.kod), active: toBool(o.active) };
+    return o;
+}
+
+function mergeById(existingArr, importedArr, entity) {
+    const byId = new Map((existingArr || []).map(x => [String(x.id), x]));
+    for (const obj of importedArr) {
+        const n = normalizeEntity(entity, obj);
+        if (!n.id) n.id = `${entity}-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+        byId.set(String(n.id), { ...byId.get(String(n.id)), ...n });
+    }
+    return Array.from(byId.values());
+}
+
+async function loadMenu() {
+    const r = await fetch(`${JSONBIN_URL}/${MENU_BIN_ID}`, {
+        headers: { "X-Master-Key": JSONBIN_API_KEY },
+    });
+    const j = await r.json();
+    return j?.record ?? j;
+}
+
+async function saveMenu(menu) {
+    const r = await fetch(`${JSONBIN_URL}/${MENU_BIN_ID}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": JSONBIN_API_KEY,
+        },
+        body: JSON.stringify(menu),
+    });
+    return r.json();
+}
+
+// --- EXPORT ---
+app.get("/export/:entity", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { entity } = req.params;
+        const format = (req.query.format || "csv").toLowerCase();
+        if (!["tables", "categories", "items"].includes(entity))
+            return res.status(400).json({ error: "Neznáma entita." });
+
+        const menu = await loadMenu();
+        const data = entity === "tables" ? menu.tables : entity === "categories" ? menu.categories : menu.menuItems;
+        if (format === "json") {
+            res.setHeader("Content-Type", "application/json");
+            return res.send(JSON.stringify(data, null, 2));
+        }
+        res.setHeader("Content-Type", "text/csv");
+        return res.send(stringifyCSV(data));
+    } catch (e) {
+        console.error("Export error:", e);
+        res.status(500).json({ error: "Chyba pri exporte." });
+    }
+});
+
+// --- IMPORT ---
+app.post("/import/:entity", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { entity } = req.params;
+        const format = (req.query.format || req.body.format || "csv").toLowerCase();
+        if (!["tables", "categories", "items"].includes(entity))
+            return res.status(400).json({ error: "Neznáma entita." });
+
+        const text = typeof req.body === "string" ? req.body : req.body?.data;
+        let imported = [];
+
+        if (format === "json") {
+            imported = Array.isArray(req.body) ? req.body : req.body.data || [];
+        } else {
+            const parsed = parseCSV(text);
+            imported = parsed.data;
+        }
+
+        const menu = await loadMenu();
+        const merged = mergeById(
+            entity === "tables" ? menu.tables : entity === "categories" ? menu.categories : menu.menuItems,
+            imported,
+            entity
+        );
+
+        if (entity === "tables") menu.tables = merged;
+        if (entity === "categories") menu.categories = merged;
+        if (entity === "items") menu.menuItems = merged;
+
+        await saveMenu(menu);
+        res.json({ ok: true, imported: imported.length });
+    } catch (e) {
+        console.error("Import error:", e);
+        res.status(500).json({ error: "Chyba pri importe." });
+    }
+});
+
 // Spustenie servera
 app.listen(PORT, () => console.log(`Server beží na porte ${PORT}`));
 
