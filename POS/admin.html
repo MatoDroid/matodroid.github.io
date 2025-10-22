@@ -96,28 +96,6 @@
     <button onclick="addMenuItem()">Pridať novú položku</button>
   </div>
 
-  <!-- 🟢 NOVÁ SEKCIA: Import / Export -->
-  <div id="import-export">
-    <h2>Import / Export</h2>
-
-    <h3>Stoly</h3>
-    <button onclick="exportEntity('tables','csv')">Export CSV</button>
-    <button onclick="exportEntity('tables','json')">Export JSON</button>
-    <input type="file" accept=".csv" onchange="importEntity(event,'tables','csv')" />
-    <input type="file" accept=".json" onchange="importEntity(event,'tables','json')" />
-
-    <h3>Kategórie</h3>
-    <button onclick="exportEntity('categories','csv')">Export CSV</button>
-    <button onclick="exportEntity('categories','json')">Export JSON</button>
-    <input type="file" accept=".csv" onchange="importEntity(event,'categories','csv')" />
-    <input type="file" accept=".json" onchange="importEntity(event,'categories','json')" />
-
-    <h3>Položky</h3>
-    <button onclick="exportEntity('items','csv')">Export CSV</button>
-    <button onclick="exportEntity('items','json')">Export JSON</button>
-    <input type="file" accept=".csv" onchange="importEntity(event,'items','csv')" />
-    <input type="file" accept=".json" onchange="importEntity(event,'items','json')" />
-  </div>
 
         <!-- Import / Export sekcia -->
     <div>
@@ -293,72 +271,6 @@
       localStorage.removeItem("authToken");
       window.location.href="/POS/login.html";
     });
-
-        // === Import / Export funkcie ===
-    function getToken() {
-        return localStorage.getItem("authToken");
-    }
-
-    async function exportEntity(entity, format = "csv") {
-        const token = getToken();
-        if (!token) {
-            alert("Chýba token – prihláste sa znova.");
-            return;
-        }
-
-        try {
-            const response = await fetch(`${BACKEND_URL}/export/${entity}?format=${format}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (!response.ok) throw new Error("Export zlyhal");
-
-            const blob = await response.blob();
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `${entity}-${new Date().toISOString().slice(0, 10)}.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } catch (error) {
-            alert("Chyba pri exporte: " + error.message);
-        }
-    }
-
-    async function importEntity(event, entity, format) {
-        const token = getToken();
-        if (!token) {
-            alert("Chýba token – prihláste sa znova.");
-            return;
-        }
-
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            const body = format === "json"
-                ? { format: "json", data: JSON.parse(text) }
-                : { format: "csv", data: text };
-
-            const response = await fetch(`${BACKEND_URL}/import/${entity}?format=${format}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(body),
-            });
-
-            if (!response.ok) throw new Error("Import zlyhal");
-
-            const result = await response.json();
-            alert(`Import úspešný (${result.imported} záznamov).`);
-            await loadMenuData(); // obnov dáta po importe
-        } catch (error) {
-            alert("Chyba pri importe: " + error.message);
-        }
-    }
 
   </script>
 </body>
