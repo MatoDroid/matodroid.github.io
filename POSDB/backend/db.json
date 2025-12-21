@@ -1,0 +1,305 @@
+{
+    "menu": {
+        "header": {
+            "title": "Restaurant POS System"
+        },
+        "tables": [
+            {
+                "number": 1,
+                "name": "Stôl 1"
+            },
+            {
+                "number": 2,
+                "name": "Stôl 2"
+            },
+            {
+                "number": 3,
+                "name": "Stôl 3"
+            },
+            {
+                "number": 4,
+                "name": "Stôl 4"
+            },
+            {
+                "number": 5,
+                "name": "Stôl 5"
+            }
+        ],
+        "categories": [
+            {
+                "id": "main",
+                "name": "Hlavné jedlá",
+                "order": null,
+                "active": false
+            },
+            {
+                "id": "appetizer",
+                "name": "Predjedlá",
+                "order": null,
+                "active": false
+            },
+            {
+                "id": "soup",
+                "name": "Polievky",
+                "order": null,
+                "active": false
+            },
+            {
+                "id": "dessert",
+                "name": "Dezerty",
+                "order": null,
+                "active": false
+            },
+            {
+                "id": "drink",
+                "name": "Nápoje"
+            },
+            {
+                "id": "alco",
+                "name": "Alkohol",
+                "order": null,
+                "active": false
+            },
+            {
+                "id": "nealko",
+                "name": "Nealko",
+                "order": null,
+                "active": false
+            }
+        ],
+        "menuItems": [
+            {
+                "category": "drink",
+                "name": "Voda",
+                "price": 1
+            },
+            {
+                "id": "items-1761210962128-ad70",
+                "category": "main",
+                "name": "Rezeň so zemiakmi",
+                "price": 12.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-f16d",
+                "category": "main",
+                "name": "Sviečková na smotane",
+                "price": 14.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-7d4d",
+                "category": "main",
+                "name": "Penne Carbonara",
+                "price": 11.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-b9fa",
+                "category": "main",
+                "name": "Losos s ryžou",
+                "price": 15.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-2a91",
+                "category": "main",
+                "name": "Kuracie Supreme",
+                "price": 13.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-bbef",
+                "category": "appetizer",
+                "name": "Bruschetta",
+                "price": 6.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-c772",
+                "category": "appetizer",
+                "name": "Carpaccio",
+                "price": 7.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-29b5",
+                "category": "appetizer",
+                "name": "Grécky šalát",
+                "price": 5.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-6388",
+                "category": "soup",
+                "name": "Slepačí vývar",
+                "price": 4.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-7011",
+                "category": "soup",
+                "name": "Paradajková polievka",
+                "price": 4.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-ff7a",
+                "category": "soup",
+                "name": "Cesnaková polievka",
+                "price": 5.2,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-a3eb",
+                "category": "dessert",
+                "name": "Tiramisu",
+                "price": 5.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-d276",
+                "category": "dessert",
+                "name": "Čokoládová torta",
+                "price": 5.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-8b54",
+                "category": "dessert",
+                "name": "Palacinky s nutelou",
+                "price": 4.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-43e8",
+                "category": "nealko",
+                "name": "Coca-Cola",
+                "price": 2.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-8eb0",
+                "category": "nealko",
+                "name": "Minerálna voda",
+                "price": 2.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-6a0b",
+                "category": "nealko",
+                "name": "Džús pomarančový",
+                "price": 2.9,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-7101",
+                "category": "nealko",
+                "name": "Káva Espresso",
+                "price": 3.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-8282",
+                "category": "alco",
+                "name": "Pivo",
+                "price": 1.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-a603",
+                "category": "alco",
+                "name": "Vodka",
+                "price": 2,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-907b",
+                "category": "alco",
+                "name": "Borovička",
+                "price": 2,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-b6d2",
+                "category": "alco",
+                "name": "Slivovica",
+                "price": 2.5,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-2a3e",
+                "category": "alco",
+                "name": "Rum",
+                "price": 2,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-d8d1",
+                "category": "alco",
+                "name": "Whiskey",
+                "price": 3,
+                "vat": null,
+                "sku": "",
+                "active": false
+            },
+            {
+                "id": "items-1761210962128-b64d",
+                "category": "nealko",
+                "name": "Voda",
+                "price": 1,
+                "vat": null,
+                "sku": "",
+                "active": false
+            }
+        ]
+    },
+    "orders": {},
+    "paidOrders": []
+}

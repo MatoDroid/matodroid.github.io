@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="sk">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administrácia Menu</title>
+  <style>
+    body.hidden {
+      display: none;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9fafb;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    h1,
+    h2 {
+      color: #444;
+      font-weight: 600;
+    }
+
+    div {
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      background-color: #fff;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #64b5f6;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: #42a5f5;
+    }
+
+    input,
+    select {
+      padding: 8px;
+      margin: 4px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      text-align: left;
+      background: #f0f0f0;
+    }
+
+    #import-export input[type=file] {
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body class="hidden">
+  <h1>Administrácia Menu</h1>
+
+  <!-- Správa stolov -->
+  <div>
+    <h2>Stoly</h2>
+    <table id="tablesTable">
+      <thead>
+        <tr>
+          <th>Číslo</th>
+          <th>Názov</th>
+          <th>Akcia</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addTable()">Pridať nový stôl</button>
+  </div>
+
+  <!-- Správa kategórií -->
+  <div>
+    <h2>Kategórie</h2>
+    <table id="categoriesTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Názov</th>
+          <th>Akcia</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addCategory()">Pridať novú kategóriu</button>
+  </div>
+
+  <!-- Správa položiek menu -->
+  <div>
+    <h2>Položky Menu</h2>
+    <table id="menuTable">
+      <thead>
+        <tr>
+          <th>Kategória</th>
+          <th>Názov</th>
+          <th>Cena</th>
+          <th>Akcia</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addMenuItem()">Pridať novú položku</button>
+  </div>
+
+
+  <!-- Import / Export sekcia -->
+  <div>
+    <h2>Import / Export</h2>
+
+    <h3>Stoly</h3>
+    <button onclick="exportEntity('tables','csv')">Export CSV</button>
+    <button onclick="exportEntity('tables','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'tables','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'tables','json')" />
+
+    <h3>Kategórie</h3>
+    <button onclick="exportEntity('categories','csv')">Export CSV</button>
+    <button onclick="exportEntity('categories','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'categories','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'categories','json')" />
+
+    <h3>Položky</h3>
+    <button onclick="exportEntity('items','csv')">Export CSV</button>
+    <button onclick="exportEntity('items','json')">Export JSON</button>
+    <input type="file" accept=".csv" onchange="importEntity(event,'items','csv')" />
+    <input type="file" accept=".json" onchange="importEntity(event,'items','json')" />
+  </div>
+
+
+  <!-- Správa používateľov -->
+  <div>
+    <h2>Pridať nového používateľa</h2>
+    <form id="addUserForm">
+      <label for="username">Používateľské meno:</label>
+      <input type="text" id="username" name="username" required>
+      <label for="password">Heslo:</label>
+      <input type="password" id="password" name="password" required>
+      <label for="role">Rola:</label>
+      <select id="role" name="role" required>
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+      </select>
+      <button type="submit">Pridať používateľa</button>
+    </form>
+  </div>
+
+  <button id="logout-button">Odhlásiť sa</button>
+  <button onclick="saveMenuData()">Uložiť zmeny</button>
+
+  <script>
+    const BACKEND_URL = "http://localhost:3000";
+    let menuData = {};
+
+    // Overenie tokenu
+    document.addEventListener("DOMContentLoaded", async () => {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Neautorizovaný prístup. Prihláste sa.");
+        return (window.location.href = "/login.html");
+      }
+      try {
+        const res = await fetch(`${BACKEND_URL}/verify-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.role !== "admin") throw new Error();
+        document.body.classList.remove("hidden");
+        loadMenuData();
+      } catch {
+        alert("Neplatný token. Prihláste sa znova.");
+        window.location.href = "/login.html";
+      }
+    });
+
+    // ---------------- MENU CRUD ----------------
+    async function loadMenuData() {
+      const res = await fetch(`${BACKEND_URL}/menu`);
+      menuData = await res.json();
+      if (!menuData.tables) menuData.tables = [];
+      if (!menuData.categories) menuData.categories = [];
+      if (!menuData.menuItems) menuData.menuItems = [];
+      renderTables(); renderCategories(); renderMenuItems();
+    }
+
+    async function saveMenuData() {
+      const res = await fetch(`${BACKEND_URL}/menu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(menuData),
+      });
+      if (res.ok) alert("Dáta uložené!");
+      else alert("Chyba pri ukladaní.");
+    }
+
+    // --- Tables ---
+    function renderTables() {
+      const tbody = document.querySelector("#tablesTable tbody");
+      tbody.innerHTML = "";
+      menuData.tables.forEach((t, i) => {
+        const r = document.createElement("tr");
+        r.innerHTML = `
+          <td><input type="number" value="${t.number ?? ""}" onchange="menuData.tables[${i}].number=this.value"></td>
+          <td><input type="text" value="${t.name ?? ""}" onchange="menuData.tables[${i}].name=this.value"></td>
+          <td><button onclick="menuData.tables.splice(${i},1);renderTables()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addTable() { menuData.tables.push({ number: "", name: "" }); renderTables(); }
+
+    // --- Categories ---
+    function renderCategories() {
+      const tbody = document.querySelector("#categoriesTable tbody");
+      tbody.innerHTML = "";
+      menuData.categories.forEach((c, i) => {
+        const r = document.createElement("tr");
+        r.innerHTML = `<td><input value="${c.id ?? ""}" onchange="menuData.categories[${i}].id=this.value"></td>
+          <td><input value="${c.name ?? ""}" onchange="menuData.categories[${i}].name=this.value"></td>
+          <td><button onclick="menuData.categories.splice(${i},1);renderCategories()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addCategory() { menuData.categories.push({ id: "", name: "" }); renderCategories(); }
+
+    // --- Items ---
+    function renderMenuItems() {
+      const tbody = document.querySelector("#menuTable tbody");
+      tbody.innerHTML = "";
+      menuData.menuItems.forEach((it, i) => {
+        const r = document.createElement("tr");
+        r.innerHTML = `
+          <td><select onchange="menuData.menuItems[${i}].category=this.value">
+            ${menuData.categories.map(c => `<option value="${c.id}" ${c.id === it.category ? "selected" : ""}>${c.name}</option>`).join("")}
+          </select></td>
+          <td><input value="${it.name ?? ""}" onchange="menuData.menuItems[${i}].name=this.value"></td>
+          <td><input type="number" value="${it.price ?? 0}" onchange="menuData.menuItems[${i}].price=parseFloat(this.value)"></td>
+          <td><button onclick="menuData.menuItems.splice(${i},1);renderMenuItems()">Odstrániť</button></td>`;
+        tbody.appendChild(r);
+      });
+    }
+    function addMenuItem() { menuData.menuItems.push({ category: "", name: "", price: 0 }); renderMenuItems(); }
+
+    // ---------------- IMPORT / EXPORT ----------------
+    function getToken() { return localStorage.getItem("authToken"); }
+
+    async function exportEntity(entity, format = "csv") {
+      const token = getToken();
+      const url = `${BACKEND_URL}/export/${entity}?format=${format}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return alert("Chyba exportu");
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${entity}-${new Date().toISOString().slice(0, 10)}.${format}`;
+      a.click();
+    }
+
+    async function importEntity(ev, entity, format) {
+      const token = getToken();
+      const f = ev.target.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      const body = format === "json" ? { format: "json", data: JSON.parse(text) } : { format: "csv", data: text };
+      const r = await fetch(`${BACKEND_URL}/import/${entity}?format=${format}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) return alert("Import zlyhal");
+      const j = await r.json();
+      alert(`Import OK (${j.imported} záznamov).`);
+      loadMenuData();
+    }
+
+    // ---------------- Logout ----------------
+    document.getElementById("logout-button").addEventListener("click", () => {
+      localStorage.removeItem("authToken");
+      window.location.href = "/POS/login.html";
+    });
+
+  </script>
+</body>
+
+</html>

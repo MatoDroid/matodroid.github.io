@@ -1,0 +1,3 @@
+admin menu do hlavnej stranky
+heslo na admin menu
+
