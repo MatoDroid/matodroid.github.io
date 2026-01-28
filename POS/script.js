@@ -7,6 +7,17 @@ let saveTimeout = null; // Timeout identifikátor pre oneskorené uloženie
 let targetTable = null; // Globálna premenná pre cieľový stôl
 const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
 
+// NOVÉ: Definícia priorít kategórií pre zoradenie
+const CATEGORY_PRIORITY = {
+    "Predjedlá": 1,
+    "Polievky": 2,
+    "Hlavné jedlá": 3,
+    "Dezerty": 4,
+    "Nápoje": 5,
+    "Alko": 5,
+    "Nealko": 5
+};
+
 // Funkcia na načítanie údajov zo servera
 async function loadMenuData() {
     try {
@@ -68,7 +79,32 @@ function updateTableStyles() {
     });
 }
 
-// Zobrazenie objednávok vrátane tlačidiel + a -
+// Pomocná funkcia na získanie priority položky
+function getItemPriority(itemName, itemData) {
+    // 1. Skúsime zistiť ID kategórie z uloženej objednávky
+    let categoryId = itemData.category;
+    
+    // 2. Ak v objednávke nie je kategória, nájdeme ju v menuData podľa názvu jedla
+    if (!categoryId && menuData && menuData.menuItems) {
+        const foundItem = menuData.menuItems.find(i => i.name === itemName);
+        if (foundItem) {
+            categoryId = foundItem.category;
+        }
+    }
+
+    // 3. Ak máme ID kategórie, nájdeme jej Názov (napr. "Polievky")
+    if (categoryId && menuData && menuData.categories) {
+        const foundCategory = menuData.categories.find(c => c.id == categoryId);
+        if (foundCategory) {
+            // 4. Vrátime číslo priority podľa mapy (ak nenájde, dá 99 - na koniec)
+            return CATEGORY_PRIORITY[foundCategory.name] || 99;
+        }
+    }
+    
+    return 99; // Neznáma kategória ide na koniec
+}
+
+// Zobrazenie objednávok vrátane tlačidiel + a - (UPRAVENÉ TREDENIE)
 function updateOrderDisplay() {
     const orderItems = $(".order-items");
     orderItems.empty();
@@ -78,7 +114,24 @@ function updateOrderDisplay() {
         return;
     }
 
-    Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
+    // Prevedieme objekt položiek na pole, aby sme ich mohli zoradiť
+    const itemsArray = Object.entries(tableOrders[currentTable].items);
+
+    // ZORADENIE PODĽA PRIORÍT KATEGÓRIÍ
+    itemsArray.sort((a, b) => {
+        const nameA = a[0];
+        const dataA = a[1];
+        const nameB = b[0];
+        const dataB = b[1];
+
+        const priorityA = getItemPriority(nameA, dataA);
+        const priorityB = getItemPriority(nameB, dataB);
+
+        return priorityA - priorityB;
+    });
+
+    // Vykreslenie zoradených položiek
+    itemsArray.forEach(([itemName, item]) => {
         const itemTotal = (item.price * item.quantity).toFixed(2);
         const newItem = $(`
             <div class="order-item">
@@ -324,6 +377,7 @@ function renderSplitOrderModalContent() {
     // Aktuálne položky
     const $currentItemsList = $columns.find(".current-items-list");
     if (tableOrders[currentTable]?.items) {
+        // Tu zatiaľ netriedime pre split modal, ale mohli by sme rovnakou logikou
         Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
             const $item = $(`
                 <div class="split-order-item">
@@ -589,6 +643,8 @@ $(document).ready(async function () {
 
         const itemName = $(this).find("h3").text();
         const itemPrice = parseFloat($(this).data("price"));
+        // Získanie ID kategórie pre neskoršie triedenie
+        const categoryId = $(this).data("category");
 
         if (!tableOrders[currentTable]) {
             tableOrders[currentTable] = { items: {}, total: 0 };
@@ -597,8 +653,14 @@ $(document).ready(async function () {
         if (tableOrders[currentTable].items[itemName]) {
             tableOrders[currentTable].items[itemName].quantity += 1;
             tableOrders[currentTable].total += itemPrice;
+            // Aktualizujeme kategoriu pre istotu
+            tableOrders[currentTable].items[itemName].category = categoryId;
         } else {
-            tableOrders[currentTable].items[itemName] = { price: itemPrice, quantity: 1 };
+            tableOrders[currentTable].items[itemName] = { 
+                price: itemPrice, 
+                quantity: 1, 
+                category: categoryId // Ukladáme kategóriu
+            };
             tableOrders[currentTable].total += itemPrice;
         }
 
