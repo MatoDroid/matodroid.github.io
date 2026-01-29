@@ -9,13 +9,13 @@ const BACKEND_URL = "https://matodroid.onrender.com"; // URL backendu
 
 // NOVÉ: Definícia priorít kategórií pre zoradenie
 const CATEGORY_PRIORITY = {
-    "Predjedlá": 1,
-    "Polievky": 2,
-    "Hlavné jedlá": 3,
-    "Dezerty": 4,
-    "Nápoje": 5,
-    "Alko": 5,
-    "Nealko": 5
+    appetizer: 1, // Predjedlá
+    soup: 2,      // Polievky
+    main: 3,      // Hlavné jedlá
+    dessert: 4,   // Dezerty
+    drink: 5,     // Nápoje
+    alco: 6,
+    nealko: 6
 };
 
 // Funkcia na načítanie údajov zo servera
@@ -80,29 +80,11 @@ function updateTableStyles() {
 }
 
 // Pomocná funkcia na získanie priority položky
-function getItemPriority(itemName, itemData) {
-    // 1. Skúsime zistiť ID kategórie z uloženej objednávky
-    let categoryId = itemData.category;
-    
-    // 2. Ak v objednávke nie je kategória, nájdeme ju v menuData podľa názvu jedla
-    if (!categoryId && menuData && menuData.menuItems) {
-        const foundItem = menuData.menuItems.find(i => i.name === itemName);
-        if (foundItem) {
-            categoryId = foundItem.category;
-        }
-    }
-
-    // 3. Ak máme ID kategórie, nájdeme jej Názov (napr. "Polievky")
-    if (categoryId && menuData && menuData.categories) {
-        const foundCategory = menuData.categories.find(c => c.id == categoryId);
-        if (foundCategory) {
-            // 4. Vrátime číslo priority podľa mapy (ak nenájde, dá 99 - na koniec)
-            return CATEGORY_PRIORITY[foundCategory.name] || 99;
-        }
-    }
-    
-    return 99; // Neznáma kategória ide na koniec
+function getItemPriority(itemData) {
+    if (!itemData?.category) return 99;
+    return CATEGORY_PRIORITY[itemData.category] ?? 99;
 }
+
 
 // Zobrazenie objednávok vrátane tlačidiel + a - (UPRAVENÉ TREDENIE)
 function updateOrderDisplay() {
@@ -119,16 +101,11 @@ function updateOrderDisplay() {
 
     // ZORADENIE PODĽA PRIORÍT KATEGÓRIÍ
     itemsArray.sort((a, b) => {
-        const nameA = a[0];
-        const dataA = a[1];
-        const nameB = b[0];
-        const dataB = b[1];
-
-        const priorityA = getItemPriority(nameA, dataA);
-        const priorityB = getItemPriority(nameB, dataB);
-
-        return priorityA - priorityB;
+        const pDiff = getItemPriority(a[1]) - getItemPriority(b[1]);
+        if (pDiff !== 0) return pDiff;
+        return a[0].localeCompare(b[0], "sk");
     });
+
 
     // Vykreslenie zoradených položiek
     itemsArray.forEach(([itemName, item]) => {
@@ -378,7 +355,16 @@ function renderSplitOrderModalContent() {
     const $currentItemsList = $columns.find(".current-items-list");
     if (tableOrders[currentTable]?.items) {
         // Tu zatiaľ netriedime pre split modal, ale mohli by sme rovnakou logikou
-        Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
+        const sortedItems = Object.entries(tableOrders[currentTable].items)
+            .filter(([, item]) => item.quantity > 0)
+            .sort((a, b) => {
+                const pDiff = getItemPriority(a[1]) - getItemPriority(b[1]);
+                if (pDiff !== 0) return pDiff;
+                return a[0].localeCompare(b[0], "sk");
+            });
+
+        sortedItems.forEach(([itemName, item]) => {
+
             const $item = $(`
                 <div class="split-order-item">
                     <span>${item.quantity}x ${itemName}</span>
