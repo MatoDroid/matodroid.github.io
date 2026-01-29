@@ -564,7 +564,7 @@ $(document).ready(async function () {
         $(".menu-item").hide();
         $(`.menu-item[data-category="${selectedCategory}"]`).show();
     });
-log
+
     // 3. PRIDANIE POLOŽKY (S dynamickým zoraďovaním)
     $(document).on("click", ".menu-item", function () {
         if (!currentTable) {
