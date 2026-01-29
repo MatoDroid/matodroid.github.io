@@ -562,6 +562,25 @@ button {
     color: #000; /* Hover efekt */
 }
 
+/* Nadpis kategórie v objednávke */
+.order-category-title {
+    background-color: #e9ecef;
+    color: #495057;
+    font-weight: bold;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Aby prvý nadpis nemal hornú medzeru */
+.order-category-title:first-child {
+    margin-top: 0;
+}
+
 /* Responzívne štýly pre mobilné zariadenia (šírka <= 600px) */
 @media (max-width: 600px) {
     #split-order-modal .modal-content {
@@ -624,6 +643,46 @@ button {
 
     .close-modal {
         font-size: 20px; /* Zmenšíme veľkosť ikony na zatvorenie */
+    }
+
+    /* 1. Kategórie: Odstránime pozadie a zmenšíme ich */
+    .order-category-title {
+        background-color: transparent; /* Žiadne sivé pozadie */
+        border-radius: 0;
+        border-bottom: 1px solid #e0e0e0; /* Len tenká čiara naspodu */
+        
+        color: #999;               /* Svetlejšia, nenápadná farba písma */
+        font-size: 0.7rem;         /* Menšie písmo */
+        font-weight: 600;
+        
+        padding: 2px 0;            /* Minimálne odsadenie */
+        margin-top: 8px;           /* Menší odstup zhora */
+        margin-bottom: 2px;        /* Minimálny odstup zdola */
+        text-align: left;          /* Zarovnanie doľava (voliteľné) */
+    }
+
+    /* 2. Položky objednávky: Hustejší zoznam */
+    .order-item {
+        padding: 4px 0;            /* Menšie medzery medzi jedlami */
+        font-size: 0.85rem;        /* Mierne menšie písmo pre jedlá */
+        min-height: 35px;          /* Menšia výška riadku */
+    }
+
+    /* 3. Názov jedla: Aby nezaberal veľa miesta */
+    .order-item .item-name {
+        line-height: 1.2;
+    }
+
+    /* 4. Tlačidlá +/- : Menšie a kompaktnejšie */
+    .quantity-btn {
+        padding: 2px 8px;          /* Menšie tlačidlá */
+        font-size: 12px;
+        height: 24px;              /* Fixná výška */
+        line-height: 20px;         /* Centrovanie textu */
+    }
+
+    .quantity-controls {
+        gap: 4px;                  /* Menšia medzera medzi tlačidlami */
     }
 }
 
