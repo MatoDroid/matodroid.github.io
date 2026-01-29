@@ -9,7 +9,7 @@ let saveTimeout = null;
 let targetTable = null; 
 const BACKEND_URL = "https://matodroid.onrender.com"; 
 
-// --- DEFINÍCIA PRIORÍT (PREDVEDENÉ RADENIE) ---
+// --- DEFINÍCIA PRIORÍT (PRE ZORAĎOVANIE) ---
 const CATEGORY_PRIORITY = {
     "appetizer": 1, // Predjedlá
     "soup": 2,      // Polievky
@@ -19,11 +19,6 @@ const CATEGORY_PRIORITY = {
     "alco": 5,      // Alkohol
     "nealko": 5     // Nealko
 };
-
-// --- DEBUG LOGOVANIE (Pre kontrolu v konzole F12) ---
-function debugLog(message, data = "") {
-    console.log(`[POS SYSTEM]: ${message}`, data);
-}
 
 // ==========================================
 // FUNKCIE PRE PRÁCU S DÁTAMI A MENU
@@ -40,8 +35,6 @@ async function loadMenuData() {
         }
 
         menuData = await response.json();
-        debugLog("Menu úspešne načítané. Počet položiek:", menuData.menuItems.length);
-        
         renderMenuData(menuData);
         
         // Ak je otvorený stôl, prekreslíme objednávku (aby sa aplikovali kategórie)
@@ -90,7 +83,6 @@ function renderMenuData(data) {
     // Pridanie položiek menu
     if (data.menuItems) {
         data.menuItems.forEach((item) => {
-            // DÔLEŽITÉ: Ukladáme data-category do HTML
             $(".menu-items").append(
                 `<div class="menu-item" data-category="${item.category}" data-price="${item.price}">
                     <h3>${item.name}</h3>
@@ -135,7 +127,7 @@ function updateOrderDisplay() {
     // 1. Prevedieme položky na pole
     const itemsArray = Object.entries(tableOrders[currentTable].items);
 
-    // 2. ZORADENIE (Sorting Logic)
+    // 2. ZORADENIE
     itemsArray.sort((a, b) => {
         const nameA = a[0];
         const dataA = a[1];
@@ -144,9 +136,6 @@ function updateOrderDisplay() {
 
         const priorityA = getItemPriority(nameA, dataA);
         const priorityB = getItemPriority(nameB, dataB);
-
-        // Debug výpis pre kontrolu
-        // console.log(`Porovnávam: ${nameA} (${priorityA}) vs ${nameB} (${priorityB})`);
 
         if (priorityA !== priorityB) {
             return priorityA - priorityB; // Menšie číslo ide hore
@@ -216,7 +205,6 @@ async function saveOrdersToBackend() {
 
     saveTimeout = setTimeout(async () => {
         try {
-            // Vyčistenie prázdnych stolov
             const cleanedOrders = Object.fromEntries(
                 Object.entries(tableOrders).filter(([key, value]) => value && Object.keys(value.items || {}).length > 0)
             );
@@ -243,7 +231,6 @@ async function loadOrdersFromBackend() {
         const response = await fetch(`${BACKEND_URL}/orders`, { method: "GET" });
         if (response.ok) {
             tableOrders = await response.json() || {};
-            debugLog("Objednávky načítané z backendu.");
         }
     } catch (error) {
         console.error("Chyba pri načítaní objednávok:", error);
@@ -260,7 +247,7 @@ function updateTableStyles() {
 }
 
 // ==========================================
-// MODUL: ROZDELENIE ÚČTU (SPLIT ORDER) - PLNÁ VERZIA
+// MODUL: ROZDELENIE ÚČTU (SPLIT ORDER)
 // ==========================================
 
 function openSplitOrderModal() {
@@ -273,7 +260,7 @@ function openSplitOrderModal() {
         return;
     }
 
-    itemsToMove = {}; // Reset
+    itemsToMove = {}; 
     $("#split-order-modal").fadeIn();
     renderSplitOrderModalContent();
 }
@@ -293,7 +280,6 @@ function moveItemsToTargetTable(targetTable, itemName, quantity) {
     if (itemsToMove[targetTable].items[itemName]) {
         itemsToMove[targetTable].items[itemName].quantity += quantity;
     } else {
-        // Kopírujeme celú položku vrátane kategórie
         itemsToMove[targetTable].items[itemName] = { ...item, quantity: quantity };
     }
     itemsToMove[targetTable].total += item.price * quantity;
@@ -574,10 +560,7 @@ $(document).ready(async function () {
 
         const itemName = $(this).find("h3").text();
         const itemPrice = parseFloat($(this).data("price"));
-        // DÔLEŽITÉ: Získame kategóriu z HTML atribútu
         const categoryId = $(this).data("category");
-
-        debugLog(`Pridávam položku: ${itemName}, Kategória: ${categoryId}`);
 
         if (!tableOrders[currentTable]) {
             tableOrders[currentTable] = { items: {}, total: 0 };
@@ -586,20 +569,19 @@ $(document).ready(async function () {
         if (tableOrders[currentTable].items[itemName]) {
             tableOrders[currentTable].items[itemName].quantity += 1;
             tableOrders[currentTable].total += itemPrice;
-            // Pre istotu aktualizujeme kategóriu
             tableOrders[currentTable].items[itemName].category = categoryId;
         } else {
             tableOrders[currentTable].items[itemName] = { 
                 price: itemPrice, 
                 quantity: 1, 
-                category: categoryId // Ukladáme kategóriu
+                category: categoryId 
             };
             tableOrders[currentTable].total += itemPrice;
         }
 
         $(`.table-button[data-table="${currentTable}"]`).addClass("has-order");
         saveOrders();
-        updateOrderDisplay(); // Okamžité prekreslenie a zoradenie
+        updateOrderDisplay();
     });
 
     // Ostatné tlačidlá
