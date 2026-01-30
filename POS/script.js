@@ -484,7 +484,7 @@ $(document).ready(async function () {
     $(".pay-button").click(payOrder);
     $(".cancel-button").click(cancelOrder);
     $("#close-modal").click(closeQrModal);
-    $("#logout-button").click(logout);
+    $(".logout-button").click(logout);
 
     await loadOrdersFromBackend();
     loadMenuData();

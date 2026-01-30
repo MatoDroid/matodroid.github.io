@@ -422,7 +422,7 @@ button {
     overflow-y: auto;  /* ak je obsahu veľa, objaví sa scrollbar */
     
     position: fixed;
-    top: 50%;
+    top: 20%;
     left: 50%;
     transform: translateX(-50%);
     backface-visibility: hidden;
