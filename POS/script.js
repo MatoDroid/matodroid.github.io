@@ -9,16 +9,6 @@ let saveTimeout = null;
 let targetTable = null; 
 const BACKEND_URL = "https://matodroid.onrender.com"; 
 
-// --- DEFINÍCIA PRIORÍT (PRE ZORAĎOVANIE) ---
-const CATEGORY_PRIORITY = {
-    "appetizer": 1, // Predjedlá
-    "soup": 2,      // Polievky
-    "main": 3,      // Hlavné jedlá
-    "dessert": 4,   // Dezerty
-    "drink": 5,     // Nápoje
-    "alco": 5,      // Alkohol
-    "nealko": 5     // Nealko
-};
 
 // ==========================================
 // FUNKCIE PRE PRÁCU S DÁTAMI A MENU
@@ -54,7 +44,9 @@ function renderMenuData(data) {
     updateTableStyles();
 
     if (data.categories) {
-        data.categories.sort((a, b) => (CATEGORY_PRIORITY[a.id] || 99) - (CATEGORY_PRIORITY[b.id] || 99));
+        // NOVÁ OPRAVA: Zoradenie podľa priority uloženej v objekte kategórie
+        data.categories.sort((a, b) => (a.priority || 99) - (b.priority || 99));
+        
         data.categories.forEach((category) => {
             $(".menu-categories").append(`<button class="category-button" data-category="${category.id}">${category.name}</button>`);
         });
@@ -72,15 +64,26 @@ function renderMenuData(data) {
     }
 }
 
-// Pomocná funkcia: Získanie priority (čísla)
+/// Pomocná funkcia: Získanie priority (čísla) z načítaných dát
 function getItemPriority(itemName, itemData) {
     let categoryId = itemData.category;
+    
+    // Ak položka v objednávke nemá kategóriu, skúsime ju nájsť v menuItems
     if (!categoryId && menuData && menuData.menuItems) {
         const foundItem = menuData.menuItems.find(i => i.name === itemName);
         if (foundItem) categoryId = foundItem.category;
     }
-    const priority = CATEGORY_PRIORITY[categoryId];
-    return priority !== undefined ? priority : 99;
+
+    // Nájdeme kategóriu v zozname menuData.categories
+    if (menuData && menuData.categories) {
+        const categoryObj = menuData.categories.find(c => c.id === categoryId);
+        // Ak sme našli kategóriu, vrátime jej prioritu, inak 99
+        if (categoryObj) {
+            return categoryObj.priority !== undefined ? categoryObj.priority : 99;
+        }
+    }
+    
+    return 99; // Predvolená hodnota ak sa nič nenájde
 }
 
 // NOVÁ FUNKCIA: Získanie názvu kategórie pre nadpis (napr. "main" -> "Hlavné jedlá")

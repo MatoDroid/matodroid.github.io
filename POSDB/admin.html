@@ -104,11 +104,7 @@
     <h2>Kategórie</h2>
     <table id="categoriesTable">
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Názov</th>
-          <th>Akcia</th>
-        </tr>
+        <tr><th>ID</th><th>Názov</th><th>Priorita</th><th>Akcia</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -243,15 +239,24 @@
       const tbody = document.querySelector("#categoriesTable tbody");
       tbody.innerHTML = "";
       menuData.categories.forEach((c, i) => {
+        // Inicializácia priority, ak neexistuje (nastavíme na 99)
+        if (c.priority === undefined) c.priority = 99;
+
         const r = document.createElement("tr");
-        r.innerHTML = `<td><input value="${c.id ?? ""}" onchange="menuData.categories[${i}].id=this.value"></td>
+        r.innerHTML = `
+          <td><input value="${c.id ?? ""}" onchange="menuData.categories[${i}].id=this.value"></td>
           <td><input value="${c.name ?? ""}" onchange="menuData.categories[${i}].name=this.value"></td>
+          <td><input type="number" value="${c.priority}" onchange="menuData.categories[${i}].priority=parseInt(this.value)"></td>
           <td><button onclick="menuData.categories.splice(${i},1);renderCategories()">Odstrániť</button></td>`;
         tbody.appendChild(r);
       });
     }
-    function addCategory() { menuData.categories.push({ id: "", name: "" }); renderCategories(); }
 
+    // Pri pridaní novej kategórie nastavíme predvolenú prioritu
+    function addCategory() {
+        menuData.categories.push({ id: "", name: "", priority: 99 });
+        renderCategories();
+    }
     // --- Items ---
     function renderMenuItems() {
       const tbody = document.querySelector("#menuTable tbody");
