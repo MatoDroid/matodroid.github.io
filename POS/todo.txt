@@ -1,3 +1,142 @@
-admin menu do hlavnej stranky
-heslo na admin menu
+1. Modul pre Obsluhu (Front Office / Pokladňa)
+Toto je časť, ktorú si práve dizajnoval. Musí byť rýchla a intuitívna.
 
+Manažment stolov (Table Map):
+
+Vizuálna mapa miestností a stolov (drag & drop rozloženie).
+
+Farebné indikátory stavu stola (voľný, obsadený, čaká na platbu, rezervovaný).
+
+Zobrazenie času, ako dlho je stôl otvorený.
+
+Práca s objednávkou:
+
+Rýchle pridávanie položiek (vyhľadávanie podľa názvu alebo kódu).
+
+Modifikátory a poznámky: Výber príloh, stupňa prepečenia (rare/medium), "bez cibule", extra omáčka.
+
+Chody (Coursing): Označenie položiek ako "Predjedlo", "Hlavné jedlo", "Dezert" (aby kuchyňa vedela, kedy čo vydať).
+
+Presun položiek: Presun celého účtu na iný stôl alebo presun konkrétnych položiek (to, čo si riešil v modálnom okne).
+
+Platobné funkcie:
+
+Delenie účtu (Split Bill): Rozdelenie na rovnaké časti, podľa osôb alebo výberom konkrétnych položiek.
+
+Kombinované platby (časť hotovosť, časť karta, gastrolístky).
+
+Sprepitné (Tringelty) - možnosť zadať % alebo pevnú sumu.
+
+Tlač predbežného účtu (medziúčet).
+
+Zľavy a akcie:
+
+Manuálne zľavy (na položku alebo celý účet).
+
+Happy Hour (automatické zmeny cien v určitom čase).
+
+Storno položky (s dôvodom a nutnosťou autorizácie manažéra).
+
+2. Modul pre Kuchyňu a Bar (Production)
+Aby sa objednávky dostali tam, kam majú.
+
+Smerovanie tlače (Routing):
+
+Nápoje sa tlačia na bare, jedlo v kuchyni, pizza pri peci.
+
+KDS (Kitchen Display System):
+
+Namiesto papierových bonov obrazovka v kuchyni.
+
+Farebné odlíšenie objednávok podľa času čakania (zelená -> žltá -> červená).
+
+Možnosť "odškrtnúť" hotové jedlo (upovedomí čašníka).
+
+Správa menu (86 list):
+
+Rýchle vypnutie položky, ktorá sa minula (Sold out), priamo z POS, aby ju čašníci nemohli objednať.
+
+3. Skladový Modul (Inventory & Stock)
+Kľúčové pre kontrolu nákladov (Food Cost).
+
+Receptúry (Kalkulácie):
+
+Definovanie, z čoho sa skladá jedlo (napr. Burger = 1x žemľa, 150g mäsa, 20g omáčky).
+
+Automatický odpis zo skladu pri predaji (tzv. odťažovanie).
+
+Inventúra:
+
+Tlač hárkov pre inventúru.
+
+Zadávanie reálneho stavu a porovnanie s počítačovým (zistenie mánk a prebytkov).
+
+Manažment dodávateľov:
+
+Evidencia príjemiek (nákup tovaru).
+
+Sledovanie vývoja nákupných cien surovín.
+
+Upozornenia:
+
+Notifikácia pri poklese zásob pod minimálnu hranicu.
+
+4. Manažérsky Modul (Back Office & Reporting)
+Mozog celej reštaurácie.
+
+Reporting a Analytika:
+
+Predaj podľa kategórií, hodín, dní (Heatmapy predaja).
+
+Výkonnosť čašníkov (kto má najlepšie predaje, kto robí najviac storn).
+
+Ziskovosť položiek (ktoré jedlo zarába najviac).
+
+X a Z uzávierky (finančné prehľady dňa).
+
+Správa zamestnancov:
+
+Práva a roly (Manažér, Čašník, Brigádnik).
+
+Dochádzkový systém (Clock-in / Clock-out).
+
+Editácia Menu:
+
+Jednoduchá zmena cien, názvov, fotiek.
+
+Denné menu (plánovanie dopredu).
+
+5. Zákaznícky Modul (CRM & Loyalty)
+Databáza zákazníkov:
+
+História objednávok (obľúbené jedlá).
+
+Fakturácia na firmu.
+
+Vernostný program:
+
+Zbieranie bodov, kredity, digitálna peňaženka.
+
+Zľavové kupóny a vouchery.
+
+6. Technické a Legislatívne požiadavky (Špecifické pre SR)
+eKasa integrácia:
+
+Priame napojenie na Portál finančnej správy (VRP alebo ORP chránené úložisko).
+
+Povinné údaje na bločku, QR kód bločku.
+
+Offline režim:
+
+Systém musí fungovať (brať objednávky, tlačiť do kuchyne) aj pri výpadku internetu. Po obnovení sa dáta zosynchronizujú.
+
+Podpora hardvéru:
+
+Tlačiarne (USB, LAN, Bluetooth), čítačky čiarových kódov, zásuvky na peniaze, platobné terminály.
+
+7. Moderné trendy (Bonusové funkcie)
+QR Objednávanie od stola: Zákazník si naskenuje QR kód na stole a objedná/zaplatí sám cez mobil.
+
+Integrácia Donášky: Prepojenie s Wolt, Bolt Food, Uber Eats (všetky objednávky padajú do jedného POS tabletu).
+
+Kiosk Mode: Rozhranie pre samoobslužný kiosk (napr. vo fast-foodoch).
