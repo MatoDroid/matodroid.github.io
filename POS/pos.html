@@ -2,89 +2,165 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Restaurant POS System</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1F231D">
+    <title>Restaurant POS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
     <link rel="stylesheet" href="/POS/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </head>
-<body class="visible">  <!-- docasna zmena na visible -->
-    <div class="container">
-        <header class="header">
-            <h1>Restaurant POS System</h1>
-        </header>
+<body>
 
-        <section class="tables-section">
-            <h2>Stoly</h2>
-            <div class="table-grid"></div>
-        </section>
+<div class="pos-app" id="pos-app" data-page="tables">
 
-        <section class="order-section">
-            <div class="menu-categories"></div>
-            <div class="menu-items"></div>
-            <div class="current-order">
-                <h2>Vyberte stôl</h2>
-                <div class="order-items"></div>
-                <div class="total-section">
-                    <span>Spolu:</span>
-                    <span>0.00 €</span>
+    <!-- ============ STOLY ============ -->
+    <aside class="rail">
+        <div class="rail-head">
+            <div class="brand">
+                <div class="mark">R</div>
+                <div>
+                    <div class="name">Restaurant POS</div>
+                    <div class="sub" id="shift-info">Zmena</div>
                 </div>
-                <div class="action-buttons">
-                    <button class="action-button pay-button" disabled>Zaplatiť</button>
-                    <button class="action-button split-order-button">Rozdeliť objednávku</button>
-                    <button class="action-button cancel-button" disabled>Zrušiť</button>
-                    <button class="action-button logout-button">Odhlásiť sa</button>
-                </div>
-
-                <!-- loading  menu-data please wait -->
-                <div id="loading-data-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
-                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
-                        <h3>Načítavanie, čakajte prosím...</h3>
-                    </div>
-                </div>
-                
-                 <!-- loading please wait -->
-                <div id="loading-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
-                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
-                        <h3>Účet sa pripravuje, čakajte prosím...</h3>
-                    </div>
-                </div>
-
-                <!-- QR Code Modal -->
-                <div id="qr-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;">
-                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
-                        <h3>Platobný QR kód</h3>
-                        <img id="qr-code" alt="QR kód pre platbu" style="margin-bottom:15px;">
-                        <br>
-                        <button id="close-modal" style="padding:10px 20px; background:#ea4335; color:white; border:none; border-radius:5px; cursor:pointer;">Zavrieť</button>
-                    </div>
-                </div>
-
-                
-
-                <!-- Modálne okno na výber cieľového stola -->
-                <div id="select-table-modal" style="display: none;">
-                    <div class="modal-content">
-                        <h3>Vyberte cieľový stôl</h3>
-                        <div class="table-selection">
-                            <!-- Tu sa dynamicky načítajú tlačidlá stolov -->
-                        </div>
-                        <button id="close-modal">Zavrieť</button>
-                    </div>
-                </div>
-             
             </div>
-        </section>
-    </div>
+        </div>
 
-    <!-- Modálne okno pre rozdelenie objednávky -->
-    <div id="split-order-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <!-- Obsah modálneho okna sa dynamicky naplní pomocou JavaScriptu -->
+        <div class="legend">
+            <span><i class="dot dot-free"></i>Voľný</span>
+            <span><i class="dot dot-occ"></i>Obsadený</span>
+        </div>
+
+        <div class="table-grid"></div>
+
+        <div class="rail-foot">
+            <button class="profile-btn logout-button" type="button">
+                <span class="av">⎋</span>
+                <span class="who"><b>Odhlásiť sa</b><small>Ukončiť smenu</small></span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ============ MENU ============ -->
+    <section class="menu-pane">
+        <div class="menu-sticky">
+            <div class="menu-head">
+                <div>
+                    <div class="eyebrow" id="menu-eyebrow">Vyberte stôl</div>
+                    <h2>Menu</h2>
+                </div>
+                <button class="icon-btn" id="search-toggle" type="button" aria-label="Hľadať jedlo" aria-expanded="false">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="search" id="search-wrap" hidden>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <input type="text" id="search-input" placeholder="Hľadať jedlo…" autocomplete="off">
+            </div>
+
+            <div class="menu-categories"></div>
+        </div>
+
+        <div class="menu-scroll">
+            <div class="menu-items"></div>
+        </div>
+    </section>
+
+    <!-- ============ ÚČET ============ -->
+    <aside class="current-order">
+        <div class="ticket-head">
+            <div class="eyebrow">Objednávka</div>
+            <h2>Vyberte stôl</h2>
+        </div>
+
+        <div class="order-items"></div>
+
+        <div class="ticket-foot">
+            <div class="totals-row"><span id="ticket-count">0 položiek</span><span></span></div>
+            <div class="total-section totals-row grand"><span>Spolu</span><span class="mono">0,00 €</span></div>
+
+            <button class="action-button pay-button" type="button" disabled>Zaplatiť</button>
+            <div class="secondary-row">
+                <button class="split-order-button" type="button" disabled>Rozdeliť účet</button>
+                <button class="cancel-button danger" type="button" disabled>Zrušiť</button>
+            </div>
+        </div>
+    </aside>
+
+</div>
+
+<!-- plávajúci súhrn (mobil, pri objednávaní) -->
+<button class="mobile-bar" id="mobile-bar" type="button" hidden>
+    <span id="mobile-bar-text">0 položiek · 0,00 €</span>
+    <span>Zobraziť účet →</span>
+</button>
+
+<!-- spodná navigácia (mobil) -->
+<nav class="mobile-nav" id="mobile-nav">
+    <button type="button" data-page="tables" class="active"><span class="nav-ico">▤</span>Stoly</button>
+    <button type="button" data-page="menu"><span class="nav-ico">☰</span>Menu</button>
+    <button type="button" data-page="ticket"><span class="nav-ico">🧾</span>Účet<span class="nav-badge" id="nav-badge" hidden>0</span></button>
+</nav>
+
+<!-- ============ MODÁLNE OKNÁ ============ -->
+
+<div class="modal" id="loading-data-modal">
+    <div class="modal-card">
+        <div class="spinner"></div>
+        <h3>Načítavanie…</h3>
+        <p>Sťahujem menu a objednávky zo servera.</p>
+    </div>
+</div>
+
+<div class="modal" id="loading-modal">
+    <div class="modal-card">
+        <div class="spinner"></div>
+        <h3>Účet sa pripravuje</h3>
+        <p>Čakajte prosím.</p>
+    </div>
+</div>
+
+<div class="modal" id="qr-modal">
+    <div class="modal-card">
+        <h3>Platobný QR kód</h3>
+        <p id="qr-subtitle">Naskenujte pre úhradu.</p>
+        <img id="qr-code" alt="QR kód pre platbu">
+        <button class="modal-close-btn" id="close-modal" type="button">Zavrieť</button>
+    </div>
+</div>
+
+<div class="modal" id="split-order-modal">
+    <div class="modal-card">
+        <div class="sheet-head">
+            <div>
+                <div class="eyebrow">Rozdeliť účet</div>
+                <h3 id="split-source">Stôl</h3>
+            </div>
+        </div>
+        <div class="sheet-body">
+            <div class="field-label">1 · Presunúť na stôl</div>
+            <div class="target-table-buttons"></div>
+            <div class="field-label">2 · Koľko kusov presunúť</div>
+            <div class="split-items-list"></div>
+        </div>
+        <div class="sheet-foot">
+            <div class="totals-row grand"><span>Presúva sa</span><span class="mono" id="split-sum">0,00 €</span></div>
+            <button class="action-button confirm-split-button" type="button" disabled>Presunúť</button>
+            <div class="secondary-row" style="grid-template-columns:1fr;">
+                <button class="cancel-split-button" type="button">Zrušiť</button>
+            </div>
         </div>
     </div>
+</div>
 
-    <script src="/POS/script.js"></script>
+<div class="toast-stack" id="toast-stack"></div>
 
+<script src="/POS/script.js"></script>
 </body>
 </html>

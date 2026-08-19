@@ -1,18 +1,98 @@
-// ==========================================
-// GLOBÁLNE PREMENNÉ A NASTAVENIA
-// ==========================================
-let currentTable = null; 
-let tableOrders = {}; 
-let menuData = null; 
-let itemsToMove = {}; 
-let saveTimeout = null; 
-let targetTable = null; 
-const BACKEND_URL = "https://matodroid.onrender.com"; 
+// ==========================================================================
+// Restaurant POS — klientská logika
+// Dátový model zo servera:
+//   menuData.tables      [{ number, name }]
+//   menuData.categories  [{ id, name, priority }]
+//   menuData.menuItems   [{ category, name, price }]
+//   tableOrders          { [cisloStola]: { items: { [nazov]: {price, quantity, category} },
+//                                          total, createdAt } }
+// ==========================================================================
 
+const BACKEND_URL = "https://matodroid.onrender.com";
 
-// ==========================================
-// FUNKCIE PRE PRÁCU S DÁTAMI A MENU
-// ==========================================
+let currentTable = null;
+let tableOrders = {};
+let menuData = null;
+let activeCategory = null;
+let searchTerm = "";
+let saveTimeout = null;
+
+// stav rozdeľovania účtu
+let splitTarget = null;
+let itemsToMove = {};
+
+// ==========================================================================
+// POMOCNÉ FUNKCIE
+// ==========================================================================
+
+function fmt(n) {
+    return (Number(n) || 0).toFixed(2).replace(".", ",") + " €";
+}
+
+// slovenské skloňovanie: 1 položka / 2–4 položky / 5+ položiek
+function plItems(n) {
+    if (n === 1) return "1 položka";
+    if (n >= 2 && n <= 4) return n + " položky";
+    return n + " položiek";
+}
+
+function plMoved(n) {
+    if (n === 1) return "1 položka presunutá";
+    if (n >= 2 && n <= 4) return n + " položky presunuté";
+    return n + " položiek presunutých";
+}
+
+function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+}
+
+function toast(message) {
+    const $t = $(`<div class="toast"></div>`).text(message);
+    $("#toast-stack").append($t);
+    requestAnimationFrame(() => $t.addClass("show"));
+    setTimeout(() => {
+        $t.removeClass("show");
+        setTimeout(() => $t.remove(), 220);
+    }, 1800);
+}
+
+function showModal(id) { $("#" + id).addClass("show"); }
+function hideModal(id) { $("#" + id).removeClass("show"); }
+
+// číslo stola používame ako kľúč – vždy ako reťazec, aby sa "3" a 3 nerozchádzali
+function tableKey(n) { return String(n); }
+
+function tableLabel(table) {
+    return table.name && String(table.name).trim() ? table.name : `Stôl ${table.number}`;
+}
+
+function orderOf(tableNumber) {
+    return tableOrders[tableKey(tableNumber)];
+}
+
+// súčet vždy prepočítame z položiek — pripočítavanie po centoch
+// inak nazbiera chybu plávajúcej čiarky (napr. 14.799999999999999)
+function recalcTotal(order) {
+    if (!order) return;
+    const cents = Object.values(order.items).reduce(
+        (sum, i) => sum + Math.round(i.price * 100) * i.quantity, 0
+    );
+    order.total = cents / 100;
+}
+
+function elapsedLabel(order) {
+    if (!order || !order.createdAt) return "Obsadený";
+    const mins = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000);
+    if (!isFinite(mins) || mins < 0) return "Obsadený";
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)} h ${mins % 60} min`;
+}
+
+// ==========================================================================
+// NAČÍTANIE DÁT
+// ==========================================================================
 
 async function loadMenuData() {
     try {
@@ -20,476 +100,681 @@ async function loadMenuData() {
         if (!response.ok) throw new Error("Chyba načítania menu");
 
         menuData = await response.json();
-        renderMenuData(menuData);
-        
-        if (currentTable) {
-            updateOrderDisplay();
+        menuData.tables = menuData.tables || [];
+        menuData.categories = menuData.categories || [];
+        menuData.menuItems = menuData.menuItems || [];
+
+        // kategórie zoradíme podľa priority z admin menu
+        menuData.categories.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+
+        if (!activeCategory && menuData.categories.length) {
+            activeCategory = menuData.categories[0].id;
         }
+
+        renderTables();
+        renderCategories();
+        renderMenuItems();
+        updateOrderDisplay();
     } catch (error) {
         console.error("Chyba načítania údajov:", error);
-        alert("Nepodarilo sa načítať údaje zo servera.");
+        toast("Nepodarilo sa načítať menu zo servera.");
     }
-}
-
-function renderMenuData(data) {
-    $(".table-grid").empty();
-    $(".menu-categories").empty();
-    $(".menu-items").empty();
-
-    if (data.tables) {
-        data.tables.forEach((table) => {
-            $(".table-grid").append(`<button class="table-button" data-table="${table.number}">${table.name}</button>`);
-        });
-    }
-    updateTableStyles();
-
-    if (data.categories) {
-        // NOVÁ OPRAVA: Zoradenie podľa priority uloženej v objekte kategórie
-        data.categories.sort((a, b) => (a.priority || 99) - (b.priority || 99));
-        
-        data.categories.forEach((category) => {
-            $(".menu-categories").append(`<button class="category-button" data-category="${category.id}">${category.name}</button>`);
-        });
-    }
-
-    if (data.menuItems) {
-        data.menuItems.forEach((item) => {
-            $(".menu-items").append(
-                `<div class="menu-item" data-category="${item.category}" data-price="${item.price}">
-                    <h3>${item.name}</h3>
-                    <p>${item.price.toFixed(2)} €</p>
-                </div>`
-            );
-        });
-    }
-}
-
-/// Pomocná funkcia: Získanie priority (čísla) z načítaných dát
-function getItemPriority(itemName, itemData) {
-    let categoryId = itemData.category;
-    
-    // Ak položka v objednávke nemá kategóriu, skúsime ju nájsť v menuItems
-    if (!categoryId && menuData && menuData.menuItems) {
-        const foundItem = menuData.menuItems.find(i => i.name === itemName);
-        if (foundItem) categoryId = foundItem.category;
-    }
-
-    // Nájdeme kategóriu v zozname menuData.categories
-    if (menuData && menuData.categories) {
-        const categoryObj = menuData.categories.find(c => c.id === categoryId);
-        // Ak sme našli kategóriu, vrátime jej prioritu, inak 99
-        if (categoryObj) {
-            return categoryObj.priority !== undefined ? categoryObj.priority : 99;
-        }
-    }
-    
-    return 99; // Predvolená hodnota ak sa nič nenájde
-}
-
-// NOVÁ FUNKCIA: Získanie názvu kategórie pre nadpis (napr. "main" -> "Hlavné jedlá")
-function getCategoryName(categoryId) {
-    if (!menuData || !menuData.categories) return "Ostatné";
-    const category = menuData.categories.find(c => c.id === categoryId);
-    return category ? category.name : "Ostatné";
-}
-
-// ==========================================
-// HLAVNÁ FUNKCIA PRE ZOBRAZENIE (S KATEGÓRIAMI)
-// ==========================================
-
-function updateOrderDisplay() {
-    const orderItems = $(".order-items");
-    orderItems.empty();
-
-    if (!currentTable || !tableOrders[currentTable]) {
-        $(".total-section span:last").text("0.00 €");
-        return;
-    }
-
-    // 1. Prevedieme na pole
-    const itemsArray = Object.entries(tableOrders[currentTable].items);
-
-    // 2. Zoradíme
-    itemsArray.sort((a, b) => {
-        const nameA = a[0]; const dataA = a[1];
-        const nameB = b[0]; const dataB = b[1];
-        const pA = getItemPriority(nameA, dataA);
-        const pB = getItemPriority(nameB, dataB);
-
-        if (pA !== pB) return pA - pB;
-        return nameA.localeCompare(nameB);
-    });
-
-    // 3. Vykreslenie s nadpismi kategórií
-    let lastCategoryId = null; // Pomocná premenná na sledovanie zmeny kategórie
-
-    itemsArray.forEach(([itemName, item]) => {
-        // Zistíme ID kategórie pre túto položku
-        let currentCategoryId = item.category;
-        if (!currentCategoryId && menuData && menuData.menuItems) {
-            const found = menuData.menuItems.find(i => i.name === itemName);
-            if (found) currentCategoryId = found.category;
-        }
-
-        // AK SA ZMENILA KATEGÓRIA, VLOŽÍME NADPIS
-        // (Ale len ak to nie je "undefined" kategória, alebo ak chceme zobraziť aj tú)
-        if (currentCategoryId !== lastCategoryId) {
-            const prettyName = getCategoryName(currentCategoryId);
-            orderItems.append(`<div class="order-category-title">${prettyName}</div>`);
-            lastCategoryId = currentCategoryId;
-        }
-
-        // Vykreslenie samotnej položky
-        const itemTotal = (item.price * item.quantity).toFixed(2);
-        const newItem = $(`
-            <div class="order-item">
-                <span class="item-quantity">${item.quantity}x</span>
-                <span class="item-name">${itemName}</span>
-                <div class="quantity-controls">
-                    <button class="quantity-btn minus">-</button>
-                    <button class="quantity-btn plus">+</button>
-                </div>
-                <span class="item-total">${itemTotal} €</span>
-            </div>
-        `);
-
-        newItem.find(".minus").on("click", () => updateItemQuantity(itemName, -1));
-        newItem.find(".plus").on("click", () => updateItemQuantity(itemName, 1));
-        orderItems.append(newItem);
-    });
-
-    $(".total-section span:last").text(tableOrders[currentTable].total.toFixed(2) + " €");
-}
-
-// Aktualizácia množstva
-function updateItemQuantity(itemName, delta) {
-    if (!currentTable || !tableOrders[currentTable]) return;
-    const item = tableOrders[currentTable].items[itemName];
-    if (!item) return;
-
-    const newQuantity = item.quantity + delta;
-    if (newQuantity <= 0) {
-        tableOrders[currentTable].total -= item.price * item.quantity;
-        delete tableOrders[currentTable].items[itemName];
-    } else {
-        tableOrders[currentTable].total += item.price * delta;
-        item.quantity = newQuantity;
-    }
-
-    if (Object.keys(tableOrders[currentTable].items).length === 0) {
-        delete tableOrders[currentTable];
-        $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
-    }
-
-    saveOrders();
-    updateOrderDisplay();
-}
-
-// ==========================================
-// UKLADANIE A BACKEND
-// ==========================================
-
-async function saveOrdersToBackend() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(async () => {
-        try {
-            const cleanedOrders = Object.fromEntries(
-                Object.entries(tableOrders).filter(([k, v]) => v && Object.keys(v.items || {}).length > 0)
-            );
-            const dataToSave = Object.keys(cleanedOrders).length === 0 ? { empty: true } : cleanedOrders;
-
-            await fetch(`${BACKEND_URL}/orders`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(dataToSave),
-            });
-        } catch (error) { console.error("Chyba ukladania:", error); }
-    }, 2500);
-}
-
-function saveOrders() {
-    saveOrdersToBackend();
-    updateOrderDisplay();
 }
 
 async function loadOrdersFromBackend() {
     try {
         const response = await fetch(`${BACKEND_URL}/orders`, { method: "GET" });
-        if (response.ok) tableOrders = await response.json() || {};
-    } catch (error) { console.error("Chyba načítania:", error); }
-}
+        if (!response.ok) return;
 
-function updateTableStyles() {
-    $(".table-button").removeClass("has-order");
-    Object.keys(tableOrders).forEach((table) => {
-        if (tableOrders[table] && Object.keys(tableOrders[table].items).length > 0) {
-            $(`.table-button[data-table="${table}"]`).addClass("has-order");
-        }
-    });
-}
+        const data = (await response.json()) || {};
 
-// ==========================================
-// MODUL: ROZDELENIE ÚČTU (SPLIT ORDER)
-// ==========================================
+        // server posiela { empty: true } keď nie sú žiadne objednávky —
+        // bez odfiltrovania by vznikol neplatný "stôl" s názvom empty
+        delete data.empty;
 
-function openSplitOrderModal() {
-    if (!currentTable) return alert("Najprv vyberte stôl!");
-    if (!tableOrders[currentTable] || !Object.keys(tableOrders[currentTable].items).length) return alert("Prázdny stôl.");
-    itemsToMove = {}; 
-    $("#split-order-modal").fadeIn();
-    renderSplitOrderModalContent();
-}
-
-function moveItemsToTargetTable(targetTable, itemName, quantity) {
-    if (!targetTable) return alert("Vyberte cieľový stôl!");
-    const item = tableOrders[currentTable].items[itemName];
-    if (!item || item.quantity < quantity) return alert("Nedostatok položiek.");
-
-    if (!itemsToMove[targetTable]) itemsToMove[targetTable] = { items: {}, total: 0 };
-    if (itemsToMove[targetTable].items[itemName]) {
-        itemsToMove[targetTable].items[itemName].quantity += quantity;
-    } else {
-        itemsToMove[targetTable].items[itemName] = { ...item, quantity: quantity };
+        // preistotu zahodíme záznamy bez položiek
+        tableOrders = Object.fromEntries(
+            Object.entries(data).filter(
+                ([, v]) => v && typeof v === "object" && Object.keys(v.items || {}).length > 0
+            )
+        );
+    } catch (error) {
+        console.error("Chyba načítania objednávok:", error);
     }
-    itemsToMove[targetTable].total += item.price * quantity;
-
-    item.quantity -= quantity;
-    if (item.quantity <= 0) delete tableOrders[currentTable].items[itemName];
-    tableOrders[currentTable].total -= item.price * quantity;
-    renderSplitOrderModalContent();
 }
 
-function moveItemBackToOriginalTable(itemName, quantity) {
-    if (!targetTable || !itemsToMove[targetTable]) return;
-    const item = itemsToMove[targetTable].items[itemName];
-    if (!item || item.quantity < quantity) return;
+// ==========================================================================
+// UKLADANIE
+// ==========================================================================
 
-    if (tableOrders[currentTable].items[itemName]) {
-        tableOrders[currentTable].items[itemName].quantity += quantity;
-    } else {
-        tableOrders[currentTable].items[itemName] = { ...item, quantity: quantity };
-    }
-    tableOrders[currentTable].total += item.price * quantity;
-
-    item.quantity -= quantity;
-    if (item.quantity <= 0) delete itemsToMove[targetTable].items[itemName];
-    renderSplitOrderModalContent();
+function buildOrdersPayload() {
+    const cleaned = Object.fromEntries(
+        Object.entries(tableOrders).filter(
+            ([, v]) => v && Object.keys(v.items || {}).length > 0
+        )
+    );
+    return Object.keys(cleaned).length === 0 ? { empty: true } : cleaned;
 }
 
-function renderSplitOrderModalContent() {
-    const $modalContent = $("#split-order-modal .modal-content");
-    $modalContent.empty();
-
-    const $columns = $(`
-        <div class="split-order-columns">
-            <div class="current-items-column">
-                <h3>Stôl ${currentTable}</h3>
-                <div class="current-items-list"></div>
-            </div>
-            <div class="moved-items-column">
-                <h3>Presunúť na: <span id="target-table-number">${targetTable ? targetTable : ''}</span></h3>
-                <div class="target-table-buttons"></div>
-                <div class="moved-items-list"></div>
-            </div>
-        </div>
-        <div class="modal-actions">
-            <button class="cancel-split-button">Zrušiť</button>
-            <button class="confirm-split-button">Presunúť</button>
-        </div>
-    `);
-
-    const $targetTableButtons = $columns.find(".target-table-buttons");
-    if (menuData && menuData.tables) {
-        menuData.tables.forEach(table => {
-            if (table.number !== currentTable) {
-                $targetTableButtons.append(`<button class="target-table-button" data-table="${table.number}">Stôl ${table.number}</button>`);
-            }
+async function pushOrders() {
+    try {
+        await fetch(`${BACKEND_URL}/orders`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(buildOrdersPayload()),
         });
+    } catch (error) {
+        console.error("Chyba ukladania:", error);
+        toast("Objednávku sa nepodarilo uložiť.");
     }
-
-    const $currentItemsList = $columns.find(".current-items-list");
-    if (tableOrders[currentTable]?.items) {
-        Object.entries(tableOrders[currentTable].items).forEach(([itemName, item]) => {
-            const $item = $(`
-                <div class="split-order-item">
-                    <span>${item.quantity}x ${itemName}</span>
-                    <div class="move-buttons">
-                        <button class="move-item-button">></button>
-                        <button class="move-all-button">>></button>
-                    </div>
-                </div>
-            `);
-            $item.find(".move-item-button").click(() => { if (targetTable) moveItemsToTargetTable(targetTable, itemName, 1); });
-            $item.find(".move-all-button").click(() => { if (targetTable) moveItemsToTargetTable(targetTable, itemName, item.quantity); });
-            $currentItemsList.append($item);
-        });
-    }
-
-    const updateMovedItemsList = (selectedTable) => {
-        const $movedItemsList = $columns.find(".moved-items-list");
-        $movedItemsList.empty();
-        $targetTableButtons.hide();
-        $columns.find("#target-table-number").text(selectedTable);
-
-        if (tableOrders[selectedTable]?.items) {
-            Object.entries(tableOrders[selectedTable].items).forEach(([itemName, item]) => {
-                $movedItemsList.append(`<div class="split-order-item"><span>${item.quantity}x ${itemName} (Tam)</span></div>`);
-            });
-        }
-        if (itemsToMove[selectedTable]?.items) {
-            Object.entries(itemsToMove[selectedTable].items).forEach(([itemName, item]) => {
-                const $item = $(`
-                    <div class="split-order-item">
-                        <span>${item.quantity}x ${itemName} (Presun)</span>
-                        <div class="move-buttons">
-                            <button class="move-back-button"><</button>
-                            <button class="move-all-back-button"><<</button>
-                        </div>
-                    </div>
-                `);
-                $item.find(".move-back-button").click(() => moveItemBackToOriginalTable(itemName, 1));
-                $item.find(".move-all-back-button").click(() => moveItemBackToOriginalTable(itemName, item.quantity));
-                $movedItemsList.append($item);
-            });
-        }
-    };
-
-    $columns.find(".target-table-button").click(function() {
-        targetTable = parseInt($(this).data("table"));
-        updateMovedItemsList(targetTable);
-    });
-
-    $columns.find(".cancel-split-button").click(() => {
-        if (itemsToMove[targetTable]?.items) {
-            Object.entries(itemsToMove[targetTable].items).forEach(([itemName, item]) => {
-                if (tableOrders[currentTable].items[itemName]) tableOrders[currentTable].items[itemName].quantity += item.quantity;
-                else tableOrders[currentTable].items[itemName] = { ...item };
-                tableOrders[currentTable].total += item.price * item.quantity;
-            });
-        }
-        currentTable = null; targetTable = null; itemsToMove = {};
-        $("#split-order-modal").fadeOut();
-        updateOrderDisplay();
-    });
-
-    $columns.find(".confirm-split-button").click(() => {
-        if (!targetTable) return alert("Vyberte stôl!");
-        if (itemsToMove[targetTable]?.items) {
-            if (!tableOrders[targetTable]) tableOrders[targetTable] = { items: {}, total: 0 };
-            Object.entries(itemsToMove[targetTable].items).forEach(([itemName, item]) => {
-                if (tableOrders[targetTable].items[itemName]) tableOrders[targetTable].items[itemName].quantity += item.quantity;
-                else tableOrders[targetTable].items[itemName] = { ...item };
-                tableOrders[targetTable].total += item.price * item.quantity;
-            });
-        }
-        itemsToMove = {}; saveOrders();
-        currentTable = null; targetTable = null;
-        $("#split-order-modal").fadeOut();
-        updateOrderDisplay(); updateTableStyles();
-    });
-
-    $modalContent.append($columns);
-    if (targetTable) updateMovedItemsList(targetTable);
 }
 
-// ==========================================
-// PLATBA, STORNO, INICIALIZÁCIA
-// ==========================================
+// bežné zmeny sa zlučujú, platba a storno sa ukladajú okamžite
+function saveOrders(options) {
+    const immediate = options && options.immediate;
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+
+    if (immediate) return pushOrders();
+    saveTimeout = setTimeout(pushOrders, 2500);
+}
+
+// ==========================================================================
+// VYKRESLENIE — STOLY
+// ==========================================================================
+
+function renderTables() {
+    const $grid = $(".table-grid").empty();
+    if (!menuData || !menuData.tables.length) {
+        $grid.append(`<div class="empty-hint">Žiadne stoly.<br>Pridajte ich v admin menu.</div>`);
+        return;
+    }
+
+    menuData.tables.forEach((table) => {
+        const key = tableKey(table.number);
+        const order = tableOrders[key];
+        const hasOrder = !!order && Object.keys(order.items || {}).length > 0;
+        const isActive = currentTable !== null && tableKey(currentTable) === key;
+
+        const $btn = $(`
+            <button class="table-button" type="button" data-table="${escapeHtml(table.number)}">
+                <span class="dot ${hasOrder ? "dot-occ" : "dot-free"}"></span>
+                <span class="info">
+                    <span class="t-name">${escapeHtml(tableLabel(table))}</span>
+                    <span class="t-meta">${hasOrder ? escapeHtml(elapsedLabel(order)) : "Voľný"}</span>
+                </span>
+                ${hasOrder ? `<span class="t-total mono">${fmt(order.total)}</span>` : ""}
+            </button>
+        `);
+
+        if (isActive) $btn.addClass("active");
+        $grid.append($btn);
+    });
+}
+
+// staré volania ponechávame funkčné
+function updateTableStyles() { renderTables(); }
+
+// ==========================================================================
+// VYKRESLENIE — KATEGÓRIE A POLOŽKY
+// ==========================================================================
+
+function renderCategories() {
+    const $wrap = $(".menu-categories").empty();
+    if (!menuData) return;
+
+    menuData.categories.forEach((category) => {
+        const $btn = $(`<button class="category-button" type="button"></button>`)
+            .attr("data-category", category.id)
+            .text(category.name || category.id);
+        if (category.id === activeCategory) $btn.addClass("active");
+        $wrap.append($btn);
+    });
+}
+
+function countOnTicket(itemName) {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order || !order.items[itemName]) return 0;
+    return order.items[itemName].quantity;
+}
+
+function renderMenuItems() {
+    const $wrap = $(".menu-items").empty();
+    if (!menuData) return;
+
+    const term = searchTerm.trim().toLowerCase();
+    const list = menuData.menuItems.filter((item) =>
+        term ? String(item.name).toLowerCase().includes(term) : item.category === activeCategory
+    );
+
+    if (!list.length) {
+        $wrap.append(`<div class="empty-hint">${term ? "Nič sa nenašlo." : "V tejto kategórii nie sú položky."}</div>`);
+        return;
+    }
+
+    list.forEach((item) => {
+        const onTicket = countOnTicket(item.name);
+        $wrap.append(`
+            <button class="menu-item" type="button"
+                    data-category="${escapeHtml(item.category)}"
+                    data-price="${escapeHtml(item.price)}"
+                    data-name="${escapeHtml(item.name)}">
+                ${onTicket > 0
+                    ? `<span class="m-count mono">${onTicket}</span>`
+                    : `<span class="m-add">+</span>`}
+                <span class="m-name">${escapeHtml(item.name)}</span>
+                <span class="m-price mono">${fmt(item.price)}</span>
+            </button>
+        `);
+    });
+}
+
+// ==========================================================================
+// VYKRESLENIE — ÚČET
+// ==========================================================================
+
+function getCategoryName(categoryId) {
+    if (!menuData) return "Ostatné";
+    const category = menuData.categories.find((c) => c.id === categoryId);
+    return category ? (category.name || category.id) : "Ostatné";
+}
+
+function getCategoryRank(categoryId) {
+    if (!menuData) return 99;
+    const index = menuData.categories.findIndex((c) => c.id === categoryId);
+    return index === -1 ? 99 : index;
+}
+
+// kategória položky — z objednávky, inak dohľadaná v menu
+function categoryOfItem(itemName, itemData) {
+    if (itemData && itemData.category) return itemData.category;
+    if (menuData) {
+        const found = menuData.menuItems.find((i) => i.name === itemName);
+        if (found) return found.category;
+    }
+    return undefined;
+}
+
+function updateOrderDisplay() {
+    const $items = $(".order-items").empty();
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+
+    if (!order || !Object.keys(order.items).length) {
+        $items.append(
+            currentTable === null
+                ? `<div class="empty-hint">Vyberte stôl.</div>`
+                : `<div class="empty-hint">Zatiaľ žiadne položky.<br>Klepnite na jedlo v menu.</div>`
+        );
+        $(".total-section span:last").text(fmt(0));
+        $("#ticket-count").text(plItems(0));
+        updateActionButtons();
+        updateMobileSummary();
+        return;
+    }
+
+    const entries = Object.entries(order.items);
+
+    // zoradenie podľa poradia kategórií z admin menu, potom abecedne
+    entries.sort((a, b) => {
+        const rankA = getCategoryRank(categoryOfItem(a[0], a[1]));
+        const rankB = getCategoryRank(categoryOfItem(b[0], b[1]));
+        if (rankA !== rankB) return rankA - rankB;
+        return a[0].localeCompare(b[0], "sk");
+    });
+
+    let lastCategory = null;
+    let count = 0;
+
+    entries.forEach(([itemName, item]) => {
+        const categoryId = categoryOfItem(itemName, item);
+        if (categoryId !== lastCategory) {
+            $items.append(`<div class="order-category-title">${escapeHtml(getCategoryName(categoryId))}</div>`);
+            lastCategory = categoryId;
+        }
+
+        count += item.quantity;
+
+        const $row = $(`
+            <div class="order-item">
+                <span class="item-quantity">${item.quantity}×</span>
+                <span class="item-name">${escapeHtml(itemName)}</span>
+                <span class="quantity-controls">
+                    <button class="quantity-btn minus" type="button" aria-label="Menej">–</button>
+                    <button class="quantity-btn plus" type="button" aria-label="Viac">+</button>
+                </span>
+                <span class="item-total mono">${fmt(item.price * item.quantity)}</span>
+            </div>
+        `);
+
+        $row.find(".minus").on("click", () => updateItemQuantity(itemName, -1));
+        $row.find(".plus").on("click", () => updateItemQuantity(itemName, 1));
+        $items.append($row);
+    });
+
+    $(".total-section span:last").text(fmt(order.total));
+    $("#ticket-count").text(plItems(count));
+    updateActionButtons();
+    updateMobileSummary();
+}
+
+function updateActionButtons() {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    const hasItems = !!order && Object.keys(order.items).length > 0;
+
+    $(".pay-button").prop("disabled", !hasItems);
+    $(".cancel-button").prop("disabled", !hasItems);
+    $(".split-order-button").prop("disabled", !hasItems);
+}
+
+function orderItemCount(order) {
+    if (!order) return 0;
+    return Object.values(order.items).reduce((sum, i) => sum + i.quantity, 0);
+}
+
+function updateMobileSummary() {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    const count = orderItemCount(order);
+    const onMenuPage = $("#pos-app").attr("data-page") === "menu";
+
+    $("#mobile-bar-text").text(`${plItems(count)} · ${fmt(order ? order.total : 0)}`);
+    $("#mobile-bar").prop("hidden", !(onMenuPage && count > 0));
+
+    $("#nav-badge").text(count).prop("hidden", count === 0);
+}
+
+// ==========================================================================
+// ZMENY OBJEDNÁVKY
+// ==========================================================================
+
+function addItemToOrder(itemName, itemPrice, categoryId) {
+    const key = tableKey(currentTable);
+
+    if (!tableOrders[key]) {
+        tableOrders[key] = { items: {}, total: 0, createdAt: new Date().toISOString() };
+    }
+
+    const order = tableOrders[key];
+    if (order.items[itemName]) {
+        order.items[itemName].quantity += 1;
+        order.items[itemName].category = categoryId;
+    } else {
+        order.items[itemName] = { price: itemPrice, quantity: 1, category: categoryId };
+    }
+    recalcTotal(order);
+
+    saveOrders();
+    renderTables();
+    renderMenuItems();
+    updateOrderDisplay();
+    toast(`+1 ${itemName}`);
+}
+
+function updateItemQuantity(itemName, delta) {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return;
+
+    const item = order.items[itemName];
+    if (!item) return;
+
+    const newQuantity = item.quantity + delta;
+    if (newQuantity <= 0) {
+        delete order.items[itemName];
+    } else {
+        item.quantity = newQuantity;
+    }
+    recalcTotal(order);
+
+    if (Object.keys(order.items).length === 0) {
+        delete tableOrders[tableKey(currentTable)];
+    }
+
+    saveOrders();
+    renderTables();
+    renderMenuItems();
+    updateOrderDisplay();
+}
+
+// ==========================================================================
+// PLATBA A STORNO
+// ==========================================================================
 
 async function payOrder() {
-    if (!currentTable || !tableOrders[currentTable]) return alert("Prázdny stôl!");
-    const totalAmount = tableOrders[currentTable].total.toFixed(2);
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return;
+
+    const table = currentTable;
+    const totalAmount = order.total.toFixed(2);
     const paidOrder = {
-        table: currentTable,
-        items: tableOrders[currentTable].items,
+        table: table,
+        items: order.items,
         total: totalAmount,
         date: new Date().toISOString(),
     };
 
     try {
-        $('#loading-modal').fadeIn(); 
+        showModal("loading-modal");
+
         const response = await fetch(`${BACKEND_URL}/orders/paid`, {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(paidOrder)
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(paidOrder),
         });
         if (!response.ok) throw new Error("Chyba platby");
 
-        delete tableOrders[currentTable];
-        saveOrdersToBackend();
-        $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
+        delete tableOrders[tableKey(table)];
+        await saveOrders({ immediate: true });
+
+        renderTables();
+        renderMenuItems();
         updateOrderDisplay();
 
-        const qrResponse = await fetch(`${BACKEND_URL}/generate-qr?amount=${totalAmount}&table=${currentTable}`);
+        const qrResponse = await fetch(`${BACKEND_URL}/generate-qr?amount=${totalAmount}&table=${encodeURIComponent(table)}`);
+        hideModal("loading-modal");
+
         if (qrResponse.ok) {
             $("#qr-code").attr("src", qrResponse.url);
-            $('#loading-modal').fadeOut(); $("#qr-modal").fadeIn();
+            $("#qr-subtitle").text(`${tableTitle(table)} · ${fmt(totalAmount)}`);
+            showModal("qr-modal");
+        } else {
+            toast("Objednávka zaplatená, QR kód sa nepodarilo načítať.");
+            closeQrModal();
         }
     } catch (error) {
-        console.error("Chyba:", error); alert("Chyba pri platbe."); $('#loading-modal').fadeOut(); 
+        console.error("Chyba pri platbe:", error);
+        hideModal("loading-modal");
+        toast("Chyba pri platbe. Skúste znova.");
     }
 }
 
 function cancelOrder() {
-    if (!currentTable || !tableOrders[currentTable]) return;
-    if (confirm(`Zrušiť objednávku pre stôl ${currentTable}?`)) {
-        delete tableOrders[currentTable];
-        saveOrdersToBackend();
-        updateOrderDisplay();
-        $(`.table-button[data-table="${currentTable}"]`).removeClass("has-order");
-        $(".current-order h2").text("Vyberte stôl");
-        $(".action-buttons button").prop("disabled", true);
-    }
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return;
+
+    if (!confirm(`Naozaj zrušiť objednávku pre ${tableTitle(currentTable)}?`)) return;
+
+    delete tableOrders[tableKey(currentTable)];
+    saveOrders({ immediate: true });
+
+    renderTables();
+    renderMenuItems();
+    updateOrderDisplay();
+    toast("Objednávka zrušená.");
+}
+
+function tableTitle(tableNumber) {
+    if (tableNumber === null || tableNumber === undefined) return "Stôl";
+    const table = menuData && menuData.tables.find((t) => tableKey(t.number) === tableKey(tableNumber));
+    return table ? tableLabel(table) : `Stôl ${tableNumber}`;
 }
 
 function closeQrModal() {
-    $("#qr-modal").fadeOut(); currentTable = null;
-    $(".current-order h2").text("Vyberte stôl"); $(".action-buttons button").prop("disabled", true);
+    hideModal("qr-modal");
+    selectTable(null);
+    goToPage("tables");
 }
 
-function logout() { localStorage.removeItem("authToken"); window.location.href = "/POS/login.html"; }
+// ==========================================================================
+// ROZDELENIE ÚČTU
+// ==========================================================================
 
-$(document).ready(async function () {
-    $(document).on("click", ".table-button", function () {
-        const tableNumber = $(this).data("table");
-        $(".table-button").removeClass("active"); $(this).addClass("active");
-        currentTable = tableNumber;
-        updateOrderDisplay();
-        $(".action-buttons button").prop("disabled", false);
-        $(".current-order h2").text(`Stôl ${tableNumber}`);
+function movingSum() {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return 0;
+    return Object.entries(itemsToMove).reduce(
+        (sum, [name, qty]) => sum + (order.items[name] ? order.items[name].price * qty : 0), 0
+    );
+}
+
+function movingCount() {
+    return Object.values(itemsToMove).reduce((sum, q) => sum + q, 0);
+}
+
+function openSplitOrderModal() {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return;
+
+    splitTarget = null;
+    itemsToMove = {};
+
+    $("#split-source").text(tableTitle(currentTable));
+    renderSplitTargets();
+    renderSplitItems();
+    renderSplitFoot();
+    showModal("split-order-modal");
+}
+
+function renderSplitTargets() {
+    const $wrap = $(".target-table-buttons").empty();
+    if (!menuData) return;
+
+    const others = menuData.tables.filter((t) => tableKey(t.number) !== tableKey(currentTable));
+    if (!others.length) {
+        $wrap.append(`<div class="empty-hint">Nie je kam presúvať.</div>`);
+        return;
+    }
+
+    others.forEach((table) => {
+        const $btn = $(`<button class="target-table-button" type="button"></button>`)
+            .attr("data-table", table.number)
+            .text(tableLabel(table));
+        if (splitTarget !== null && tableKey(splitTarget) === tableKey(table.number)) {
+            $btn.addClass("active");
+        }
+        $wrap.append($btn);
     });
+}
 
-    $(document).on("click", ".category-button", function () {
-        const selectedCategory = $(this).data("category");
-        $(".category-button").removeClass("active"); $(this).addClass("active");
-        $(".menu-item").hide(); $(`.menu-item[data-category="${selectedCategory}"]`).show();
+function renderSplitItems() {
+    const $wrap = $(".split-items-list").empty();
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order) return;
+
+    Object.entries(order.items).forEach(([itemName, item]) => {
+        const moving = itemsToMove[itemName] || 0;
+        const $row = $(`
+            <div class="split-order-item${moving > 0 ? " is-moving" : ""}">
+                <span class="nm">${escapeHtml(itemName)}
+                    <span class="have">na účte ${item.quantity}× · ${fmt(item.price)}</span>
+                </span>
+                <span class="quantity-controls">
+                    <button class="quantity-btn move-back-button" type="button" aria-label="Menej">–</button>
+                    <span class="moving mono">${moving}</span>
+                    <button class="quantity-btn move-item-button" type="button" aria-label="Viac">+</button>
+                </span>
+            </div>
+        `);
+
+        $row.find(".move-item-button").on("click", () => changeMoving(itemName, 1));
+        $row.find(".move-back-button").on("click", () => changeMoving(itemName, -1));
+        $wrap.append($row);
     });
+}
 
-    $(document).on("click", ".menu-item", function () {
-        if (!currentTable) return alert("Vyberte stôl!");
-        const itemName = $(this).find("h3").text();
-        const itemPrice = parseFloat($(this).data("price"));
-        const categoryId = $(this).data("category");
+function changeMoving(itemName, delta) {
+    const order = currentTable !== null ? orderOf(currentTable) : null;
+    if (!order || !order.items[itemName]) return;
 
-        if (!tableOrders[currentTable]) tableOrders[currentTable] = { items: {}, total: 0 };
-        if (tableOrders[currentTable].items[itemName]) {
-            tableOrders[currentTable].items[itemName].quantity += 1;
-            tableOrders[currentTable].total += itemPrice;
-            tableOrders[currentTable].items[itemName].category = categoryId;
+    const max = order.items[itemName].quantity;
+    const next = Math.min(max, Math.max(0, (itemsToMove[itemName] || 0) + delta));
+
+    if (next === 0) delete itemsToMove[itemName];
+    else itemsToMove[itemName] = next;
+
+    renderSplitItems();
+    renderSplitFoot();
+}
+
+function renderSplitFoot() {
+    $("#split-sum").text(fmt(movingSum()));
+
+    const ready = splitTarget !== null && movingCount() > 0;
+    $(".confirm-split-button")
+        .prop("disabled", !ready)
+        .text(splitTarget !== null ? `Presunúť na ${tableTitle(splitTarget)}` : "Presunúť");
+}
+
+function confirmSplit() {
+    const source = currentTable !== null ? orderOf(currentTable) : null;
+    if (!source || splitTarget === null || movingCount() === 0) return;
+
+    const targetKey = tableKey(splitTarget);
+    if (!tableOrders[targetKey]) {
+        tableOrders[targetKey] = { items: {}, total: 0, createdAt: new Date().toISOString() };
+    }
+    const target = tableOrders[targetKey];
+    const count = movingCount();
+
+    Object.entries(itemsToMove).forEach(([itemName, qty]) => {
+        const item = source.items[itemName];
+        if (!item) return;
+
+        if (target.items[itemName]) {
+            target.items[itemName].quantity += qty;
         } else {
-            tableOrders[currentTable].items[itemName] = { price: itemPrice, quantity: 1, category: categoryId };
-            tableOrders[currentTable].total += itemPrice;
+            target.items[itemName] = { price: item.price, quantity: qty, category: item.category };
         }
 
-        $(`.table-button[data-table="${currentTable}"]`).addClass("has-order");
-        saveOrders(); updateOrderDisplay();
+        item.quantity -= qty;
+        if (item.quantity <= 0) delete source.items[itemName];
     });
 
-    $(".split-order-button").click(openSplitOrderModal);
-    $(".pay-button").click(payOrder);
-    $(".cancel-button").click(cancelOrder);
-    $("#close-modal").click(closeQrModal);
-    $(".logout-button").click(logout);
+    recalcTotal(source);
+    recalcTotal(target);
 
+    if (Object.keys(source.items).length === 0) {
+        delete tableOrders[tableKey(currentTable)];
+    }
+
+    const targetName = tableTitle(splitTarget);
+    itemsToMove = {};
+    splitTarget = null;
+
+    saveOrders({ immediate: true });
+    hideModal("split-order-modal");
+
+    renderTables();
+    renderMenuItems();
+    updateOrderDisplay();
+    toast(`${plMoved(count)} na ${targetName}`);
+}
+
+function cancelSplit() {
+    itemsToMove = {};
+    splitTarget = null;
+    hideModal("split-order-modal");
+}
+
+// ==========================================================================
+// VÝBER STOLA, NAVIGÁCIA, ODHLÁSENIE
+// ==========================================================================
+
+function selectTable(tableNumber) {
+    currentTable = tableNumber;
+
+    const title = tableNumber === null ? "Vyberte stôl" : tableTitle(tableNumber);
+    $(".current-order .ticket-head h2").text(title);
+    $("#menu-eyebrow").text(title);
+
+    renderTables();
+    renderMenuItems();
+    updateOrderDisplay();
+}
+
+function goToPage(page) {
+    $("#pos-app").attr("data-page", page);
+    $("#mobile-nav button").removeClass("active")
+        .filter(`[data-page="${page}"]`).addClass("active");
+    updateMobileSummary();
+}
+
+function setSearchOpen(open) {
+    $("#search-wrap").prop("hidden", !open);
+    $("#search-toggle").toggleClass("is-on", open).attr("aria-expanded", String(open));
+
+    if (open) {
+        $("#search-input").trigger("focus");
+    } else if (searchTerm) {
+        searchTerm = "";
+        $("#search-input").val("");
+        renderMenuItems();
+    }
+}
+
+function logout() {
+    localStorage.removeItem("authToken");
+    window.location.href = "/POS/login.html";
+}
+
+// ==========================================================================
+// INICIALIZÁCIA
+// ==========================================================================
+
+$(document).ready(async function () {
+
+    // --- výber stola ---
+    $(document).on("click", ".table-button", function () {
+        selectTable($(this).data("table"));
+        goToPage("menu");   // na mobile rovno pokračujeme do menu
+    });
+
+    // --- kategórie ---
+    $(document).on("click", ".category-button", function () {
+        activeCategory = $(this).data("category");
+        searchTerm = "";
+        $("#search-input").val("");
+        renderCategories();
+        renderMenuItems();
+    });
+
+    // --- pridanie položky ---
+    $(document).on("click", ".menu-item", function () {
+        if (currentTable === null) {
+            toast("Najprv vyberte stôl.");
+            goToPage("tables");
+            return;
+        }
+        addItemToOrder(
+            $(this).data("name"),
+            parseFloat($(this).data("price")),
+            $(this).data("category")
+        );
+    });
+
+    // --- hľadanie ---
+    $("#search-toggle").on("click", function () {
+        setSearchOpen($("#search-wrap").prop("hidden"));
+    });
+    $("#search-input").on("input", function () {
+        searchTerm = $(this).val();
+        renderMenuItems();
+    }).on("keydown", function (e) {
+        if (e.key === "Escape") setSearchOpen(false);
+    });
+
+    // --- akcie účtu ---
+    $(".pay-button").on("click", payOrder);
+    $(".cancel-button").on("click", cancelOrder);
+    $(".split-order-button").on("click", openSplitOrderModal);
+    $("#close-modal").on("click", closeQrModal);
+    $(".logout-button").on("click", logout);
+
+    // --- rozdelenie účtu ---
+    $(document).on("click", ".target-table-button", function () {
+        splitTarget = $(this).data("table");
+        renderSplitTargets();
+        renderSplitFoot();
+    });
+    $(".confirm-split-button").on("click", confirmSplit);
+    $(".cancel-split-button").on("click", cancelSplit);
+
+    // --- mobilná navigácia ---
+    $("#mobile-nav button").on("click", function () {
+        goToPage($(this).data("page"));
+    });
+    $("#mobile-bar").on("click", () => goToPage("ticket"));
+
+    // --- štart ---
+    showModal("loading-data-modal");
     await loadOrdersFromBackend();
-    loadMenuData();
-    updateTableStyles();
+    await loadMenuData();
+    hideModal("loading-data-modal");
 });
