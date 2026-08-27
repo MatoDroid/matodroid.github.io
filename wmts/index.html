@@ -636,7 +636,14 @@
             controller.abort();
         }, OVERPASS_TIMEOUT_MS);
 
-        return fetch(endpoint + "?data=" + encodeURIComponent(query), { signal: controller.signal })
+        // POST namiesto GET s ?data= – dlhší dopyt (rozšírený bbox aj filter
+        // na vylúčenie drobných ciest) sa tak nemôže naraziť na limit dĺžky
+        // URL, ktorý majú niektoré reverse proxy pred verejnými zrkadlami
+        return fetch(endpoint, {
+            method: "POST",
+            body: "data=" + encodeURIComponent(query),
+            signal: controller.signal
+        })
             .then(function(response) {
                 clearTimeout(timer);
                 if (!response.ok) {
