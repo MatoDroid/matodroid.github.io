@@ -250,8 +250,7 @@
     // (overpass-api.de má najdlhšiu frontu) a až potom skúsiť záložný.
     var OVERPASS_ENDPOINTS = [
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://overpass.private.coffee/api/interpreter"
+        "https://overpass.kumi.systems/api/interpreter"
     ];
 
     // Timeout na jedno zrkadlo. Verejné inštancie majú okrem výpočtu aj
@@ -482,6 +481,27 @@
         var widthKm = map.distance(sw, L.latLng(sw.lat, ne.lng)) / 1000;
         var heightKm = map.distance(sw, L.latLng(ne.lat, sw.lng)) / 1000;
         return widthKm * heightKm;
+    }
+
+    // "Failed to fetch" (Chrome) / "NetworkError" (Firefox) / "Load failed"
+    // (Safari) znamenajú, že spojenie neotvoril prehliadač – server o dopyte
+    // vôbec nevedel. Príčina je v prostredí, nie v Overpasse.
+    function isNetworkLevelError(reason) {
+        return /failed to fetch|networkerror|load failed|network request failed/i.test(reason);
+    }
+
+    // Najpravdepodobnejšia príčina toho, že prehliadač spojenie neotvoril
+    function diagnoseNetwork() {
+        if (navigator.onLine === false) {
+            return "Vyzerá to, že počítač nie je pripojený na internet.";
+        }
+        if (location.protocol === 'file:') {
+            return "Stránka je otvorená priamo zo súboru (file://), preto prehliadač " +
+                   "blokuje volania na Overpass API. Otvor ju cez webový server, " +
+                   "napríklad z adresy github.io.";
+        }
+        return "Spojenie zablokoval prehliadač alebo sieť – najčastejšie blokovač " +
+               "reklám, rozšírenie na ochranu súkromia, firewall alebo VPN.";
     }
 
     function shorten(text) {
@@ -731,8 +751,14 @@
                 }
 
                 showLoading(false);
-                showMessage("Cesty sa nepodarilo načítať. " + err.message +
-                    ". Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.", "error");
+
+                // Sieťová chyba nie je problém Overpassu – približovanie mapy
+                // ani opakovanie na nej nič nezmenia, tak neraď nezmysly
+                var hint = isNetworkLevelError(err.message)
+                    ? diagnoseNetwork()
+                    : "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
+
+                showMessage("Cesty sa nepodarilo načítať. " + err.message + ". " + hint, "error");
                 roadsJob = null;
             });
     }
