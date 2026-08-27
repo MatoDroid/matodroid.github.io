@@ -646,11 +646,15 @@
             controller.abort();
         }, OVERPASS_TIMEOUT_MS);
 
-        // POST namiesto GET s ?data= – dlhší dopyt (rozšírený bbox aj filter
-        // na vylúčenie drobných ciest) sa tak nemôže naraziť na limit dĺžky
-        // URL, ktorý majú niektoré reverse proxy pred verejnými zrkadlami
+        // POST namiesto GET s ?data= – dlhší dopyt sa tak nemôže naraziť na
+        // limit dĺžky URL (Apache LimitRequestLine, default ~8 kB).
+        // Content-Type MUSÍ byť uvedený: telo je "data=" + urlencode(...),
+        // teda formulárové kódovanie. Bez neho pošle prehliadač
+        // text/plain a server nemusí telo rozparsovať. Táto hodnota je
+        // zároveň CORS-safelisted, takže nepridáva preflight OPTIONS.
         return fetch(endpoint, {
             method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: "data=" + encodeURIComponent(query),
             signal: controller.signal
         })
