@@ -258,8 +258,12 @@
     // frontu, preto sa neoplatí čakať dlho – radšej vyhrá iné zrkadlo.
     var OVERPASS_TIMEOUT_MS = 20000;
 
-    // Nad touto plochou výrezu cesty nenačítavame (Overpass by to neuniesol)
-    var MAX_BBOX_AREA_KM2 = 50;
+    // Nad touto plochou cesty nenačítavame (Overpass by to neuniesol).
+    // Kontroluje sa plocha, ktorú reálne sťahujeme, teda AJ s rozšírením.
+    // Dopyt s chodníkmi je oveľa ťažší, preto má prísnejší limit než dopyt
+    // len na hlavné cesty, ktoré sú v teréne riedke.
+    var MAX_BBOX_AREA_KM2 = 15;
+    var MAX_BBOX_AREA_KM2_MAJOR = 60;
 
     // Pod týmto priblížením sťahujeme len hlavné cesty. Chodníky, chodníčky,
     // účelové a servisné cesty tvoria väčšinu dát a pri oddialení sú aj tak
@@ -269,9 +273,9 @@
         "footway", "path", "cycleway", "steps", "service", "track", "bridleway"
     ];
 
-    // O koľko sa rozšíri sťahovaný bbox oproti výrezu (0.25 = +25 %).
-    // Vďaka tomu malý posun mapy nespustí nové sťahovanie.
-    var BBOX_PADDING = 0.25;
+    // O koľko sa rozšíri sťahovaný bbox oproti výrezu. Pozor, pad() rozširuje
+    // na KAŽDÚ stranu, takže 0.08 znamená ~1.35× väčšiu plochu (nie 1.08×).
+    var BBOX_PADDING = 0.08;
 
     // Oneskorenie pred volaním Overpass po posune/zoome mapy
     var MOVE_DEBOUNCE_MS = 450;
@@ -480,6 +484,23 @@
         return widthKm * heightKm;
     }
 
+    function shorten(text) {
+        var clean = String(text).replace(/\s+/g, " ").trim();
+        return clean.length > 160 ? clean.slice(0, 160) + "…" : clean;
+    }
+
+    // Krátky názov zrkadla do hlásenia (celé URL je zbytočne dlhé)
+    function endpointName(endpoint) {
+        return endpoint.split("/")[2];
+    }
+
+    // Z HTML/textovej chybovej odpovede Overpassu vytiahne užitočnú vetu
+    function describeOverpassError(body) {
+        if (!body) { return ""; }
+        var match = String(body).match(/(rate_limited|too many requests|Query timed out[^<]*|runtime error[^<]*|error[^<]{0,120})/i);
+        return match ? " – " + shorten(match[0]) : "";
+    }
+
     // Volanie jedného Overpass zrkadla s vlastným timeoutom
     function fetchOverpassEndpoint(endpoint, query, controller) {
         var timedOut = false;
@@ -492,11 +513,22 @@
             .then(function(response) {
                 clearTimeout(timer);
                 if (!response.ok) {
-                    throw new Error("HTTP " + response.status);
+                    // Overpass posiela dôvod (preťaženie, prekročený limit)
+                    // v tele odpovede – bez neho sa chyba nedá diagnostikovať
+                    return response.text().then(function(body) {
+                        throw new Error("HTTP " + response.status + describeOverpassError(body));
+                    }, function() {
+                        throw new Error("HTTP " + response.status);
+                    });
                 }
                 return response.json();
             })
             .then(function(data) {
+                // Pri chybe počas výpočtu vráti Overpass kód 200 a prázdny
+                // zoznam prvkov s vysvetlením v poli "remark".
+                if (data && data.remark && /error/i.test(data.remark)) {
+                    throw new Error(shorten(data.remark));
+                }
                 return { endpoint: endpoint, data: data };
             })
             .catch(function(err) {
@@ -517,9 +549,8 @@
         };
 
         return new Promise(function(resolve, reject) {
-            var failures = 0;
             var settled = false;
-            var lastError = null;
+            var reasons = [];
 
             OVERPASS_ENDPOINTS.forEach(function(endpoint, i) {
                 fetchOverpassEndpoint(endpoint, query, controllers[i])
@@ -539,12 +570,16 @@
 
                         var reason = err.timedOut ? "časový limit vypršal" : err.message;
                         console.warn("Overpass zrkadlo zlyhalo (" + endpoint + "): " + reason);
-                        lastError = new Error(reason);
 
-                        failures++;
-                        if (failures === OVERPASS_ENDPOINTS.length) {
+                        // Zbierame dôvody zo VŠETKÝCH zrkadiel – pri poslednom
+                        // dôvode sa nedá zistiť, čo vlastne zlyhalo
+                        reasons.push(endpointName(endpoint) + ": " + reason);
+
+                        if (reasons.length === OVERPASS_ENDPOINTS.length) {
                             settled = true;
-                            reject(lastError);
+                            var error = new Error(reasons.join(", "));
+                            error.reasons = reasons;
+                            reject(error);
                         }
                     });
             });
@@ -608,8 +643,14 @@
         var bbox = map.getBounds();
         var includeMinor = map.getZoom() >= MINOR_ROADS_MIN_ZOOM;
 
-        // Kontrola veľkosti výrezu – pri veľkej ploche Overpass nevoláme
-        if (bboxAreaKm2(bbox) > MAX_BBOX_AREA_KM2) {
+        // Sťahujeme o niečo väčšie územie, než je vidieť, aby malý posun
+        // mapy nespustil nové volanie Overpassu
+        var requestBounds = bbox.pad(BBOX_PADDING);
+
+        // Kontrola veľkosti – rozhoduje plocha, ktorú reálne pýtame od
+        // Overpassu, nie len viditeľný výrez
+        var areaLimit = includeMinor ? MAX_BBOX_AREA_KM2 : MAX_BBOX_AREA_KM2_MAJOR;
+        if (bboxAreaKm2(requestBounds) > areaLimit) {
             cancelRoadsJob();
             showLoading(false);
             if (roadsLayer) {
@@ -631,18 +672,20 @@
         // Zrušenie predchádzajúceho, ešte bežiaceho požiadavku
         cancelRoadsJob();
 
-        // Sťahujeme o niečo väčšie územie, než je vidieť, aby malý posun
-        // mapy nespustil nové volanie Overpassu
-        var requestBounds = bbox.pad(BBOX_PADDING);
         var job = { cancelled: false, abort: null };
         roadsJob = job;
-
-        var query = buildRoadsQuery(requestBounds, includeMinor);
 
         hideMessage();
         showLoading(true);
 
-        fetchOverpass(query, job)
+        runRoadsQuery(requestBounds, includeMinor, job);
+    }
+
+    // Jeden pokus o stiahnutie a vykreslenie ciest. Ak zlyhá s plným
+    // dopytom, skúsi sa raz zopakovať len s hlavnými cestami – odľahčený
+    // dopyt často prejde aj tam, kde plný nestihne časový limit.
+    function runRoadsQuery(requestBounds, includeMinor, job) {
+        fetchOverpass(buildRoadsQuery(requestBounds, includeMinor), job)
             .then(function(result) {
                 if (job.cancelled) { return; }
 
@@ -669,15 +712,27 @@
                 showLoading(false);
                 roadsJob = null;
 
-                if (!includeMinor) {
+                if (!geojsonData.features.length) {
+                    showMessage("V tomto výreze nie sú žiadne cesty.", "info", 4000);
+                } else if (!includeMinor) {
                     showMessage("Zobrazené sú len hlavné cesty. Priblíž mapu pre chodníky a poľné cesty.", "info", 4000);
                 }
             })
             .catch(function(err) {
                 if (job.cancelled || err.name === 'AbortError') { return; }
-                console.error("Chyba pri načítaní ciest:", err);
+
+                console.error("Chyba pri načítaní ciest:", err.message);
+
+                // Druhý pokus s odľahčeným dopytom
+                if (includeMinor) {
+                    console.warn("Skúšam znova len s hlavnými cestami.");
+                    runRoadsQuery(requestBounds, false, job);
+                    return;
+                }
+
                 showLoading(false);
-                showMessage("Cesty sa nepodarilo načítať (" + err.message + "). Skús to znova tlačidlom „Načítať cesty“.", "error");
+                showMessage("Cesty sa nepodarilo načítať. " + err.message +
+                    ". Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.", "error");
                 roadsJob = null;
             });
     }
