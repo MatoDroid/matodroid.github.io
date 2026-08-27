@@ -4,6 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa s kreslením, cestami a exportom</title>
+
+    <!-- Ladiaca konzola (Eruda) len na vyžiadanie – bežní návštevníci ju
+         nesťahujú. Zapnutie/vypnutie: ...?debug=1 / ...?debug=0, zapamätá sa
+         v localStorage, aby nebolo treba parameter zadávať pri každom otvorení. -->
+    <script>
+        (function () {
+            try {
+                var params = new URLSearchParams(location.search);
+                if (params.has('debug')) {
+                    if (params.get('debug') === '0') {
+                        localStorage.removeItem('wmts.debug');
+                    } else {
+                        localStorage.setItem('wmts.debug', '1');
+                    }
+                }
+                if (localStorage.getItem('wmts.debug') === '1') {
+                    document.write('<script src="https://cdn.jsdelivr.net/npm/eruda"><\/script>');
+                    document.write('<script>eruda.init();<\/script>');
+                }
+            } catch (err) {
+                console.warn('Ladiaca konzola sa nedala zapnúť:', err);
+            }
+        })();
+    </script>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <style>
