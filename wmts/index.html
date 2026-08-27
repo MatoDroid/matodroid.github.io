@@ -367,8 +367,9 @@
     var messageTimer = null;
     var loadingHintTimer = null;
 
-    // Po dlhšej chvíli čakania dáme vedieť, že to nie je zamrznuté – len sa
-    // čaká na pomalé pripojenie
+    // Po dlhšej chvíli čakania dáme vedieť, že to nie je zamrznuté. Príčinu
+    // (pomalé pripojenie vs. preťažený Overpass server) nevieme z tohto
+    // miesta rozlíšiť, tak ju v texte netvrdíme.
     var LOADING_HINT_DELAY_MS = 8000;
 
     function showLoading(visible) {
@@ -378,7 +379,7 @@
         if (visible) {
             loadingTextEl.textContent = "Načítavam cesty...";
             loadingHintTimer = setTimeout(function() {
-                loadingTextEl.textContent = "Načítavam cesty... pripojenie je pomalé, chvíľu to potrvá";
+                loadingTextEl.textContent = "Načítavam cesty... trvá to dlhšie, ešte chvíľu strpenia";
             }, LOADING_HINT_DELAY_MS);
         }
     }
@@ -825,8 +826,11 @@
                     // mapy ani opakovanie na nej nič nezmenia
                     hint = diagnoseNetwork();
                 } else if (allTimedOut(err)) {
-                    hint = "Vyzerá to na pomalé pripojenie (slabý signál, preplnená Wi-Fi). " +
-                           "Skús to znova, keď bude sieť rýchlejšia, alebo sa presuň bližšie k zdroju signálu.";
+                    // Bezplatné verejné Overpass servery bývajú preťažené a
+                    // nestabilné aj pri rýchlom pripojení – to je bežnejšia
+                    // príčina timeoutu než pomalá sieť
+                    hint = "Overpass servery sú pravdepodobne preťažené. Skús to o chvíľu znova " +
+                           "tlačidlom „Načítať cesty“, prípadne over stav na overpass-api.de/api/status.";
                 } else {
                     hint = "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
                 }
