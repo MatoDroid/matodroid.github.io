@@ -558,15 +558,40 @@
         });
     }
 
+    // Mobilné Chrome/Safari nepodporujú rozšírenia – rada "vypni rozšírenie"
+    // je tam zavádzajúca. Príčiny blokovania sú tam iné (Private DNS,
+    // VPN/ad-block appka, filtrovanie u operátora) a menu na Androide a
+    // iOS sa líši, tak ich netreba miešať do jednej rady.
+    function getMobilePlatform() {
+        var ua = navigator.userAgent || "";
+        if (/Android/i.test(ua)) { return "android"; }
+        if (/iPhone|iPad|iPod/i.test(ua)) { return "ios"; }
+        return null;
+    }
+
     // Najpravdepodobnejšia príčina toho, že prehliadač spojenie neotvoril
     function diagnoseNetwork() {
         if (navigator.onLine === false) {
-            return "Vyzerá to, že počítač nie je pripojený na internet.";
+            return "Vyzerá to, že zariadenie nie je pripojené na internet.";
         }
         if (location.protocol === 'file:') {
             return "Stránka je otvorená priamo zo súboru (file://), preto prehliadač " +
                    "blokuje volania na Overpass API. Otvor ju cez webový server, " +
                    "napríklad z adresy github.io.";
+        }
+
+        var platform = getMobilePlatform();
+        if (platform === "android") {
+            return "Spojenie zablokoval telefón alebo sieť ešte pred jeho nadviazaním. " +
+                   "Skontroluj Nastavenia → Sieť a internet → Private DNS (nastav na " +
+                   "Automaticky), vypni prípadnú VPN/ad-block appku a skús aj cez Wi-Fi " +
+                   "namiesto mobilných dát – pomôže to odlíšiť, či ide o operátora.";
+        }
+        if (platform === "ios") {
+            return "Spojenie zablokoval telefón alebo sieť ešte pred jeho nadviazaním. " +
+                   "Skontroluj v Nastaveniach profily VPN/DNS a appky na blokovanie obsahu " +
+                   "(Settings → General → VPN & Device Management), a skús aj cez Wi-Fi " +
+                   "namiesto mobilných dát – pomôže to odlíšiť, či ide o operátora.";
         }
         return "Spojenie zablokoval prehliadač alebo sieť – najčastejšie blokovač " +
                "reklám, rozšírenie na ochranu súkromia, firewall alebo VPN.";
