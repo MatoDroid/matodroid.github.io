@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,10 +20,169 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(255, 255, 255, 0.9);
             padding: 10px;
             border-radius: 5px;
             z-index: 1000;
+            font: 13px/1.4 Arial, Helvetica, sans-serif;
+            max-width: 250px;
+            box-sizing: border-box;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+        }
+
+        #controls-toggle {
+            display: block;
+            width: 100%;
+            margin-bottom: 8px;
+            padding: 4px 6px;
+            cursor: pointer;
+        }
+
+        #controls-container.collapsed #controls-body {
+            display: none;
+        }
+
+        #controls-container.collapsed {
+            padding: 6px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .control-row label {
+            flex: 0 0 60px;
+        }
+
+        .control-row input[type="range"] {
+            flex: 1 1 auto;
+            min-width: 60px;
+            width: 100%;
+        }
+
+        .opacity-value {
+            flex: 0 0 26px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .control-row.checkbox-row label {
+            flex: 1 1 auto;
+        }
+
+        #controls-body button {
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            padding: 5px 6px;
+            cursor: pointer;
+            font-size: inherit;
+        }
+
+        /* Stavové hlásenia a indikátor načítania */
+        #map-status {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            pointer-events: none;
+            max-width: 90%;
+        }
+
+        #map-status > div {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font: 13px/1.4 Arial, Helvetica, sans-serif;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+        }
+
+        #roads-loading {
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #333;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #roads-loading.visible {
+            display: flex;
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ccc;
+            border-top-color: #337ab7;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #map-message {
+            display: none;
+            text-align: center;
+        }
+
+        #map-message.visible {
+            display: block;
+        }
+
+        #map-message.info {
+            background-color: rgba(255, 250, 210, 0.97);
+            color: #6b5a00;
+            border: 1px solid #e0d48a;
+        }
+
+        #map-message.error {
+            background-color: rgba(255, 226, 226, 0.97);
+            color: #8a1f1f;
+            border: 1px solid #e09a9a;
+        }
+
+        /* Mobil – ovládací panel nesmie zaberať veľkú časť mapy */
+        @media (max-width: 600px) {
+            #controls-container {
+                top: 6px;
+                right: 6px;
+                padding: 6px;
+                max-width: 62vw;
+                font-size: 12px;
+                border-radius: 4px;
+            }
+
+            .control-row {
+                gap: 4px;
+                margin-bottom: 4px;
+            }
+
+            .control-row label {
+                flex-basis: 46px;
+            }
+
+            .opacity-value {
+                flex-basis: 22px;
+            }
+
+            #controls-body button {
+                margin-top: 4px;
+                padding: 4px;
+            }
+
+            #map-status > div {
+                font-size: 12px;
+                padding: 5px 10px;
+            }
         }
     </style>
 </head>
@@ -31,13 +190,36 @@
 
 <div id="map"></div>
 <div id="controls-container">
-    <label for="opacity-osm">OSM</label>
-    <input type="range" id="opacity-osm" min="0" max="1" step="0.1" value="0"><br>
-    <label for="opacity-roads">Cesty</label>
-    <input type="range" id="opacity-roads" min="0" max="1" step="0.1" value="1"><br>
-    <label for="opacity-ortov1">OrtoV1</label>
-    <input type="range" id="opacity-ortov1" min="0" max="1" step="0.1" value="1"><br>
-    <button id="export-geojson">Export do GeoJSON</button>
+    <button id="controls-toggle" type="button" aria-expanded="true">Ovládanie ▲</button>
+    <div id="controls-body">
+        <div class="control-row">
+            <label for="opacity-osm">OSM</label>
+            <input type="range" id="opacity-osm" min="0" max="1" step="0.1" value="0">
+            <span class="opacity-value" id="opacity-osm-value">0.0</span>
+        </div>
+        <div class="control-row">
+            <label for="opacity-roads">Cesty</label>
+            <input type="range" id="opacity-roads" min="0" max="1" step="0.1" value="1">
+            <span class="opacity-value" id="opacity-roads-value">1.0</span>
+        </div>
+        <div class="control-row">
+            <label for="opacity-ortov1">OrtoV1</label>
+            <input type="range" id="opacity-ortov1" min="0" max="1" step="0.1" value="1">
+            <span class="opacity-value" id="opacity-ortov1-value">1.0</span>
+        </div>
+        <div class="control-row checkbox-row">
+            <input type="checkbox" id="toggle-baselayer" checked>
+            <label for="toggle-baselayer">Podklad Freemap</label>
+        </div>
+        <button id="export-geojson" type="button">Export do GeoJSON</button>
+        <button id="export-gpx" type="button">Export do GPX</button>
+        <button id="clear-drawings" type="button">Vymazať kresby</button>
+    </div>
+</div>
+
+<div id="map-status">
+    <div id="roads-loading"><span class="spinner"></span><span>Načítavam cesty...</span></div>
+    <div id="map-message"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -45,35 +227,184 @@
 <script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.min.js"></script>
 
 <script>
+    // ---------------------------------------------------------------------
+    // Konštanty
+    // ---------------------------------------------------------------------
+
+    // Mapa dovoľuje priblíženie až na 22 (kvôli presnému kresleniu), jednotlivé
+    // dlaždicové vrstvy majú vlastný maxNativeZoom podľa toho, čo server reálne
+    // poskytuje – nad ním Leaflet dlaždice len zväčší namiesto sťahovania 404.
+    var MAP_MAX_ZOOM = 22;
+
+    // Reálne maximálne priblíženie podkladových serverov:
+    //  - Freemap ofmozaika: z20 (mozaika bola rozšírená z 19 na 20)
+    //  - OSM standard tiles: z19 (limit tile.openstreetmap.org)
+    //  - ArcGIS OrtoV1: predvolene 20, presnú hodnotu dočítame z metadát služby
+    var FREEMAP_MAX_NATIVE_ZOOM = 20;
+    var OSM_MAX_NATIVE_ZOOM = 19;
+    var ORTOV1_MAX_NATIVE_ZOOM = 20;
+
+    // Overpass – hlavný server a záložný endpoint
+    var OVERPASS_ENDPOINTS = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter"
+    ];
+    var OVERPASS_TIMEOUT_MS = 25000;
+
+    // Nad touto plochou výrezu cesty nenačítavame (Overpass by to neuniesol)
+    var MAX_BBOX_AREA_KM2 = 50;
+
+    // Oneskorenie pred volaním Overpass po posune/zoome mapy
+    var MOVE_DEBOUNCE_MS = 450;
+
+    var STORAGE_KEY = "wmts.drawnItems.v1";
+
+    // ---------------------------------------------------------------------
     // Inicializácia mapy
-    var map = L.map('map').setView([48.9465, 20.5613], 13);
+    // ---------------------------------------------------------------------
+    var map = L.map('map', { maxZoom: MAP_MAX_ZOOM }).setView([48.9465, 20.5613], 13);
 
     // Základná podkladová vrstva (Freemap.sk)
     var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
-        maxZoom: 26,
+        maxZoom: MAP_MAX_ZOOM,
+        maxNativeZoom: FREEMAP_MAX_NATIVE_ZOOM,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     }).addTo(map);
 
     // Ortofotografia vrstva (OrtoV1)
-    var wmtsUrl = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer/tile/{z}/{y}/{x}";
-    var wmtsLayer = L.tileLayer(wmtsUrl, { tileSize: 256, maxZoom: 26, opacity: 1 }).addTo(map);
+    var wmtsService = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer";
+    var wmtsUrl = wmtsService + "/tile/{z}/{y}/{x}";
+    var wmtsLayer = L.tileLayer(wmtsUrl, {
+        tileSize: 256,
+        maxZoom: MAP_MAX_ZOOM,
+        maxNativeZoom: ORTOV1_MAX_NATIVE_ZOOM,
+        opacity: 1
+    }).addTo(map);
+
+    // Presný maxNativeZoom OrtoV1 zistíme z metadát dlaždicovej služby (LODs).
+    // Ak sa to nepodarí, ostane predvolená hodnota.
+    fetch(wmtsService + "?f=json")
+        .then(function(response) { return response.json(); })
+        .then(function(info) {
+            var lods = info && info.tileInfo && info.tileInfo.lods;
+            if (!lods || !lods.length) { return; }
+            var maxLevel = lods.reduce(function(max, lod) {
+                return Math.max(max, lod.level);
+            }, 0);
+            if (maxLevel > 0 && maxLevel !== wmtsLayer.options.maxNativeZoom) {
+                wmtsLayer.options.maxNativeZoom = maxLevel;
+                wmtsLayer.redraw();
+            }
+        })
+        .catch(function() { /* metadáta nie sú dostupné – držíme sa predvolenej hodnoty */ });
 
     // Transparentná vrstva (OSM)
     var osmTransparentLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 26,
+        maxZoom: MAP_MAX_ZOOM,
+        maxNativeZoom: OSM_MAX_NATIVE_ZOOM,
         opacity: 0
     }).addTo(map);
 
-    // Posuvníky priehľadnosti
-    document.getElementById('opacity-osm').addEventListener('input', function(e) {
-        osmTransparentLayer.setOpacity(e.target.value);
+    // ---------------------------------------------------------------------
+    // Stavové hlásenia a indikátor načítania
+    // ---------------------------------------------------------------------
+    var loadingEl = document.getElementById('roads-loading');
+    var messageEl = document.getElementById('map-message');
+    var messageTimer = null;
+
+    function showLoading(visible) {
+        loadingEl.classList.toggle('visible', !!visible);
+    }
+
+    function showMessage(text, type, autoHideMs) {
+        clearTimeout(messageTimer);
+        messageEl.textContent = text;
+        messageEl.className = 'visible ' + (type || 'info');
+        if (autoHideMs) {
+            messageTimer = setTimeout(hideMessage, autoHideMs);
+        }
+    }
+
+    function hideMessage() {
+        clearTimeout(messageTimer);
+        messageEl.className = '';
+        messageEl.textContent = '';
+    }
+
+    // ---------------------------------------------------------------------
+    // Posuvníky priehľadnosti (s live zobrazením hodnoty)
+    // ---------------------------------------------------------------------
+    function formatOpacity(value) {
+        return Number(value).toFixed(1);
+    }
+
+    function bindOpacitySlider(inputId, valueId, onChange) {
+        var input = document.getElementById(inputId);
+        var valueEl = document.getElementById(valueId);
+
+        function update() {
+            valueEl.textContent = formatOpacity(input.value);
+            onChange(parseFloat(input.value));
+        }
+
+        input.addEventListener('input', update);
+        update();
+    }
+
+    bindOpacitySlider('opacity-osm', 'opacity-osm-value', function(value) {
+        osmTransparentLayer.setOpacity(value);
     });
 
-    document.getElementById('opacity-ortov1').addEventListener('input', function(e) {
-        wmtsLayer.setOpacity(e.target.value);
+    bindOpacitySlider('opacity-ortov1', 'opacity-ortov1-value', function(value) {
+        wmtsLayer.setOpacity(value);
     });
 
+    // Priehľadnosť ciest – listener sa registruje LEN RAZ pri inicializácii,
+    // nie vnútri loadRoads() (predtým vznikali duplicitné handlery).
+    var roadsOpacity = 1;
+    bindOpacitySlider('opacity-roads', 'opacity-roads-value', function(value) {
+        roadsOpacity = value;
+        if (roadsLayer) {
+            roadsLayer.setStyle({ opacity: roadsOpacity });
+        }
+    });
+
+    // Prepínač základnej podkladovej vrstvy (Freemap)
+    document.getElementById('toggle-baselayer').addEventListener('change', function(e) {
+        if (e.target.checked) {
+            if (!map.hasLayer(baseLayer)) {
+                baseLayer.addTo(map);
+                baseLayer.bringToBack();
+            }
+        } else if (map.hasLayer(baseLayer)) {
+            map.removeLayer(baseLayer);
+        }
+    });
+
+    // Zbalenie/rozbalenie ovládacieho panela (dôležité hlavne na mobile)
+    var controlsContainer = document.getElementById('controls-container');
+    var controlsToggle = document.getElementById('controls-toggle');
+
+    function setControlsCollapsed(collapsed) {
+        controlsContainer.classList.toggle('collapsed', collapsed);
+        controlsToggle.textContent = collapsed ? 'Ovládanie ▼' : 'Ovládanie ▲';
+        controlsToggle.setAttribute('aria-expanded', String(!collapsed));
+    }
+
+    controlsToggle.addEventListener('click', function() {
+        setControlsCollapsed(!controlsContainer.classList.contains('collapsed'));
+    });
+
+    // Na malých obrazovkách štartujeme zbalení
+    setControlsCollapsed(window.innerWidth <= 600);
+
+    // Kliky a scroll nad panelom nesmú ovládať mapu
+    L.DomEvent.disableClickPropagation(controlsContainer);
+    L.DomEvent.disableScrollPropagation(controlsContainer);
+
+    // ---------------------------------------------------------------------
     // Štýly z OpenStreetMap (upravené)
+    // ---------------------------------------------------------------------
     function osmStyle(feature) {
         var highway = feature.properties.highway || "default";
 
@@ -96,25 +427,101 @@
             "default": { color: "#808080", weight: 2, opacity: 0.8 }
         };
 
-        return styles[highway] || styles["default"];
+        var style = Object.assign({}, styles[highway] || styles["default"]);
+        style.opacity = roadsOpacity;
+        return style;
     }
 
+    // ---------------------------------------------------------------------
     // Vrstvy pre cesty
+    // ---------------------------------------------------------------------
     var roadsLayer;
+    var roadsJob = null;
+
+    // Plocha aktuálneho výrezu v km²
+    function bboxAreaKm2(bounds) {
+        var sw = bounds.getSouthWest();
+        var ne = bounds.getNorthEast();
+        var widthKm = map.distance(sw, L.latLng(sw.lat, ne.lng)) / 1000;
+        var heightKm = map.distance(sw, L.latLng(ne.lat, sw.lng)) / 1000;
+        return widthKm * heightKm;
+    }
+
+    // Postupné volanie Overpass endpointov – pri chybe/timeoute skúsi ďalší
+    function fetchOverpass(query, job, index) {
+        var endpoint = OVERPASS_ENDPOINTS[index];
+        var controller = new AbortController();
+        var timedOut = false;
+        var timer = setTimeout(function() {
+            timedOut = true;
+            controller.abort();
+        }, OVERPASS_TIMEOUT_MS);
+
+        job.abort = function() { controller.abort(); };
+
+        return fetch(endpoint + "?data=" + encodeURIComponent(query), { signal: controller.signal })
+            .then(function(response) {
+                clearTimeout(timer);
+                if (!response.ok) {
+                    throw new Error("HTTP " + response.status);
+                }
+                return response.json();
+            })
+            .catch(function(err) {
+                clearTimeout(timer);
+
+                // Prerušené novším požiadavkom – nefallbackujeme
+                if (err.name === 'AbortError' && !timedOut) {
+                    throw err;
+                }
+
+                var reason = timedOut ? "časový limit vypršal" : err.message;
+                console.warn("Overpass endpoint zlyhal (" + endpoint + "): " + reason);
+
+                if (index + 1 < OVERPASS_ENDPOINTS.length) {
+                    return fetchOverpass(query, job, index + 1);
+                }
+                throw new Error(reason);
+            });
+    }
 
     // Funkcia na načítanie ciest cez Overpass API
     function loadRoads() {
+        // Zrušenie predchádzajúceho, ešte bežiaceho požiadavku
+        if (roadsJob) {
+            roadsJob.cancelled = true;
+            if (roadsJob.abort) { roadsJob.abort(); }
+        }
+
         var bbox = map.getBounds();
+
+        // Kontrola veľkosti výrezu – pri veľkej ploche Overpass nevoláme
+        if (bboxAreaKm2(bbox) > MAX_BBOX_AREA_KM2) {
+            roadsJob = null;
+            showLoading(false);
+            if (roadsLayer) {
+                map.removeLayer(roadsLayer);
+                roadsLayer = null;
+            }
+            showMessage("Priblíž mapu pre zobrazenie ciest", "info");
+            return;
+        }
+
+        var job = { cancelled: false, abort: null };
+        roadsJob = job;
+
         var query = `
-            [out:json];
+            [out:json][timeout:25];
             way["highway"](${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()});
             out geom;`;
 
-        var overpassUrl = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+        hideMessage();
+        showLoading(true);
 
-        fetch(overpassUrl)
-            .then(response => response.json())
-            .then(data => {
+        fetchOverpass(query, job, 0)
+            .then(function(data) {
+                if (job.cancelled) { return; }
+
                 var geojsonData = osmtogeojson(data);
 
                 // Odstrániť starú vrstvu ciest
@@ -131,22 +538,71 @@
                     }
                 }).addTo(map);
 
-                // Posuvník na úpravu priehľadnosti ciest
-                document.getElementById('opacity-roads').addEventListener('input', function(e) {
-                    var opacity = e.target.value;
-                    roadsLayer.setStyle({ opacity: opacity });
-                });
+                showLoading(false);
+                roadsJob = null;
             })
-            .catch(err => console.error("Chyba pri načítaní ciest:", err));
+            .catch(function(err) {
+                if (job.cancelled || err.name === 'AbortError') { return; }
+                console.error("Chyba pri načítaní ciest:", err);
+                showLoading(false);
+                showMessage("Cesty sa nepodarilo načítať: " + err.message, "error");
+                roadsJob = null;
+            });
+    }
+
+    // Debounce – Overpass nevoláme pri každom medzikroku posunu/zoomu
+    function debounce(fn, wait) {
+        var timer = null;
+        return function() {
+            clearTimeout(timer);
+            timer = setTimeout(fn, wait);
+        };
     }
 
     // Načítanie ciest pri zmene mapy
-    map.on('moveend', loadRoads);
+    map.on('moveend', debounce(loadRoads, MOVE_DEBOUNCE_MS));
     loadRoads();
 
+    // ---------------------------------------------------------------------
     // Vrstvy na kreslenie
+    // ---------------------------------------------------------------------
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
+
+    // Uloženie/načítanie kresieb z localStorage
+    function saveDrawnItems() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(drawnItems.toGeoJSON()));
+        } catch (err) {
+            console.warn("Kresby sa nepodarilo uložiť do localStorage:", err);
+        }
+    }
+
+    function restoreDrawnItems() {
+        var raw;
+        try {
+            raw = localStorage.getItem(STORAGE_KEY);
+        } catch (err) {
+            console.warn("localStorage nie je dostupný:", err);
+            return;
+        }
+        if (!raw) { return; }
+
+        try {
+            var saved = JSON.parse(raw);
+            L.geoJSON(saved, {
+                pointToLayer: function(feature, latlng) {
+                    return L.marker(latlng);
+                }
+            }).eachLayer(function(layer) {
+                drawnItems.addLayer(layer);
+            });
+        } catch (err) {
+            console.warn("Uložené kresby sa nepodarilo načítať:", err);
+        }
+    }
+
+    restoreDrawnItems();
 
     var drawControl = new L.Control.Draw({
         edit: {
@@ -155,10 +611,10 @@
         },
         draw: {
             polyline: true,
-            polygon: false,
+            polygon: true,
             circle: false,
             marker: true,
-            rectangle: false
+            rectangle: true
         }
     });
     map.addControl(drawControl);
@@ -167,18 +623,137 @@
     map.on('draw:created', function(e) {
         var layer = e.layer;
         drawnItems.addLayer(layer);
+        saveDrawnItems();
     });
 
-    // Export do GeoJSON
-    document.getElementById('export-geojson').addEventListener('click', function() {
-        var data = drawnItems.toGeoJSON();
-        var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    map.on('draw:edited', saveDrawnItems);
+    map.on('draw:deleted', saveDrawnItems);
+
+    // Vymazanie všetkých kresieb
+    document.getElementById('clear-drawings').addEventListener('click', function() {
+        if (!drawnItems.getLayers().length) {
+            showMessage("Nie sú žiadne kresby na vymazanie.", "info", 3000);
+            return;
+        }
+        if (!confirm("Naozaj vymazať všetky nakreslené prvky?")) { return; }
+        drawnItems.clearLayers();
+        saveDrawnItems();
+        showMessage("Kresby boli vymazané.", "info", 3000);
+    });
+
+    // ---------------------------------------------------------------------
+    // Export
+    // ---------------------------------------------------------------------
+    function downloadFile(content, mimeType, fileName) {
+        var dataStr = "data:" + mimeType + ";charset=utf-8," + encodeURIComponent(content);
         var downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "map_data.geojson");
+        downloadAnchorNode.setAttribute("download", fileName);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
+    }
+
+    // Export do GeoJSON
+    document.getElementById('export-geojson').addEventListener('click', function() {
+        if (!drawnItems.getLayers().length) {
+            showMessage("Nie sú žiadne kresby na export.", "info", 3000);
+            return;
+        }
+        var data = drawnItems.toGeoJSON();
+        downloadFile(JSON.stringify(data), "text/json", "map_data.geojson");
+    });
+
+    // Export do GPX
+    function escapeXml(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    // Z geometrie vytiahne zoznam bodov (wpt) a zoznam línií (trkseg)
+    function collectGpxParts(geometry, points, lines) {
+        if (!geometry) { return; }
+        switch (geometry.type) {
+            case 'Point':
+                points.push(geometry.coordinates);
+                break;
+            case 'MultiPoint':
+                geometry.coordinates.forEach(function(c) { points.push(c); });
+                break;
+            case 'LineString':
+                lines.push(geometry.coordinates);
+                break;
+            case 'MultiLineString':
+                geometry.coordinates.forEach(function(line) { lines.push(line); });
+                break;
+            case 'Polygon':
+                geometry.coordinates.forEach(function(ring) { lines.push(ring); });
+                break;
+            case 'MultiPolygon':
+                geometry.coordinates.forEach(function(polygon) {
+                    polygon.forEach(function(ring) { lines.push(ring); });
+                });
+                break;
+            case 'GeometryCollection':
+                geometry.geometries.forEach(function(g) { collectGpxParts(g, points, lines); });
+                break;
+        }
+    }
+
+    function drawnItemsToGpx() {
+        var geojson = drawnItems.toGeoJSON();
+        var gpx = [];
+        gpx.push('<?xml version="1.0" encoding="UTF-8"?>');
+        gpx.push('<gpx version="1.1" creator="Mapa s kreslenim, cestami a exportom" xmlns="http://www.topografix.com/GPX/1/1">');
+
+        var pointIndex = 0;
+        var trackIndex = 0;
+
+        geojson.features.forEach(function(feature) {
+            var points = [];
+            var lines = [];
+            collectGpxParts(feature.geometry, points, lines);
+
+            var name = feature.properties && feature.properties.name;
+
+            points.forEach(function(coords) {
+                pointIndex++;
+                gpx.push('  <wpt lat="' + coords[1] + '" lon="' + coords[0] + '">');
+                gpx.push('    <name>' + escapeXml(name || ('Bod ' + pointIndex)) + '</name>');
+                if (coords.length > 2) {
+                    gpx.push('    <ele>' + coords[2] + '</ele>');
+                }
+                gpx.push('  </wpt>');
+            });
+
+            lines.forEach(function(coordsList) {
+                if (coordsList.length < 2) { return; }
+                trackIndex++;
+                gpx.push('  <trk>');
+                gpx.push('    <name>' + escapeXml(name || ('Trasa ' + trackIndex)) + '</name>');
+                gpx.push('    <trkseg>');
+                coordsList.forEach(function(coords) {
+                    gpx.push('      <trkpt lat="' + coords[1] + '" lon="' + coords[0] + '">' +
+                        (coords.length > 2 ? '<ele>' + coords[2] + '</ele>' : '') + '</trkpt>');
+                });
+                gpx.push('    </trkseg>');
+                gpx.push('  </trk>');
+            });
+        });
+
+        gpx.push('</gpx>');
+        return gpx.join('\n');
+    }
+
+    document.getElementById('export-gpx').addEventListener('click', function() {
+        if (!drawnItems.getLayers().length) {
+            showMessage("Nie sú žiadne kresby na export.", "info", 3000);
+            return;
+        }
+        downloadFile(drawnItemsToGpx(), "application/gpx+xml", "map_data.gpx");
     });
 </script>
 
