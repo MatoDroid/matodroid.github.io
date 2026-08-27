@@ -549,12 +549,26 @@
         return SLOW_CONNECTION_TYPES.indexOf(conn.effectiveType) !== -1;
     }
 
-    // Keď vypršal časový limit na oboch zrkadlách, problém je takmer isto
-    // v rýchlosti pripojenia, nie v Overpasse – "priblíž mapu" tu nepomôže,
+    // Keď vypršal časový limit na oboch zrkadlách, problém je takmer isto na
+    // strane Overpassu (preťaženie/výpadok) – "priblíž mapu" tu nepomôže,
     // bbox je väčšinou už dávno pod limitom
     function allTimedOut(err) {
         return !!err.reasons && err.reasons.every(function(r) {
             return /časový limit vypršal/.test(r);
+        });
+    }
+
+    // Overpass server niekedy vráti chybu (502/503/504) na stránke, ktorá
+    // nemá CORS hlavičky (bežné pri reverse proxy pred preťaženým backendom).
+    // Prehliadač to potom nahlási úplne rovnako ako "Failed to fetch" pri
+    // zablokovanej sieti – z JS sa to nedá rozlíšiť. Ak ale ČOKOĽVEK iné
+    // zrkadlo v tom istom kole vrátilo čitateľnú HTTP odpoveď, dokazuje to,
+    // že zariadenie/sieť vedeli dosiahnuť aspoň jeden Overpass server, takže
+    // "Failed to fetch" na inom zrkadle je oveľa pravdepodobnejšie to isté
+    // – server problém maskovaný chýbajúcimi CORS hlavičkami – než blokáda.
+    function hasReachableServerResponse(err) {
+        return !!err.reasons && err.reasons.some(function(r) {
+            return /HTTP \d{3}/.test(r);
         });
     }
 
@@ -846,16 +860,17 @@
                 showLoading(false);
 
                 var hint;
-                if (isNetworkLevelError(err.message)) {
-                    // Sieťová chyba nie je problém Overpassu – približovanie
-                    // mapy ani opakovanie na nej nič nezmenia
+                if (allTimedOut(err) || hasReachableServerResponse(err)) {
+                    // Buď vypršal čas na oboch zrkadlách, alebo aspoň jedno
+                    // vrátilo čitateľnú HTTP chybu – v oboch prípadoch je to
+                    // problém na strane Overpassu, nie zariadenia/siete
+                    hint = "Overpass servery majú práve problémy (preťaženie alebo výpadok) – " +
+                           "nesúvisí to s tvojím pripojením. Skús to o chvíľu znova tlačidlom " +
+                           "„Načítať cesty“, prípadne over stav na overpass-api.de/api/status.";
+                } else if (isNetworkLevelError(err.message)) {
+                    // Ani jedno zrkadlo nedalo čitateľnú odpoveď – teraz je
+                    // pravdepodobnejšie, že spojenie neotvorilo zariadenie
                     hint = diagnoseNetwork();
-                } else if (allTimedOut(err)) {
-                    // Bezplatné verejné Overpass servery bývajú preťažené a
-                    // nestabilné aj pri rýchlom pripojení – to je bežnejšia
-                    // príčina timeoutu než pomalá sieť
-                    hint = "Overpass servery sú pravdepodobne preťažené. Skús to o chvíľu znova " +
-                           "tlačidlom „Načítať cesty“, prípadne over stav na overpass-api.de/api/status.";
                 } else {
                     hint = "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
                 }
