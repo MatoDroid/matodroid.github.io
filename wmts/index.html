@@ -219,7 +219,7 @@
 </div>
 
 <div id="map-status">
-    <div id="roads-loading"><span class="spinner"></span><span>Načítavam cesty...</span></div>
+    <div id="roads-loading"><span class="spinner"></span><span id="roads-loading-text">Načítavam cesty...</span></div>
     <div id="map-message"></div>
 </div>
 
@@ -253,9 +253,15 @@
         "https://overpass.kumi.systems/api/interpreter"
     ];
 
-    // Timeout na jedno zrkadlo. Verejné inštancie majú okrem výpočtu aj
-    // frontu, preto sa neoplatí čakať dlho – radšej vyhrá iné zrkadlo.
-    var OVERPASS_TIMEOUT_MS = 20000;
+    // Timeout na jedno zrkadlo. Zrkadlá bežia paralelne, takže dlhší strop
+    // nič nestojí na rýchlom pripojení – uplatní sa len keď treba naozaj
+    // čakať (pomalá mobilná sieť), inak vyhrá prvá odpoveď dávno predtým.
+    var OVERPASS_TIMEOUT_MS = 25000;
+
+    // Ak Network Information API hlási takto pomalé/šetriace pripojenie,
+    // rovno preskočíme ťažší dopyt s chodníkmi a pýtame len hlavné cesty –
+    // ušetrí to celý jeden márny 25 s pokus pred odľahčeným retry.
+    var SLOW_CONNECTION_TYPES = ["slow-2g", "2g"];
 
     // Nad touto plochou cesty nenačítavame (Overpass by to neuniesol).
     // Kontroluje sa plocha, ktorú reálne sťahujeme, teda AJ s rozšírením.
@@ -331,11 +337,25 @@
     // Stavové hlásenia a indikátor načítania
     // ---------------------------------------------------------------------
     var loadingEl = document.getElementById('roads-loading');
+    var loadingTextEl = document.getElementById('roads-loading-text');
     var messageEl = document.getElementById('map-message');
     var messageTimer = null;
+    var loadingHintTimer = null;
+
+    // Po dlhšej chvíli čakania dáme vedieť, že to nie je zamrznuté – len sa
+    // čaká na pomalé pripojenie
+    var LOADING_HINT_DELAY_MS = 8000;
 
     function showLoading(visible) {
         loadingEl.classList.toggle('visible', !!visible);
+        clearTimeout(loadingHintTimer);
+
+        if (visible) {
+            loadingTextEl.textContent = "Načítavam cesty...";
+            loadingHintTimer = setTimeout(function() {
+                loadingTextEl.textContent = "Načítavam cesty... pripojenie je pomalé, chvíľu to potrvá";
+            }, LOADING_HINT_DELAY_MS);
+        }
     }
 
     function showMessage(text, type, autoHideMs) {
@@ -488,6 +508,28 @@
     // vôbec nevedel. Príčina je v prostredí, nie v Overpasse.
     function isNetworkLevelError(reason) {
         return /failed to fetch|networkerror|load failed|network request failed/i.test(reason);
+    }
+
+    // Network Information API – podporuje ju Chrome/Edge na Androide,
+    // Safari a Firefox ju nemajú, vtedy proste nevieme a sťahujeme normálne
+    function getConnectionInfo() {
+        return navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+    }
+
+    function isSlowConnection() {
+        var conn = getConnectionInfo();
+        if (!conn) { return false; }
+        if (conn.saveData) { return true; }
+        return SLOW_CONNECTION_TYPES.indexOf(conn.effectiveType) !== -1;
+    }
+
+    // Keď vypršal časový limit na oboch zrkadlách, problém je takmer isto
+    // v rýchlosti pripojenia, nie v Overpasse – "priblíž mapu" tu nepomôže,
+    // bbox je väčšinou už dávno pod limitom
+    function allTimedOut(err) {
+        return !!err.reasons && err.reasons.every(function(r) {
+            return /časový limit vypršal/.test(r);
+        });
     }
 
     // Najpravdepodobnejšia príčina toho, že prehliadač spojenie neotvoril
@@ -661,7 +703,7 @@
     // Funkcia na načítanie ciest cez Overpass API
     function loadRoads(force) {
         var bbox = map.getBounds();
-        var includeMinor = map.getZoom() >= MINOR_ROADS_MIN_ZOOM;
+        var includeMinor = map.getZoom() >= MINOR_ROADS_MIN_ZOOM && !isSlowConnection();
 
         // Sťahujeme o niečo väčšie územie, než je vidieť, aby malý posun
         // mapy nespustil nové volanie Overpassu
@@ -752,11 +794,17 @@
 
                 showLoading(false);
 
-                // Sieťová chyba nie je problém Overpassu – približovanie mapy
-                // ani opakovanie na nej nič nezmenia, tak neraď nezmysly
-                var hint = isNetworkLevelError(err.message)
-                    ? diagnoseNetwork()
-                    : "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
+                var hint;
+                if (isNetworkLevelError(err.message)) {
+                    // Sieťová chyba nie je problém Overpassu – približovanie
+                    // mapy ani opakovanie na nej nič nezmenia
+                    hint = diagnoseNetwork();
+                } else if (allTimedOut(err)) {
+                    hint = "Vyzerá to na pomalé pripojenie (slabý signál, preplnená Wi-Fi). " +
+                           "Skús to znova, keď bude sieť rýchlejšia, alebo sa presuň bližšie k zdroju signálu.";
+                } else {
+                    hint = "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
+                }
 
                 showMessage("Cesty sa nepodarilo načítať. " + err.message + ". " + hint, "error");
                 roadsJob = null;
