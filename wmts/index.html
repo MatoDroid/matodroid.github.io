@@ -273,9 +273,14 @@
     // Overpass – všetky zrkadlá sa volajú NARAZ a vyhráva prvá odpoveď.
     // Sekvenčné skúšanie znamenalo čakať celý timeout na prvom serveri
     // (overpass-api.de má najdlhšiu frontu) a až potom skúsiť záložný.
+    // Tretie zrkadlo (private.coffee) overené priamo z konzoly v prehliadači
+    // 28.8.2026 - DNS sa preloží, server odpovedá (vtedy 502, backend mal
+    // vlastný výpadok). Je to nezávislá infraštruktúra od prvých dvoch, takže
+    // sa oplatí mať ju v rotácii pre prípad, že sa spamätá skôr než ony.
     var OVERPASS_ENDPOINTS = [
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter"
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter"
     ];
 
     // Timeout na jedno zrkadlo. POZOR na jeho znižovanie: pôvodná verzia
