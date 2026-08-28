@@ -98,6 +98,30 @@
             flex: 1 1 auto;
         }
 
+        .control-row select {
+            flex: 1 1 auto;
+            min-width: 0;
+            font: inherit;
+            padding: 3px 4px;
+        }
+
+        #custom-layer-row {
+            margin-bottom: 6px;
+        }
+
+        #custom-layer-row.hidden {
+            display: none;
+        }
+
+        #custom-layer-url {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            font: inherit;
+            padding: 4px 6px;
+            margin-bottom: 4px;
+        }
+
         #controls-body button {
             display: block;
             width: 100%;
@@ -232,9 +256,18 @@
             <input type="range" id="opacity-ortov1" min="0" max="1" step="0.1" value="1">
             <span class="opacity-value" id="opacity-ortov1-value">1.0</span>
         </div>
-        <div class="control-row checkbox-row">
-            <input type="checkbox" id="toggle-baselayer" checked>
-            <label for="toggle-baselayer">Podklad Freemap</label>
+        <div class="control-row">
+            <label for="base-layer-select">Podklad</label>
+            <select id="base-layer-select">
+                <option value="freemap-ortofoto">Freemap Ortofoto</option>
+                <option value="freemap-turisticka">Freemap Turistická</option>
+                <option value="osm">OSM</option>
+                <option value="custom">Vlastná (podľa URL)…</option>
+            </select>
+        </div>
+        <div id="custom-layer-row" class="hidden">
+            <input type="text" id="custom-layer-url" placeholder="https://.../{z}/{x}/{y}.png">
+            <button id="custom-layer-apply" type="button">Použiť vlastnú mapu</button>
         </div>
         <button id="reload-roads" type="button">Načítať cesty</button>
         <button id="export-geojson" type="button">Export do GeoJSON</button>
@@ -269,6 +302,15 @@
     var FREEMAP_MAX_NATIVE_ZOOM = 20;
     var OSM_MAX_NATIVE_ZOOM = 19;
     var ORTOV1_MAX_NATIVE_ZOOM = 20;
+
+    // Freemap "Turistická" je v ich vlastnom systéme pomenovaná "Outdoor" –
+    // rovnaká dlaždicová vrstva, len iný marketingový názov. Podľa JOSM
+    // zoznamu podkladov má z6-19.
+    var FREEMAP_TURISTICKA_URL = "https://outdoor.tiles.freemap.sk/{z}/{x}/{y}";
+    var FREEMAP_TURISTICKA_MAX_NATIVE_ZOOM = 19;
+
+    var CUSTOM_LAYER_STORAGE_KEY = "wmts.customBaseLayerUrl";
+    var BASE_LAYER_CHOICE_STORAGE_KEY = "wmts.baseLayerChoice";
 
     // Overpass – všetky zrkadlá sa volajú NARAZ a vyhráva prvá odpoveď.
     // Sekvenčné skúšanie znamenalo čakať celý timeout na prvom serveri
@@ -332,12 +374,20 @@
     // ---------------------------------------------------------------------
     var map = L.map('map', { maxZoom: MAP_MAX_ZOOM }).setView([48.9465, 20.5613], 13);
 
-    // Základná podkladová vrstva (Freemap.sk)
+    // Základná podkladová vrstva (Freemap.sk ortofoto)
     var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
         maxZoom: MAP_MAX_ZOOM,
         maxNativeZoom: FREEMAP_MAX_NATIVE_ZOOM,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     }).addTo(map);
+
+    // Freemap Turistická (interne "Outdoor") – nepridaná na mapu, kým ju
+    // používateľ nezvolí v selecte podkladov
+    var freemapTuristickaLayer = L.tileLayer(FREEMAP_TURISTICKA_URL, {
+        maxZoom: MAP_MAX_ZOOM,
+        maxNativeZoom: FREEMAP_TURISTICKA_MAX_NATIVE_ZOOM,
+        attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
+    });
 
     // Ortofotografia vrstva (OrtoV1)
     var wmtsService = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer";
@@ -452,17 +502,126 @@
         }
     });
 
-    // Prepínač základnej podkladovej vrstvy (Freemap)
-    document.getElementById('toggle-baselayer').addEventListener('change', function(e) {
-        if (e.target.checked) {
-            if (!map.hasLayer(baseLayer)) {
-                baseLayer.addTo(map);
-                baseLayer.bringToBack();
-            }
-        } else if (map.hasLayer(baseLayer)) {
-            map.removeLayer(baseLayer);
+    // ---------------------------------------------------------------------
+    // Prepínanie podkladovej mapy (Freemap Ortofoto / Turistická / OSM /
+    // vlastná dlaždicová vrstva podľa URL)
+    // ---------------------------------------------------------------------
+
+    // Freemap Ortofoto a Freemap Turistická sú navzájom výlučné - v danom
+    // okamihu je na mape najviac jedna z nich (plus prípadná vlastná URL
+    // vrstva). OSM zostáva zdieľaná s posuvníkom priehľadnosti vyššie -
+    // zvolenie OSM ako podkladu len nastaví jej priehľadnosť na 1.
+    var activePresetLayer = baseLayer; // Freemap Ortofoto je už na mape pri štarte
+    var customLayer = null;
+
+    function setPresetBaseLayer(layer) {
+        if (activePresetLayer && activePresetLayer !== layer && map.hasLayer(activePresetLayer)) {
+            map.removeLayer(activePresetLayer);
         }
+        activePresetLayer = layer;
+        if (layer) {
+            if (!map.hasLayer(layer)) { layer.addTo(map); }
+            layer.bringToBack();
+        }
+    }
+
+    function setOsmOpacityAndSync(value) {
+        osmTransparentLayer.setOpacity(value);
+        var slider = document.getElementById('opacity-osm');
+        var valueEl = document.getElementById('opacity-osm-value');
+        slider.value = String(value);
+        valueEl.textContent = formatOpacity(value);
+    }
+
+    function isValidTileUrl(url) {
+        return /\{z\}/.test(url) && /\{x\}/.test(url) && /\{y\}/.test(url);
+    }
+
+    function applyCustomLayer(url, persist) {
+        if (!isValidTileUrl(url)) {
+            showMessage('Adresa musí obsahovať {z}, {x} a {y} (napr. https://.../{z}/{x}/{y}.png).', 'error', 6000);
+            return false;
+        }
+
+        if (customLayer) {
+            if (map.hasLayer(customLayer)) { map.removeLayer(customLayer); }
+        }
+
+        customLayer = L.tileLayer(url, { maxZoom: MAP_MAX_ZOOM });
+        setPresetBaseLayer(customLayer);
+        osmTransparentLayer.bringToBack();
+        customLayer.bringToBack();
+
+        if (persist !== false) {
+            try { localStorage.setItem(CUSTOM_LAYER_STORAGE_KEY, url); }
+            catch (err) { console.warn('Vlastná URL sa nedala uložiť:', err); }
+        }
+        return true;
+    }
+
+    var baseLayerSelect = document.getElementById('base-layer-select');
+    var customLayerRow = document.getElementById('custom-layer-row');
+    var customLayerUrlInput = document.getElementById('custom-layer-url');
+
+    function selectBaseLayer(choice, options) {
+        options = options || {};
+        // Riadok s URL poľom ukazujeme/skrývame vždy hneď - aj po neúspešnom
+        // pokuse má používateľ kam zadať opravenú adresu
+        customLayerRow.classList.toggle('hidden', choice !== 'custom');
+
+        var applied = true;
+        if (choice === 'freemap-ortofoto') {
+            setPresetBaseLayer(baseLayer);
+        } else if (choice === 'freemap-turisticka') {
+            setPresetBaseLayer(freemapTuristickaLayer);
+        } else if (choice === 'osm') {
+            setPresetBaseLayer(null);
+            setOsmOpacityAndSync(1);
+        } else if (choice === 'custom') {
+            var url = options.url || customLayerUrlInput.value.trim();
+            applied = !!url && applyCustomLayer(url, options.persist);
+            if (applied) { customLayerUrlInput.value = url; }
+        }
+
+        // Pri neúspešnej vlastnej URL mapa aj naďalej ukazuje predchádzajúci
+        // podklad - nesmieme teda predstierať, že "custom" je aktívna voľba
+        if (!applied) { return; }
+
+        baseLayerSelect.value = choice;
+        if (options.persist !== false) {
+            try { localStorage.setItem(BASE_LAYER_CHOICE_STORAGE_KEY, choice); }
+            catch (err) { console.warn('Voľba podkladu sa nedala uložiť:', err); }
+        }
+    }
+
+    baseLayerSelect.addEventListener('change', function(e) {
+        selectBaseLayer(e.target.value);
     });
+
+    document.getElementById('custom-layer-apply').addEventListener('click', function() {
+        var url = customLayerUrlInput.value.trim();
+        if (!url) {
+            showMessage('Zadaj adresu dlaždicovej vrstvy.', 'error', 4000);
+            return;
+        }
+        selectBaseLayer('custom', { url: url });
+    });
+
+    // Obnovenie poslednej voľby podkladu z localStorage
+    (function restoreBaseLayerChoice() {
+        var savedChoice, savedUrl;
+        try {
+            savedChoice = localStorage.getItem(BASE_LAYER_CHOICE_STORAGE_KEY);
+            savedUrl = localStorage.getItem(CUSTOM_LAYER_STORAGE_KEY);
+        } catch (err) {
+            console.warn('Uložená voľba podkladu sa nedala načítať:', err);
+            return;
+        }
+        if (savedUrl) { customLayerUrlInput.value = savedUrl; }
+        if (savedChoice && savedChoice !== 'freemap-ortofoto') {
+            selectBaseLayer(savedChoice, { url: savedUrl, persist: false });
+        }
+    })();
 
     // Zbalenie/rozbalenie ovládacieho panela (dôležité hlavne na mobile)
     var controlsContainer = document.getElementById('controls-container');
