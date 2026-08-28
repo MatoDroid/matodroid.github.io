@@ -301,12 +301,25 @@
     // poskytuje – nad ním Leaflet dlaždice len zväčší namiesto sťahovania 404.
     var MAP_MAX_ZOOM = 22;
 
-    // Reálne maximálne priblíženie podkladových serverov:
+    // Reálne maximálne priblíženie rastrových podkladových serverov:
     //  - Freemap ofmozaika: z20 (mozaika bola rozšírená z 19 na 20)
-    //  - OSM standard tiles: z19 (limit tile.openstreetmap.org)
     //  - ArcGIS OrtoV1: predvolene 20, presnú hodnotu dočítame z metadát služby
+    // OSM tu už nie je – obe OSM vrstvy sú vektorové, a tie sa neškálujú
+    // dlaždicami, ale prekresľujú sa pri každom priblížení.
     var FREEMAP_MAX_NATIVE_ZOOM = 20;
-    var OSM_MAX_NATIVE_ZOOM = 19;
+
+    // Štýl vektorových OSM dlaždíc (OpenFreeMap – zdarma, bez API kľúča).
+    // Používajú ho obe vektorové vrstvy: podkladová aj priehľadná prekryvná.
+    var OPENFREEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+    var OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
+                          'prispievatelia, dlaždice <a href="https://openfreemap.org">OpenFreeMap</a>';
+
+    // Explicitné z-poradie v rámci tilePane. Vektorové vrstvy sú obyčajné
+    // <div> kontajnery (L.Layer, nie L.TileLayer), takže na ne neplatí
+    // bringToBack/bringToFront – poradie určujeme len cez z-index.
+    var Z_INDEX_BASE = 1;      // podklad (ortofoto / turistická / OSM / vlastná)
+    var Z_INDEX_ORTOV1 = 2;    // OrtoV1 ortofoto s vlastným posuvníkom
+    var Z_INDEX_OSM_OVERLAY = 3; // priehľadná OSM prekryvná vrstva
     var ORTOV1_MAX_NATIVE_ZOOM = 20;
 
     // Freemap "Turistická" je v ich vlastnom systéme pomenovaná "Outdoor" –
@@ -384,6 +397,7 @@
     var baseLayer = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', {
         maxZoom: MAP_MAX_ZOOM,
         maxNativeZoom: FREEMAP_MAX_NATIVE_ZOOM,
+        zIndex: Z_INDEX_BASE,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     }).addTo(map);
 
@@ -392,19 +406,27 @@
     var freemapTuristickaLayer = L.tileLayer(FREEMAP_TURISTICKA_URL, {
         maxZoom: MAP_MAX_ZOOM,
         maxNativeZoom: FREEMAP_TURISTICKA_MAX_NATIVE_ZOOM,
+        zIndex: Z_INDEX_BASE,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
     });
 
-    // Vektorová OSM vrstva (OpenFreeMap – zdarma, bez API kľúča) cez
-    // MapLibre GL. Leaflet natívne vektorové dlaždice nepodporuje, preto ide
-    // cez samostatný WebGL renderer napojený ako Leaflet vrstva. Odlišné od
-    // rastrovej osmTransparentLayer nižšie (tá zostáva ako priehľadná
-    // prekryvná vrstva s vlastným posuvníkom, nedotknutá).
+    // Vektorová OSM vrstva ako PODKLAD (voľba "OSM (vektorová)" v selecte).
+    // Leaflet natívne vektorové dlaždice nepodporuje, preto ide cez MapLibre
+    // GL (WebGL renderer) napojený ako Leaflet vrstva.
     var osmVectorLayer = L.maplibreGL({
-        style: 'https://tiles.openfreemap.org/styles/liberty',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
-                     'prispievatelia, dlaždice <a href="https://openfreemap.org">OpenFreeMap</a>'
+        style: OPENFREEMAP_STYLE_URL,
+        attribution: OSM_ATTRIBUTION
     });
+
+    // Priehľadnosť a z-poradie vektorovej vrstvy sa nastavuje na jej DOM
+    // kontajneri – L.MaplibreGL rozširuje L.Layer, takže nemá setOpacity()
+    // ani zIndex option ako L.TileLayer.
+    function styleVectorLayer(layer, opacity, zIndex) {
+        var container = layer.getContainer && layer.getContainer();
+        if (!container) { return; }
+        container.style.opacity = String(opacity);
+        container.style.zIndex = String(zIndex);
+    }
 
     // Ortofotografia vrstva (OrtoV1)
     var wmtsService = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer";
@@ -413,6 +435,7 @@
         tileSize: 256,
         maxZoom: MAP_MAX_ZOOM,
         maxNativeZoom: ORTOV1_MAX_NATIVE_ZOOM,
+        zIndex: Z_INDEX_ORTOV1,
         opacity: 1
     }).addTo(map);
 
@@ -433,12 +456,23 @@
         })
         .catch(function() { /* metadáta nie sú dostupné – držíme sa predvolenej hodnoty */ });
 
-    // Transparentná vrstva (OSM)
-    var osmTransparentLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: MAP_MAX_ZOOM,
-        maxNativeZoom: OSM_MAX_NATIVE_ZOOM,
-        opacity: 0
-    }).addTo(map);
+    // Priehľadná OSM prekryvná vrstva – tiež vektorová (MapLibre GL).
+    // Na rozdiel od pôvodnej rastrovej verzie sa na mapu pridáva až keď je
+    // priehľadnosť > 0: WebGL kontext, ktorý pri predvolenej hodnote 0 nič
+    // viditeľné nevykresľuje, by bol zbytočná záťaž.
+    var osmOverlayLayer = L.maplibreGL({
+        style: OPENFREEMAP_STYLE_URL,
+        attribution: OSM_ATTRIBUTION
+    });
+
+    function setOsmOverlayOpacity(value) {
+        if (value <= 0) {
+            if (map.hasLayer(osmOverlayLayer)) { map.removeLayer(osmOverlayLayer); }
+            return;
+        }
+        if (!map.hasLayer(osmOverlayLayer)) { osmOverlayLayer.addTo(map); }
+        styleVectorLayer(osmOverlayLayer, value, Z_INDEX_OSM_OVERLAY);
+    }
 
     // ---------------------------------------------------------------------
     // Stavové hlásenia a indikátor načítania
@@ -502,7 +536,7 @@
     }
 
     bindOpacitySlider('opacity-osm', 'opacity-osm-value', function(value) {
-        osmTransparentLayer.setOpacity(value);
+        setOsmOverlayOpacity(value);
     });
 
     bindOpacitySlider('opacity-ortov1', 'opacity-ortov1-value', function(value) {
@@ -536,11 +570,16 @@
             map.removeLayer(activePresetLayer);
         }
         activePresetLayer = layer;
-        if (layer) {
-            if (!map.hasLayer(layer)) { layer.addTo(map); }
-            // maplibreGL vrstva (vektorová OSM) implementuje bringToBack
-            // inak než L.tileLayer - obranná kontrola pre istotu
-            if (layer.bringToBack) { layer.bringToBack(); }
+        if (!layer) { return; }
+
+        if (!map.hasLayer(layer)) { layer.addTo(map); }
+
+        if (layer === osmVectorLayer) {
+            // Vektorová vrstva nemá setOpacity ani zIndex option – z-poradie
+            // sa jej nastavuje priamo na DOM kontajneri
+            styleVectorLayer(layer, 1, Z_INDEX_BASE);
+        } else if (layer.setZIndex) {
+            layer.setZIndex(Z_INDEX_BASE);
         }
     }
 
@@ -558,10 +597,8 @@
             if (map.hasLayer(customLayer)) { map.removeLayer(customLayer); }
         }
 
-        customLayer = L.tileLayer(url, { maxZoom: MAP_MAX_ZOOM });
+        customLayer = L.tileLayer(url, { maxZoom: MAP_MAX_ZOOM, zIndex: Z_INDEX_BASE });
         setPresetBaseLayer(customLayer);
-        osmTransparentLayer.bringToBack();
-        customLayer.bringToBack();
 
         if (persist !== false) {
             try { localStorage.setItem(CUSTOM_LAYER_STORAGE_KEY, url); }
