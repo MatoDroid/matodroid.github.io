@@ -456,22 +456,81 @@
         })
         .catch(function() { /* metadáta nie sú dostupné – držíme sa predvolenej hodnoty */ });
 
-    // Priehľadná OSM prekryvná vrstva – tiež vektorová (MapLibre GL).
-    // Na rozdiel od pôvodnej rastrovej verzie sa na mapu pridáva až keď je
-    // priehľadnosť > 0: WebGL kontext, ktorý pri predvolenej hodnote 0 nič
-    // viditeľné nevykresľuje, by bol zbytočná záťaž.
-    var osmOverlayLayer = L.maplibreGL({
-        style: OPENFREEMAP_STYLE_URL,
-        attribution: OSM_ATTRIBUTION
-    });
+    // Priehľadná OSM prekryvná vrstva – vektorová, ale so ZBAVENÝM podkladom.
+    // Hotový štýl (liberty) má nepriehľadné pozadie a súvislé výplne (lesy,
+    // lúky, voda), ktoré by ortofoto pod ňou prekryli. Preto z neho necháme
+    // len samotné prvky: cesty, budovy, popisy a body záujmu.
+    function makeTransparentOverlayStyle(style) {
+        var layers = (style.layers || []).filter(function(layer) {
+            // Plná farba podkladu – hlavný dôvod, prečo by ortofoto nebolo vidieť
+            if (layer.type === 'background') { return false; }
+
+            // Rastrové/tieňované podklady tiež zakrývajú
+            if (layer.type === 'raster' || layer.type === 'hillshade') { return false; }
+
+            // Z plôch necháme len budovy. Lesy, lúky, voda a pod. sú
+            // v ortofote reálne vidieť, kresliť ich navrch nemá zmysel.
+            if (layer.type === 'fill' || layer.type === 'fill-extrusion') {
+                return layer['source-layer'] === 'building';
+            }
+
+            // Zvyšok (line = cesty, symbol = popisy a body, circle) ostáva
+            return true;
+        });
+
+        return Object.assign({}, style, { layers: layers });
+    }
+
+    // Vrstva sa vytvára až pri prvom použití – kým je priehľadnosť 0, nemá
+    // zmysel držať WebGL kontext, ktorý nič viditeľné nevykresľuje.
+    var osmOverlayLayer = null;
+    var osmOverlayStylePromise = null;
+    var osmOverlayOpacity = 0;
+
+    function ensureOsmOverlayLayer() {
+        if (osmOverlayLayer) { return Promise.resolve(osmOverlayLayer); }
+
+        if (!osmOverlayStylePromise) {
+            // Štýl sťahujeme sami, aby sme ho stihli upraviť EŠTE PRED prvým
+            // vykreslením – inak by problikol nepriehľadný podklad
+            osmOverlayStylePromise = fetch(OPENFREEMAP_STYLE_URL)
+                .then(function(response) {
+                    if (!response.ok) { throw new Error('HTTP ' + response.status); }
+                    return response.json();
+                })
+                .then(function(style) {
+                    osmOverlayLayer = L.maplibreGL({
+                        style: makeTransparentOverlayStyle(style),
+                        attribution: OSM_ATTRIBUTION
+                    });
+                    return osmOverlayLayer;
+                });
+        }
+        return osmOverlayStylePromise;
+    }
 
     function setOsmOverlayOpacity(value) {
+        osmOverlayOpacity = value;
+
         if (value <= 0) {
-            if (map.hasLayer(osmOverlayLayer)) { map.removeLayer(osmOverlayLayer); }
+            if (osmOverlayLayer && map.hasLayer(osmOverlayLayer)) {
+                map.removeLayer(osmOverlayLayer);
+            }
             return;
         }
-        if (!map.hasLayer(osmOverlayLayer)) { osmOverlayLayer.addTo(map); }
-        styleVectorLayer(osmOverlayLayer, value, Z_INDEX_OSM_OVERLAY);
+
+        ensureOsmOverlayLayer()
+            .then(function(layer) {
+                // Používateľ mohol medzitým stiahnuť posuvník späť na 0
+                if (osmOverlayOpacity <= 0) { return; }
+                if (!map.hasLayer(layer)) { layer.addTo(map); }
+                styleVectorLayer(layer, osmOverlayOpacity, Z_INDEX_OSM_OVERLAY);
+            })
+            .catch(function(err) {
+                osmOverlayStylePromise = null; // aby sa dalo skúsiť znova
+                console.error('Vektorovú OSM vrstvu sa nepodarilo načítať:', err);
+                showMessage('Vektorovú OSM vrstvu sa nepodarilo načítať (' + err.message + ').', 'error', 6000);
+            });
     }
 
     // ---------------------------------------------------------------------
