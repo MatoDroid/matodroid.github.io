@@ -109,6 +109,16 @@
             padding: 3px 4px;
         }
 
+        .control-row input[type="color"] {
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 26px;
+            padding: 0;
+            border: 1px solid #aaa;
+            background: none;
+            cursor: pointer;
+        }
+
         #custom-layer-row {
             margin-bottom: 6px;
         }
@@ -251,6 +261,10 @@
             <span class="opacity-value" id="opacity-osm-value">0.0</span>
         </div>
         <div class="control-row">
+            <label for="building-color">Budovy</label>
+            <input type="color" id="building-color" value="#ff7800">
+        </div>
+        <div class="control-row">
             <label for="opacity-roads">Cesty</label>
             <input type="range" id="opacity-roads" min="0" max="1" step="0.1" value="1">
             <span class="opacity-value" id="opacity-roads-value">1.0</span>
@@ -330,6 +344,11 @@
 
     var CUSTOM_LAYER_STORAGE_KEY = "wmts.customBaseLayerUrl";
     var BASE_LAYER_CHOICE_STORAGE_KEY = "wmts.baseLayerChoice";
+    var BUILDING_COLOR_STORAGE_KEY = "wmts.buildingColor";
+
+    // Predvolená farba budov v prekryvnej vrstve. Musí sedieť s hodnotou
+    // value="..." pri <input type="color"> v ovládacom paneli.
+    var DEFAULT_BUILDING_COLOR = "#ff7800";
 
     // Overpass – všetky zrkadlá sa volajú NARAZ a vyhráva prvá odpoveď.
     // Sekvenčné skúšanie znamenalo čakať celý timeout na prvom serveri
@@ -460,25 +479,72 @@
     // Hotový štýl (liberty) má nepriehľadné pozadie a súvislé výplne (lesy,
     // lúky, voda), ktoré by ortofoto pod ňou prekryli. Preto z neho necháme
     // len samotné prvky: cesty, budovy, popisy a body záujmu.
+    // Farba budov je používateľsky nastaviteľná (color picker). Zoznam
+    // vrstiev s budovami si držíme z transformácie štýlu, aby sme ich vedeli
+    // prefarbiť aj naživo – ich názvy sa v rôznych štýloch líšia, takže ich
+    // nemá zmysel mať natvrdo.
+    var buildingColor = DEFAULT_BUILDING_COLOR;
+    var osmOverlayBuildingLayers = [];
+
     function makeTransparentOverlayStyle(style) {
-        var layers = (style.layers || []).filter(function(layer) {
+        osmOverlayBuildingLayers = [];
+        var layers = [];
+
+        (style.layers || []).forEach(function(layer) {
             // Plná farba podkladu – hlavný dôvod, prečo by ortofoto nebolo vidieť
-            if (layer.type === 'background') { return false; }
+            if (layer.type === 'background') { return; }
 
             // Rastrové/tieňované podklady tiež zakrývajú
-            if (layer.type === 'raster' || layer.type === 'hillshade') { return false; }
+            if (layer.type === 'raster' || layer.type === 'hillshade') { return; }
 
             // Z plôch necháme len budovy. Lesy, lúky, voda a pod. sú
             // v ortofote reálne vidieť, kresliť ich navrch nemá zmysel.
             if (layer.type === 'fill' || layer.type === 'fill-extrusion') {
-                return layer['source-layer'] === 'building';
+                if (layer['source-layer'] !== 'building') { return; }
+
+                // Farbu vpisujeme rovno do štýlu, aby bola správna už pri
+                // prvom vykreslení (nie až po dodatočnej úprave)
+                var colorProperty = layer.type === 'fill-extrusion'
+                    ? 'fill-extrusion-color'
+                    : 'fill-color';
+                var paint = Object.assign({}, layer.paint);
+                paint[colorProperty] = buildingColor;
+                layer = Object.assign({}, layer, { paint: paint });
+
+                osmOverlayBuildingLayers.push({ id: layer.id, colorProperty: colorProperty });
             }
 
             // Zvyšok (line = cesty, symbol = popisy a body, circle) ostáva
-            return true;
+            layers.push(layer);
         });
 
         return Object.assign({}, style, { layers: layers });
+    }
+
+    // Prefarbenie budov na už zobrazenej vrstve. Ak vrstva ešte neexistuje,
+    // stačí uložená hodnota – použije sa pri jej najbližšom vytvorení.
+    function applyBuildingColor(color) {
+        buildingColor = color;
+        try { localStorage.setItem(BUILDING_COLOR_STORAGE_KEY, color); }
+        catch (err) { console.warn('Farba budov sa nedala uložiť:', err); }
+
+        if (!osmOverlayLayer || !osmOverlayLayer.getMaplibreMap) { return; }
+        var glMap = osmOverlayLayer.getMaplibreMap();
+        if (!glMap) { return; }
+
+        function repaint() {
+            osmOverlayBuildingLayers.forEach(function(entry) {
+                try {
+                    glMap.setPaintProperty(entry.id, entry.colorProperty, color);
+                } catch (err) {
+                    console.warn('Vrstvu budov ' + entry.id + ' sa nepodarilo prefarbiť:', err);
+                }
+            });
+        }
+
+        // setPaintProperty funguje až nad načítaným štýlom
+        if (glMap.isStyleLoaded && glMap.isStyleLoaded()) { repaint(); }
+        else if (glMap.once) { glMap.once('styledata', repaint); }
     }
 
     // Vrstva sa vytvára až pri prvom použití – kým je priehľadnosť 0, nemá
@@ -597,6 +663,28 @@
     bindOpacitySlider('opacity-osm', 'opacity-osm-value', function(value) {
         setOsmOverlayOpacity(value);
     });
+
+    // Farba budov – obnovenie uloženej hodnoty a živé prefarbovanie
+    (function bindBuildingColorPicker() {
+        var input = document.getElementById('building-color');
+
+        var saved;
+        try { saved = localStorage.getItem(BUILDING_COLOR_STORAGE_KEY); }
+        catch (err) { console.warn('Uložená farba budov sa nedala načítať:', err); }
+
+        if (saved) {
+            buildingColor = saved;
+            input.value = saved;
+        } else {
+            buildingColor = input.value || DEFAULT_BUILDING_COLOR;
+        }
+
+        // 'input' sa spúšťa počas ťahania vo výbere farby, takže sa mapa
+        // prefarbuje priebežne, nie až po zavretí dialógu
+        input.addEventListener('input', function(e) {
+            applyBuildingColor(e.target.value);
+        });
+    })();
 
     bindOpacitySlider('opacity-ortov1', 'opacity-ortov1-value', function(value) {
         wmtsLayer.setOpacity(value);
