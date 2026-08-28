@@ -402,9 +402,6 @@
     // na KAŽDÚ stranu, takže 0.08 znamená ~1.35× väčšiu plochu (nie 1.08×).
     var BBOX_PADDING = 0.08;
 
-    // Oneskorenie pred volaním Overpass po posune/zoome mapy
-    var MOVE_DEBOUNCE_MS = 450;
-
     var STORAGE_KEY = "wmts.drawnItems.v1";
 
     // ---------------------------------------------------------------------
@@ -874,9 +871,6 @@
     var roadsLayer;
     var roadsJob = null;
 
-    // Rozsah, ktorý je momentálne načítaný (kvôli cache pri posune mapy)
-    var loadedRoads = null;
-
     // Cesty kreslíme na canvas – SVG je pri tisíckach čiar veľmi pomalé
     var roadsRenderer = L.canvas({ padding: 0.3 });
 
@@ -1156,13 +1150,14 @@ ${union}
             out geom;`;
     }
 
-    // Funkcia na načítanie ciest cez Overpass API
-    function loadRoads(force) {
+    // Načítanie ciest cez Overpass API. Volá sa výhradne z tlačidla
+    // "Načítať cesty" – vždy sťahuje nanovo pre aktuálny výrez.
+    function loadRoads() {
         var bbox = map.getBounds();
         var includeMinor = map.getZoom() >= MINOR_ROADS_MIN_ZOOM && !isSlowConnection();
 
-        // Sťahujeme o niečo väčšie územie, než je vidieť, aby malý posun
-        // mapy nespustil nové volanie Overpassu
+        // Sťahujeme o niečo väčšie územie, než je vidieť, aby cesty
+        // nekončili presne na okraji obrazovky
         var requestBounds = bbox.pad(BBOX_PADDING);
 
         // Kontrola veľkosti – rozhoduje plocha, ktorú reálne pýtame od
@@ -1175,15 +1170,7 @@ ${union}
                 map.removeLayer(roadsLayer);
                 roadsLayer = null;
             }
-            loadedRoads = null;
             showMessage("Priblíž mapu pre zobrazenie ciest", "info");
-            return;
-        }
-
-        // Už načítané dáta pokrývajú tento výrez – nesťahujeme znova
-        if (!force && loadedRoads &&
-            loadedRoads.includeMinor === includeMinor &&
-            loadedRoads.bounds.contains(bbox)) {
             return;
         }
 
@@ -1224,8 +1211,6 @@ ${union}
                         }
                     }
                 }).addTo(map);
-
-                loadedRoads = { bounds: requestBounds, includeMinor: includeMinor };
 
                 showLoading(false);
                 roadsJob = null;
@@ -1271,24 +1256,13 @@ ${union}
             });
     }
 
-    // Debounce – Overpass nevoláme pri každom medzikroku posunu/zoomu
-    function debounce(fn, wait) {
-        var timer = null;
-        return function() {
-            clearTimeout(timer);
-            timer = setTimeout(fn, wait);
-        };
-    }
-
-    // Načítanie ciest pri zmene mapy
-    map.on('moveend', debounce(loadRoads, MOVE_DEBOUNCE_MS));
-
-    // Manuálne vynútené znovunačítanie (obíde cache, hodí sa po chybe)
+    // Cesty sa načítavajú VÝHRADNE na kliknutie – žiadne automatické
+    // volanie pri posune/zoome mapy ani pri štarte stránky. Verejné Overpass
+    // servery sú pomalé a nespoľahlivé, takže má zmysel ísť na ne len vtedy,
+    // keď to používateľ naozaj chce, a nie pri každom pohybe mapou.
     document.getElementById('reload-roads').addEventListener('click', function() {
-        loadRoads(true);
+        loadRoads();
     });
-
-    loadRoads();
 
     // ---------------------------------------------------------------------
     // Vrstvy na kreslenie
