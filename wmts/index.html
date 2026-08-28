@@ -31,6 +31,10 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <!-- Vektorová OSM vrstva (MapLibre GL cez leaflet väzbu). Verzia
+         maplibre-gl je pripnutá na 5.x, lebo maplibre-gl-leaflet@0.1.3
+         podporuje len ^2.4.0 || ^3.3.1 || ^4.3.2 || ^5.0.0 (nie 6.x). -->
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
     <style>
         html, body {
             height: 100%;
@@ -261,7 +265,7 @@
             <select id="base-layer-select">
                 <option value="freemap-ortofoto">Freemap Ortofoto</option>
                 <option value="freemap-turisticka">Freemap Turistická</option>
-                <option value="osm">OSM</option>
+                <option value="osm">OSM (vektorová)</option>
                 <option value="custom">Vlastná (podľa URL)…</option>
             </select>
         </div>
@@ -284,6 +288,8 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
 
 <script>
     // ---------------------------------------------------------------------
@@ -387,6 +393,17 @@
         maxZoom: MAP_MAX_ZOOM,
         maxNativeZoom: FREEMAP_TURISTICKA_MAX_NATIVE_ZOOM,
         attribution: '&copy; <a href="https://freemap.sk">Freemap.sk</a>'
+    });
+
+    // Vektorová OSM vrstva (OpenFreeMap – zdarma, bez API kľúča) cez
+    // MapLibre GL. Leaflet natívne vektorové dlaždice nepodporuje, preto ide
+    // cez samostatný WebGL renderer napojený ako Leaflet vrstva. Odlišné od
+    // rastrovej osmTransparentLayer nižšie (tá zostáva ako priehľadná
+    // prekryvná vrstva s vlastným posuvníkom, nedotknutá).
+    var osmVectorLayer = L.maplibreGL({
+        style: 'https://tiles.openfreemap.org/styles/liberty',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
+                     'prispievatelia, dlaždice <a href="https://openfreemap.org">OpenFreeMap</a>'
     });
 
     // Ortofotografia vrstva (OrtoV1)
@@ -521,16 +538,10 @@
         activePresetLayer = layer;
         if (layer) {
             if (!map.hasLayer(layer)) { layer.addTo(map); }
-            layer.bringToBack();
+            // maplibreGL vrstva (vektorová OSM) implementuje bringToBack
+            // inak než L.tileLayer - obranná kontrola pre istotu
+            if (layer.bringToBack) { layer.bringToBack(); }
         }
-    }
-
-    function setOsmOpacityAndSync(value) {
-        osmTransparentLayer.setOpacity(value);
-        var slider = document.getElementById('opacity-osm');
-        var valueEl = document.getElementById('opacity-osm-value');
-        slider.value = String(value);
-        valueEl.textContent = formatOpacity(value);
     }
 
     function isValidTileUrl(url) {
@@ -575,8 +586,7 @@
         } else if (choice === 'freemap-turisticka') {
             setPresetBaseLayer(freemapTuristickaLayer);
         } else if (choice === 'osm') {
-            setPresetBaseLayer(null);
-            setOsmOpacityAndSync(1);
+            setPresetBaseLayer(osmVectorLayer);
         } else if (choice === 'custom') {
             var url = options.url || customLayerUrlInput.value.trim();
             applied = !!url && applyCustomLayer(url, options.persist);
