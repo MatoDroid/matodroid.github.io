@@ -63,6 +63,11 @@ app.get('/verify-token', authenticateToken, (req, res) => {
     res.json(req.user);
 });
 
+// Verzia API. Admin podľa nej pozná, či na serveri už beží opravené
+// zlučovanie pri importe — staršia verzia by dáta ticho zničila,
+// tak sa import v rozhraní zobrazí až od api >= 2.
+app.get('/version', (req, res) => res.json({ api: 2 }));
+
 
 
 
@@ -119,12 +124,27 @@ app.get("/pos.html", authenticateToken, (req, res) => {
 
 
 
-app.post('/add-user', async (req, res) => {
+// POZOR: tento endpoint bol verejný — ktokoľvek si cezeň vedel založiť
+// admin účet a prevziať systém. Teraz vyžaduje platný token s rolou admin.
+app.post('/add-user', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { username, password, role } = req.body;
 
         if (!username || !password || !role) {
             return res.status(400).json({ error: 'Missing required fields' });
+        }
+        if (!['admin', 'user'].includes(role)) {
+            return res.status(400).json({ error: 'Neplatná rola.' });
+        }
+        // meno ide do názvu premennej v .env, musí byť bezpečné
+        if (!/^[A-Za-z0-9_]{3,32}$/.test(username)) {
+            return res.status(400).json({ error: 'Meno smie obsahovať len písmená, číslice a podčiarkovník (3–32 znakov).' });
+        }
+        if (String(password).length < 8) {
+            return res.status(400).json({ error: 'Heslo musí mať aspoň 8 znakov.' });
+        }
+        if (process.env[`USER_${username.toUpperCase()}`]) {
+            return res.status(409).json({ error: 'Používateľ s týmto menom už existuje.' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -156,8 +176,9 @@ app.get('/menu', async (req, res) => {
     }
 });
 
-// Endpoint: Ukladanie menu
-app.post('/menu', async (req, res) => {
+// Endpoint: Ukladanie menu — len pre adminov.
+// Predtým mohol ktokoľvek prepísať celé menu vrátane cien a čísla účtu.
+app.post('/menu', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const updatedMenu = req.body; // Dáta od klienta (nové menu)
 
@@ -255,20 +276,40 @@ app.post('/orders/paid', async (req, res) => {
 
 
 // Endpoint: Generovanie QR kódu
+// Číslo účtu sa už nedrží natvrdo v kóde — nastavuje sa v admin menu
+// a ukladá spolu s menu (menu.payment).
 app.get('/generate-qr', async (req, res) => {
     const { amount, table } = req.query;
-    const IBAN = 'SK8975000000000012345671';
-    const beneficiaryName = 'Moje Meno';
-    const dueDate = '20241231';
-    const variableSymbol = table;
-
-    const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
 
     try {
-        // Vytvoriť URL pre generovanie QR kódu
-    const qrUrl = `https://api.freebysquare.sk/pay/v1/generate-png?size=400&color=3&transparent=true&amount=${amount}&currencyCode=EUR&dueDate=${dueDate}&variableSymbol=${variableSymbol}&iban=${IBAN}&beneficiaryName=${encodeURIComponent(beneficiaryName)}`;
+        const menu = await loadMenu();
+        const payment = (menu && menu.payment) || {};
 
-        res.redirect(qrUrl); // Presmerovanie na URL s QR kódom
+        const iban = String(payment.iban || '').replace(/\s+/g, '').toUpperCase();
+        const beneficiaryName = String(payment.beneficiaryName || '').trim();
+
+        if (!iban) {
+            return res.status(400).json({
+                error: 'Nie je nastavené číslo účtu. Doplňte IBAN v admin menu (sekcia Platba).',
+            });
+        }
+
+        // splatnosť "dnes" — pevný dátum v minulosti robil z každého QR prošlý doklad
+        const dueDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+        const params = new URLSearchParams({
+            size: '400',
+            color: '3',
+            transparent: 'true',
+            amount: String(amount ?? ''),
+            currencyCode: 'EUR',
+            dueDate,
+            variableSymbol: String(table ?? ''),
+            iban,
+            beneficiaryName,
+        });
+
+        res.redirect(`https://api.freebysquare.sk/pay/v1/generate-png?${params.toString()}`);
     } catch (error) {
         console.error('Chyba pri generovaní QR kódu:', error);
         res.status(500).json({ error: 'Chyba pri generovaní QR kódu' });
@@ -325,28 +366,44 @@ function parseCSV(text) {
     return { headers, data };
 }
 
+// Prirodzený kľúč každej entity tak, ako ho používa aplikácia.
+// Predtým sa všetko párovalo podľa poľa `id`, ktoré stoly ani položky nemajú —
+// pri importe sa preto všetky záznamy zliali do jedného.
+const ENTITY_KEY = { tables: "number", categories: "id", items: "name" };
+
 function normalizeEntity(entity, o) {
-    const toBool = v => ["1", "true", "yes"].includes(String(v).toLowerCase());
     const toNum = v => (v === "" || v == null ? null : Number(v));
     const trim = v => (v == null ? "" : String(v).trim());
 
     if (entity === "tables")
-        return { id: trim(o.id), name: trim(o.name ?? o.nazov), capacity: toNum(o.capacity), active: toBool(o.active), order: toNum(o.order) };
+        return { number: toNum(o.number ?? o.cislo), name: trim(o.name ?? o.nazov) };
     if (entity === "categories")
-        return { id: trim(o.id), name: trim(o.name ?? o.nazov), order: toNum(o.order), active: toBool(o.active) };
+        return { id: trim(o.id), name: trim(o.name ?? o.nazov), priority: toNum(o.priority ?? o.priorita) ?? 99 };
     if (entity === "items")
-        return { id: trim(o.id), category: trim(o.category ?? o.categoryId), name: trim(o.name ?? o.nazov), price: toNum(o.price ?? o.cena), vat: toNum(o.vat ?? o.dph), sku: trim(o.sku ?? o.kod), active: toBool(o.active) };
+        return { category: trim(o.category ?? o.categoryId ?? o.kategoria), name: trim(o.name ?? o.nazov), price: toNum(o.price ?? o.cena) };
     return o;
 }
 
-function mergeById(existingArr, importedArr, entity) {
-    const byId = new Map((existingArr || []).map(x => [String(x.id), x]));
+function mergeByKey(existingArr, importedArr, entity) {
+    const key = ENTITY_KEY[entity];
+    const map = new Map((existingArr || []).map(x => [String(x[key]), x]));
+    let skipped = 0;
+
     for (const obj of importedArr) {
         const n = normalizeEntity(entity, obj);
-        if (!n.id) n.id = `${entity}-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-        byId.set(String(n.id), { ...byId.get(String(n.id)), ...n });
+        const k = n[key];
+
+        // záznam bez kľúča sa nedá spárovať ani zmysluplne pridať
+        if (k === "" || k === null || k === undefined || (typeof k === "number" && isNaN(k))) {
+            skipped++;
+            continue;
+        }
+
+        // existujúce polia (napr. staré id) zostávajú, importované ich prepíšu
+        map.set(String(k), { ...map.get(String(k)), ...n });
     }
-    return Array.from(byId.values());
+
+    return { merged: Array.from(map.values()), skipped };
 }
 
 async function loadMenu() {
@@ -410,18 +467,26 @@ app.post("/import/:entity", authenticateToken, requireAdmin, async (req, res) =>
         }
 
         const menu = await loadMenu();
-        const merged = mergeById(
-            entity === "tables" ? menu.tables : entity === "categories" ? menu.categories : menu.menuItems,
-            imported,
-            entity
-        );
+        const existing = entity === "tables" ? menu.tables
+                       : entity === "categories" ? menu.categories
+                       : menu.menuItems;
+
+        const { merged, skipped } = mergeByKey(existing || [], imported, entity);
+
+        // poistka: import nikdy nesmie skončiť menším počtom záznamov, než bol pred ním
+        if (merged.length < (existing || []).length) {
+            return res.status(400).json({
+                error: `Import zamietnutý: zo ${(existing || []).length} záznamov by zostalo ${merged.length}. ` +
+                       `Skontrolujte, či súbor obsahuje stĺpec „${ENTITY_KEY[entity]}“.`,
+            });
+        }
 
         if (entity === "tables") menu.tables = merged;
         if (entity === "categories") menu.categories = merged;
         if (entity === "items") menu.menuItems = merged;
 
         await saveMenu(menu);
-        res.json({ ok: true, imported: imported.length });
+        res.json({ ok: true, imported: imported.length - skipped, skipped, total: merged.length });
     } catch (e) {
         console.error("Import error:", e);
         res.status(500).json({ error: "Chyba pri importe." });

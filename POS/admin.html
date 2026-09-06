@@ -90,6 +90,15 @@
     }
     .save-button { background: #2e7d32; }
     .save-button:hover { background: #276b2b; }
+    .field-note {
+      font-size: 13px;
+      color: #789;
+      margin: 4px 0 14px;
+      min-height: 18px;
+    }
+    .field-note.err { color: #b3261e; font-weight: 600; }
+    .field-note.ok  { color: #2e7d32; font-weight: 600; }
+    input.is-invalid { border-color: #b3261e; background: #fff6f5; }
   </style>
 </head>
 <body class="hidden">
@@ -132,7 +141,25 @@
   </div>
 
 
-    <!-- Export (import je dočasne vypnutý, viď upozornenie) -->
+  <!-- Platobné údaje pre QR kód -->
+  <div>
+    <h2>Platba</h2>
+    <p style="margin:0 0 12px">Účet, na ktorý smerujú platobné QR kódy generované pri zaplatení účtu.</p>
+
+    <label for="iban">IBAN</label>
+    <input type="text" id="iban" placeholder="SK00 0000 0000 0000 0000 0000" autocomplete="off">
+    <div id="iban-stav" class="field-note"></div>
+
+    <label for="beneficiary">Názov príjemcu</label>
+    <input type="text" id="beneficiary" placeholder="Názov reštaurácie alebo firmy" autocomplete="off">
+
+    <div class="field-note">
+      Variabilný symbol sa dopĺňa automaticky podľa čísla stola, suma podľa účtu
+      a dátum splatnosti je vždy aktuálny deň.
+    </div>
+  </div>
+
+    <!-- Export / Import -->
     <div>
         <h2>Export</h2>
         <p style="margin:0 0 12px">Stiahnutie aktuálnych dát pre zálohu.</p>
@@ -149,12 +176,35 @@
         <button type="button" onclick="exportEntity('items','csv')">Export CSV</button>
         <button type="button" onclick="exportEntity('items','json')">Export JSON</button>
 
+        <div id="import-blocked" class="warn" hidden>
+            <b>Import je skrytý, kým sa neaktualizuje backend.</b>
+            Staršia verzia servera páruje záznamy podľa poľa <code>id</code>, ktoré stoly nemajú —
+            import by ich zlial do jedného. Po nasadení backendu na Render sa sekcia zobrazí sama.
+        </div>
+
+        <div id="import-section" hidden>
+        <h2 style="margin-top:24px">Import</h2>
+        <p style="margin:0 0 12px">
+            Záznamy sa párujú podľa stĺpca <code>number</code> (stoly), <code>id</code> (kategórie)
+            a <code>name</code> (položky). Zhodné sa prepíšu, nové pribudnú — nič sa nemaže.
+        </p>
+
+        <h3>Stoly</h3>
+        <input type="file" accept=".csv" onchange="importEntity(event,'tables','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'tables','json')" />
+
+        <h3>Kategórie</h3>
+        <input type="file" accept=".csv" onchange="importEntity(event,'categories','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'categories','json')" />
+
+        <h3>Položky</h3>
+        <input type="file" accept=".csv" onchange="importEntity(event,'items','csv')" />
+        <input type="file" accept=".json" onchange="importEntity(event,'items','json')" />
+
         <div class="warn">
-            <b>Import je dočasne vypnutý.</b>
-            Serverové zlučovanie páruje záznamy podľa poľa <code>id</code>, ktoré stoly vôbec
-            nemajú — pri importe by sa všetkých päť stolov zlialo do jedného a POS by o ne prišiel.
-            Rovnaký problém hrozí položkám bez <code>id</code>. Kým sa nespraví mapovanie na
-            serveri (<code>normalizeEntity</code> a <code>mergeById</code>), import zostáva skrytý.
+            Import zapisuje priamo na server a <b>obíde neuložené zmeny v tomto okne</b>.
+            Pred importom si ulož rozrobené úpravy, inak ich prepíšeš.
+        </div>
         </div>
     </div>
 
@@ -231,6 +281,7 @@
         if (data.role !== "admin") throw new Error();
         document.body.classList.remove("hidden");
         loadMenuData();
+        checkApiVersion();
       } catch {
         alert("Neplatný token. Prihláste sa znova.");
         window.location.href = "/POS/login.html";
@@ -244,7 +295,9 @@
       if (!menuData.tables) menuData.tables = [];
       if (!menuData.categories) menuData.categories = [];
       if (!menuData.menuItems) menuData.menuItems = [];
-      renderTables(); renderCategories(); renderMenuItems();
+      if (!menuData.payment) menuData.payment = { iban: "", beneficiaryName: "" };
+      renderTables(); renderCategories(); renderMenuItems(); renderPayment();
+      markClean();
     }
 
     // chyby, ktoré by sa inak prejavili až v POS ako chýbajúci stôl či jedlo
@@ -277,6 +330,14 @@
         chyby.push(`${osirote.length} položiek má neexistujúcu kategóriu ` +
                    `(${osirote.slice(0,3).map(i=>i.name).join(", ")}) – v POS sa nezobrazia.`);
 
+      const iban = (menuData.payment?.iban || "").trim();
+      if (!iban)
+        chyby.push("Nie je vyplnený IBAN – pri platbe sa nevygeneruje QR kód.");
+      else if (!ibanValid(iban))
+        chyby.push("IBAN neprešiel kontrolným súčtom – peniaze by mohli ísť na cudzí účet.");
+      else if (!(menuData.payment?.beneficiaryName || "").trim())
+        chyby.push("Nie je vyplnený názov príjemcu platby.");
+
       return chyby;
     }
 
@@ -288,14 +349,19 @@
       try {
         const res = await fetch(`${BACKEND_URL}/menu`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
           body: JSON.stringify(menuData),
         });
-        if (!res.ok) throw new Error();
+        if (res.status === 401 || res.status === 403)
+          throw new Error("Prihlásenie vypršalo. Prihláste sa znova a zmeny uložte ešte raz.");
+        if (!res.ok) throw new Error("Chyba pri ukladaní. Zmeny zostávajú v okne, skúste znova.");
         markClean();
         alert("Dáta uložené!");
-      } catch {
-        alert("Chyba pri ukladaní. Zmeny zostávajú v okne, skúste znova.");
+      } catch (e) {
+        alert(e.message || "Chyba pri ukladaní.");
       }
     }
 
@@ -434,8 +500,80 @@
       renderMenuItems();
     }
 
+    // ---------------- PLATBA ----------------
+
+    // kontrolný súčet IBAN (mod 97) — odhalí preklep v čísle účtu skôr,
+    // než sa vygeneruje QR kód, ktorý pošle peniaze nikam
+    function ibanValid(raw) {
+      const s = String(raw || "").replace(/\s+/g, "").toUpperCase();
+      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+      const prehodene = s.slice(4) + s.slice(0, 4);
+      const cislice = prehodene.replace(/[A-Z]/g, (c) => c.charCodeAt(0) - 55);
+      let zvysok = 0;
+      for (const ch of cislice) zvysok = (zvysok * 10 + Number(ch)) % 97;
+      return zvysok === 1;
+    }
+
+    function formatIban(raw) {
+      return String(raw || "").replace(/\s+/g, "").toUpperCase().replace(/(.{4})/g, "$1 ").trim();
+    }
+
+    function renderPayment() {
+      const p = menuData.payment || {};
+      document.getElementById("iban").value = formatIban(p.iban || "");
+      document.getElementById("beneficiary").value = p.beneficiaryName || "";
+      checkIban();
+    }
+
+    function checkIban() {
+      const el = document.getElementById("iban");
+      const stav = document.getElementById("iban-stav");
+      const hodnota = el.value.replace(/\s+/g, "");
+
+      if (!hodnota) {
+        el.classList.remove("is-invalid");
+        stav.className = "field-note";
+        stav.textContent = "Bez IBAN sa QR kód pri platbe nevygeneruje.";
+        return true;
+      }
+      const ok = ibanValid(hodnota);
+      el.classList.toggle("is-invalid", !ok);
+      stav.className = "field-note " + (ok ? "ok" : "err");
+      stav.textContent = ok ? "IBAN je platný." : "Neplatný IBAN — sedí formát, ale nesedí kontrolný súčet.";
+      return ok;
+    }
+
+    document.getElementById("iban").addEventListener("input", checkIban);
+    document.getElementById("iban").addEventListener("change", function () {
+      const hodnota = this.value.replace(/\s+/g, "").toUpperCase();
+      this.value = formatIban(hodnota);
+      menuData.payment = menuData.payment || {};
+      menuData.payment.iban = hodnota;
+      markDirty();
+      checkIban();
+    });
+    document.getElementById("beneficiary").addEventListener("change", function () {
+      menuData.payment = menuData.payment || {};
+      menuData.payment.beneficiaryName = this.value.trim();
+      markDirty();
+    });
+
     // ---------------- IMPORT / EXPORT ----------------
     function getToken(){ return localStorage.getItem("authToken"); }
+
+    // import odomkneme až keď server hlási opravené zlučovanie (api >= 2)
+    async function checkApiVersion() {
+      let api = 0;
+      try {
+        const r = await fetch(`${BACKEND_URL}/version`);
+        if (r.ok) api = (await r.json()).api || 0;
+      } catch { /* starý backend endpoint nemá */ }
+
+      const ok = api >= 2;
+      document.getElementById("import-section").hidden = !ok;
+      document.getElementById("import-blocked").hidden = ok;
+      return api;
+    }
 
     async function exportEntity(entity, format="csv") {
       const token = getToken();
@@ -449,8 +587,44 @@
       a.click();
     }
 
-    // importEntity() bola odstránená spolu s ovládacími prvkami importu —
-    // serverové mapovanie by pri zlučovaní zničilo stoly aj položky bez id
+    async function importEntity(ev, entity, format) {
+      const vstup = ev.target;
+      const f = vstup.files?.[0];
+      if (!f) return;
+
+      const nazvy = { tables: "stoly", categories: "kategórie", items: "položky" };
+      if (dirty && !confirm(
+        `Máte neuložené zmeny, ktoré import prepíše.\n\nPokračovať a zahodiť ich?`
+      )) { vstup.value = ""; return; }
+
+      try {
+        const text = await f.text();
+        const body = format === "json"
+          ? { format: "json", data: JSON.parse(text) }
+          : { format: "csv", data: text };
+
+        const r = await fetch(`${BACKEND_URL}/import/${entity}?format=${format}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json().catch(() => ({}));
+
+        if (r.status === 401 || r.status === 403) throw new Error("Prihlásenie vypršalo, prihláste sa znova.");
+        if (!r.ok) throw new Error(j.error || "Import zlyhal.");
+
+        alert(`Import ${nazvy[entity]} prebehol.\n\n` +
+              `Spracovaných: ${j.imported}\n` +
+              (j.skipped ? `Preskočených bez kľúča: ${j.skipped}\n` : "") +
+              `Spolu v zozname: ${j.total}`);
+
+        await loadMenuData();
+      } catch (e) {
+        alert(e.message || "Import zlyhal.");
+      } finally {
+        vstup.value = "";   // aby sa dal ten istý súbor nahrať znova
+      }
+    }
 
     // ---------------- Pridanie používateľa ----------------
     // formulár predtým nemal obsluhu – odoslal sa natívne, stránka sa reloadla
