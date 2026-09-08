@@ -65,7 +65,8 @@
 
   <div class="card">
     <h1>YT prepisy</h1>
-    <p class="sub">Stiahnite prepisy (titulky) z YouTube do súboru alebo do schránky. Zvládne aj viac videí naraz a celé playlisty. Všetko beží vo vašom prehliadači.</p>
+    <p class="sub">Stiahnite prepisy (titulky) z YouTube do súboru alebo do schránky. Zvládne aj viac videí naraz a celé playlisty.
+    Všetko beží vo vašom prehliadači – údaje sa berú z verejných zrkadiel Invidious/Piped, prípadne priamo z YouTube cez CORS proxy.</p>
     <p class="back"><a href="../">← Späť na rozcestník</a></p>
   </div>
 
@@ -115,9 +116,21 @@
       <label><input type="checkbox" id="optHeader" checked> Nadpis s názvom videa</label>
     </div>
     <details>
-      <summary>Rozšírené – vlastná CORS proxy</summary>
+      <summary>Rozšírené – zdroj údajov a vlastná proxy</summary>
       <div class="body">
-        <p>YouTube neposiela CORS hlavičky, preto sa požiadavky posielajú cez verejné proxy servery. Tie bývajú preťažené. Ak máte vlastnú proxy, zadajte ju sem – použije sa prednostne.</p>
+        <p>YouTube neposiela CORS hlavičky, preto sa naň z prehliadača nedá volať priamo. Aplikácia preto najprv skúša verejné zrkadlá
+        <a href="https://invidious.io/" target="_blank" rel="noopener">Invidious</a> a <a href="https://piped.video/" target="_blank" rel="noopener">Piped</a>,
+        ktoré vlastné API s titulkami ponúkajú aj pre prehliadač. Až keď zlyhajú, siahne po verejných CORS proxy pred samotný YouTube.</p>
+        <div class="field" style="margin:10px 0">
+          <label for="source">Zdroj údajov</label>
+          <select id="source">
+            <option value="auto">Automaticky (zrkadlá, potom proxy)</option>
+            <option value="invidious">Len zrkadlá Invidious</option>
+            <option value="piped">Len zrkadlá Piped</option>
+            <option value="proxy">Len YouTube cez CORS proxy</option>
+          </select>
+        </div>
+        <p>Ak máte vlastnú proxy, zadajte ju sem – použije sa prednostne pred verejnými.</p>
         <input type="text" id="customProxy" placeholder="https://moja-proxy.workers.dev/?url={url}">
         <p class="hint"><code>{url}</code> sa nahradí adresou (kódovanou). Ak <code>{url}</code> nepoužijete, adresa sa pripojí na koniec.</p>
         <p>Príklad Cloudflare Worker (zdarma, spoľahlivejší než verejné proxy):</p>
@@ -168,17 +181,22 @@
     <details><summary>Video nemá prepis – čo s tým?</summary><div class="body">
       Prepis existuje len ak má video titulky (vlastné alebo automatické). Ak autor titulky vypol, prepis sa získať nedá.
       Skúste tiež zapnúť <em>Povoliť automatické titulky</em> a vyprázdniť pole s preferovanými jazykmi.
+      Ak jedno zrkadlo tvrdí, že video titulky nemá, oplatí sa v rozšírených nastaveniach prepnúť na iný zdroj – zrkadlá
+      občas titulky nedostanú od YouTube, hoci video ich má.
     </div></details>
-    <details><summary>Hlásenie „nepodarilo sa načítať cez proxy“</summary><div class="body">
-      Verejné CORS proxy majú limity a občas vypadnú. Skúste to o chvíľu znova (tlačidlo <em>Zopakovať neúspešné</em>),
-      znížte počet súčasne spracovaných videí na 1, alebo si nasaďte vlastný Cloudflare Worker podľa návodu v nastaveniach.
+    <details><summary>Nič sa nenačítalo – všetky zdroje zlyhali</summary><div class="body">
+      Aplikácia postupne skúša zrkadlá Invidious, potom Piped a nakoniec verejné CORS proxy pred YouTube.
+      Keď zlyhá všetko naraz, býva to tým, že sú zrkadlá dočasne preťažené alebo ich YouTube práve blokuje.
+      Skúste to o chvíľu znova (<em>Zopakovať neúspešné</em>), v rozšírených nastaveniach vyskúšajte konkrétny zdroj,
+      alebo si nasaďte vlastný Cloudflare Worker podľa návodu tamtiež – to je jediné riešenie, ktoré nezávisí od cudzích služieb.
     </div></details>
     <details><summary>Koľko videí z playlistu sa načíta?</summary><div class="body">
-      Načíta sa prvá stránka playlistu, čo je zvyčajne prvých 100 videí. Pri dlhších playlistoch pridajte zvyšné videá ručne.
+      Cez zrkadlá Invidious sa načíta až 500 videí, cez Piped a cez proxy zvyčajne prvých 100.
+      Pri dlhších playlistoch pridajte zvyšné videá ručne.
     </div></details>
     <details><summary>Odchádzajú moje dáta niekam?</summary><div class="body">
-      Aplikácia beží celá v prehliadači a nemá vlastný server. Požiadavky na YouTube však prechádzajú cez zvolenú verejnú CORS proxy –
-      tá vidí, ktoré videá sťahujete. Nastavenia sa ukladajú len lokálne do prehliadača.
+      Aplikácia beží celá v prehliadači a nemá vlastný server. Požiadavky však prechádzajú cez verejné zrkadlo alebo CORS proxy –
+      tá služba vidí, ktoré videá sťahujete. Nastavenia sa ukladajú len lokálne do prehliadača.
     </div></details>
   </div>
 
@@ -263,12 +281,14 @@
 
   /* ------------------------------------------------------ CORS proxy */
 
+  // Zaloha pre pripad, ze zrkadla nefunguju. Verejne proxy casto vypadavaju
+  // alebo zacnu vyzadovat plateny kluc, preto sa skusaju postupne.
   var PROXIES = [
     { name: "allorigins", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); } },
-    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); } },
     { name: "codetabs", url: function (u) { return "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u); } },
-    { name: "cors.workers", url: function (u) { return "https://test.cors.workers.dev/?" + u; } },
-    { name: "cors.lol", url: function (u) { return "https://api.cors.lol/?url=" + encodeURIComponent(u); } }
+    { name: "allorigins/get", unwrap: true,
+      url: function (u) { return "https://api.allorigins.win/get?url=" + encodeURIComponent(u); } },
+    { name: "corsproxy.io", url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); } }
   ];
 
   var lastGood = null;
@@ -315,6 +335,11 @@
       if (i >= chain.length) return Promise.reject(new Error("nepodarilo sa načítať cez proxy (" + errors.join("; ") + ")"));
       var p = chain[i++];
       return fetchWithTimeout(p.url(target), 30000).then(function (txt) {
+        if (p.unwrap) {
+          var box;
+          try { box = JSON.parse(txt); } catch (e) { throw new Error("neplatný obal odpovede"); }
+          txt = box && box.contents;
+        }
         if (!txt || txt.length < 20) throw new Error("prázdna odpoveď");
         if (p.name !== "vlastná proxy") lastGood = p.name;
         return txt;
@@ -472,7 +497,14 @@
     cues.forEach(function (c) {
       var text = c.text;
       if (!text) return;
-      if (prev && prev.text === text && Math.abs(prev.start - c.start) < 0.05) return;
+      if (prev && prev.text === text) return;
+      // automaticke titulky posielaju rastuce okno: "Ahoj" -> "Ahoj svet".
+      // Ak sa cue casovo prekryva a zacina rovnakym textom, nahradime predchadzajuci.
+      if (prev && text.indexOf(prev.text) === 0 && c.start < prev.start + (prev.dur || 0) + 0.05) {
+        prev.text = text;
+        prev.dur = Math.max(prev.dur || 0, c.start + c.dur - prev.start);
+        return;
+      }
       prev = { start: c.start, dur: c.dur, text: text };
       out.push(prev);
     });
@@ -484,7 +516,193 @@
     return out;
   }
 
-  function fetchTranscript(videoId, opts) {
+  /* ------------------------------- verejné zrkadlá (Invidious a Piped) */
+
+  // Tieto sluzby maju zapnute CORS hlavicky, takze idu volat priamo z prehliadaca.
+  // Instancie obcas vypadnu, preto sa skusaju postupne a funkcna sa zapamata.
+  var INVIDIOUS = [
+    "https://inv.nadeko.net",
+    "https://yewtu.be",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.jing.rocks",
+    "https://iv.melmac.space",
+    "https://invidious.privacyredirect.com",
+    "https://invidious.f5.si",
+    "https://id.420129.xyz"
+  ];
+
+  var PIPED = [
+    "https://pipedapi.kavin.rocks",
+    "https://api.piped.private.coffee",
+    "https://pipedapi.adminforge.de",
+    "https://pipedapi.ducks.party",
+    "https://pipedapi.reallyaweso.me",
+    "https://piped-api.codespace.cz"
+  ];
+
+  var goodHost = {};                          // posledne funkcne zrkadlo v skupine
+  var deadHost = {};                          // zrkadla, ktore uz v tomto sedeni zlyhali
+
+  function hostLabel(h) { return String(h).replace(/^https?:\/\//, ""); }
+
+  function absUrl(host, u) {
+    if (!u) return "";
+    if (/^https?:/i.test(u)) return u;
+    return host + (u.charAt(0) === "/" ? "" : "/") + u;
+  }
+
+  function errText(e) { return e && e.message ? e.message : String(e); }
+
+  function tryHosts(list, group, fn) {
+    var order = [], errors = [], i = 0;
+    if (goodHost[group] && list.indexOf(goodHost[group]) !== -1) order.push(goodHost[group]);
+    list.forEach(function (h) { if (order.indexOf(h) === -1 && !deadHost[h]) order.push(h); });
+    if (!order.length) { deadHost = {}; order = list.slice(); }
+
+    function next() {
+      if (aborter && aborter.signal.aborted) return Promise.reject(new Error("zastavené"));
+      if (i >= order.length) return Promise.reject(new Error(errors.join("; ") || "žiadne dostupné zrkadlo"));
+      var host = order[i++];
+      return fn(host).then(function (res) {
+        goodHost[group] = host;
+        return res;
+      }, function (e) {
+        if (aborter && aborter.signal.aborted) throw new Error("zastavené");
+        var msg = errText(e);
+        errors.push(hostLabel(host) + ": " + msg);
+        if (!/titulky|prepis|playlist/i.test(msg)) deadHost[host] = 1;
+        return next();
+      });
+    }
+    return next();
+  }
+
+  function fetchJson(url, ms) {
+    return fetchWithTimeout(url, ms || 20000).then(function (txt) {
+      var data;
+      try { data = JSON.parse(txt); } catch (e) { throw new Error("odpoveď nie je JSON"); }
+      if (data && data.error) throw new Error(String(data.error).slice(0, 120));
+      return data;
+    });
+  }
+
+  /* ------------------------------------ titulky vo formatoch VTT a TTML */
+
+  function parseTimecode(s) {
+    if (s === null || s === undefined) return NaN;
+    s = String(s).trim().replace(",", ".");
+    if (/^[\d.]+s$/.test(s)) return parseFloat(s);
+    if (/^[\d.]+$/.test(s)) return parseFloat(s);
+    var parts = s.split(":"), sec = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseFloat(parts[i]);
+      if (!isFinite(n)) return NaN;
+      sec = sec * 60 + n;
+    }
+    return sec;
+  }
+
+  function stripCueTags(s) {
+    return decodeEntities(String(s).replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  }
+
+  function parseVtt(txt) {
+    if (!txt || txt.indexOf("-->") === -1) return null;
+    var lines = txt.replace(/\r/g, "").split("\n"), cues = [], i = 0;
+    while (i < lines.length) {
+      var m = lines[i++].match(/([\d:.,]+)\s*-->\s*([\d:.,]+)/);
+      if (!m) continue;
+      var start = parseTimecode(m[1]), end = parseTimecode(m[2]), buf = [];
+      while (i < lines.length && lines[i].trim() !== "") buf.push(lines[i++]);
+      var text = stripCueTags(buf.join(" "));
+      if (text && isFinite(start)) {
+        cues.push({ start: start, dur: isFinite(end) ? Math.max(0, end - start) : 0, text: text });
+      }
+    }
+    return cues;
+  }
+
+  function parseCaptions(txt) {
+    var order = [parseJson3, parseVtt, parseXmlCaptions];
+    for (var i = 0; i < order.length; i++) {
+      var cues = order[i](txt);
+      if (cues && cues.length) return cues;
+    }
+    return [];
+  }
+
+  var RE_AUTO = /auto.?generated|automatick|auto-vygener/i;
+
+  function toTracks(list, get) {
+    return list.map(function (item) {
+      var t = get(item);
+      return {
+        languageCode: t.code || "",
+        kind: t.asr ? "asr" : undefined,
+        baseUrl: t.url,
+        label: t.label || ""
+      };
+    }).filter(function (t) { return !!t.baseUrl; });
+  }
+
+  function trackLang(track, opts) {
+    var lang = track.languageCode || track.label || "?";
+    if (track.kind === "asr") lang += " (auto)";
+    if (opts.tlang) lang += " (bez prekladu)";
+    return lang;
+  }
+
+  function loadCues(meta, track, opts) {
+    meta.lang = trackLang(track, opts);
+    return fetchWithTimeout(track.baseUrl, 25000).then(function (txt) {
+      meta.cues = fixCues(parseCaptions(txt));
+      if (!meta.cues.length) throw new Error("prepis prišiel prázdny");
+      return meta;
+    });
+  }
+
+  function noTrackError(opts, tracks) {
+    return new Error(tracks.length && !opts.allowAsr
+      ? "k dispozícii sú len automatické titulky – povoľte ich v nastaveniach"
+      : "zrkadlo nevrátilo žiadne titulky");
+  }
+
+  /* ----------------------------------------------- jednotlive zdroje */
+
+  function viaInvidious(videoId, opts) {
+    return tryHosts(INVIDIOUS, "inv", function (host) {
+      return fetchJson(host + "/api/v1/videos/" + videoId + "?fields=title,author,captions").then(function (d) {
+        var meta = { id: videoId, title: d.title || videoId, author: d.author || "", source: hostLabel(host) };
+        var tracks = toTracks(d.captions || [], function (c) {
+          return {
+            code: c.languageCode || c.language_code || "",
+            asr: RE_AUTO.test(c.label || ""),
+            url: absUrl(host, c.url),
+            label: c.label
+          };
+        });
+        var track = pickTrack(tracks, opts.prefs, opts.allowAsr);
+        if (!track) throw noTrackError(opts, tracks);
+        return loadCues(meta, track, opts);
+      });
+    });
+  }
+
+  function viaPiped(videoId, opts) {
+    return tryHosts(PIPED, "piped", function (host) {
+      return fetchJson(host + "/streams/" + videoId).then(function (d) {
+        var meta = { id: videoId, title: d.title || videoId, author: d.uploader || "", source: hostLabel(host) };
+        var tracks = toTracks(d.subtitles || [], function (s) {
+          return { code: s.code || "", asr: !!s.autoGenerated || RE_AUTO.test(s.name || ""), url: s.url, label: s.name };
+        });
+        var track = pickTrack(tracks, opts.prefs, opts.allowAsr);
+        if (!track) throw noTrackError(opts, tracks);
+        return loadCues(meta, track, opts);
+      });
+    });
+  }
+
+  function viaProxy(videoId, opts) {
     return getPlayerResponse(videoId).then(function (pr) {
       var details = pr.videoDetails || {};
       var status = pr.playabilityStatus || {};
@@ -492,11 +710,13 @@
         id: videoId,
         title: details.title || videoId,
         author: details.author || "",
-        duration: parseInt(details.lengthSeconds || 0, 10) || 0
+        duration: parseInt(details.lengthSeconds || 0, 10) || 0,
+        source: "youtube.com cez proxy"
       };
-      var fail = function (msg) {
+      var fail = function (msg, definitive) {
         var e = new Error(msg);
         e.meta = meta;
+        e.definitive = !!definitive;
         return e;
       };
       var cap = pr.captions && pr.captions.playerCaptionsTracklistRenderer;
@@ -504,23 +724,21 @@
       if (!tracks.length) {
         throw fail(status.status && status.status !== "OK"
           ? (runsToText(status.reason) || status.status)
-          : "video nemá žiadne titulky");
+          : "video nemá žiadne titulky", true);
       }
       var track = pickTrack(tracks, opts.prefs, opts.allowAsr);
-      if (!track) throw fail("k dispozícii sú len automatické titulky – povoľte ich v nastaveniach");
+      if (!track) throw fail("k dispozícii sú len automatické titulky – povoľte ich v nastaveniach", true);
 
       meta.lang = track.languageCode + (track.kind === "asr" ? " (auto)" : "");
       var params = { fmt: "json3" };
       if (opts.tlang) { params.tlang = opts.tlang; meta.lang += " → " + opts.tlang; }
 
       return proxyFetch(addParams(track.baseUrl, params)).then(function (txt) {
-        var cues = parseJson3(txt) || parseXmlCaptions(txt);
-        if (cues && cues.length) return cues;
+        var cues = parseCaptions(txt);
+        if (cues.length) return cues;
         var p2 = { fmt: null };
         if (opts.tlang) p2.tlang = opts.tlang;
-        return proxyFetch(addParams(track.baseUrl, p2)).then(function (xml) {
-          return parseXmlCaptions(xml) || [];
-        });
+        return proxyFetch(addParams(track.baseUrl, p2)).then(parseCaptions);
       }).then(function (cues) {
         meta.cues = fixCues(cues);
         if (!meta.cues.length) throw fail("prepis sa načítal prázdny");
@@ -529,7 +747,85 @@
     });
   }
 
-  function fetchPlaylist(listId) {
+  /* --------------------------------------- vyber a poradie zdrojov */
+
+  var SOURCES = {
+    invidious: { video: viaInvidious, playlist: playlistInvidious, label: "Invidious" },
+    piped: { video: viaPiped, playlist: playlistPiped, label: "Piped" },
+    proxy: { video: viaProxy, playlist: playlistProxy, label: "proxy" }
+  };
+
+  function sourceOrder(opts) {
+    if (opts.source !== "auto") return [opts.source];
+    // vlastna proxy a preklad funguju len cez YouTube, preto idu prve
+    if (opts.tlang || opts.hasCustomProxy) return ["proxy", "invidious", "piped"];
+    return ["invidious", "piped", "proxy"];
+  }
+
+  function runSources(opts, pick, args) {
+    var order = sourceOrder(opts), i = 0, errors = [], definitive = null, lastMeta = null;
+    function next() {
+      if (aborter && aborter.signal.aborted) return Promise.reject(new Error("zastavené"));
+      if (i >= order.length) {
+        var e = new Error(definitive || errors.join(" | "));
+        if (lastMeta) e.meta = lastMeta;
+        return Promise.reject(e);
+      }
+      var name = order[i++];
+      return pick(SOURCES[name]).apply(null, args).then(null, function (err) {
+        if (aborter && aborter.signal.aborted) throw new Error("zastavené");
+        if (err && err.meta) lastMeta = err.meta;
+        if (err && err.definitive && !definitive) definitive = errText(err);
+        errors.push(SOURCES[name].label + " – " + errText(err));
+        return next();
+      });
+    }
+    return next();
+  }
+
+  function fetchTranscript(videoId, opts) {
+    return runSources(opts, function (s) { return s.video; }, [videoId, opts]);
+  }
+
+  function fetchPlaylist(listId, opts) {
+    return runSources(opts, function (s) { return s.playlist; }, [listId, opts]);
+  }
+
+  /* -------------------------------------------------------- playlisty */
+
+  function playlistInvidious(listId) {
+    return tryHosts(INVIDIOUS, "inv", function (host) {
+      var videos = [], title = listId;
+      function page(p) {
+        return fetchJson(host + "/api/v1/playlists/" + listId + "?page=" + p).then(function (d) {
+          if (d.title) title = d.title;
+          var vs = d.videos || [];
+          vs.forEach(function (v) { if (v.videoId) videos.push({ id: v.videoId, title: v.title || "" }); });
+          if (vs.length >= 100 && p < 5) return page(p + 1);
+        });
+      }
+      return page(1).then(function () {
+        if (!videos.length) throw new Error("playlist je prázdny alebo neprístupný");
+        return { title: title, videos: videos };
+      });
+    });
+  }
+
+  function playlistPiped(listId) {
+    return tryHosts(PIPED, "piped", function (host) {
+      return fetchJson(host + "/playlists/" + listId).then(function (d) {
+        var videos = [];
+        (d.relatedStreams || []).forEach(function (s) {
+          var m = String(s.url || "").match(/[?&]v=([A-Za-z0-9_-]{11})/);
+          if (m) videos.push({ id: m[1], title: s.title || "" });
+        });
+        if (!videos.length) throw new Error("playlist je prázdny alebo neprístupný");
+        return { title: d.name || listId, videos: videos };
+      });
+    });
+  }
+
+  function playlistProxy(listId) {
     return proxyFetch("https://www.youtube.com/playlist?list=" + listId + "&hl=en").then(function (html) {
       var ids = [], seen = {};
       var data = extractJson(html, "ytInitialData");
@@ -656,6 +952,8 @@
     return {
       prefs: prefs,
       tlang: ($("tlang").value || "").trim(),
+      source: $("source").value,
+      hasCustomProxy: !!($("customProxy").value || "").trim(),
       allowAsr: $("optAsr").checked,
       clean: $("optClean").checked,
       header: $("optHeader").checked,
@@ -773,6 +1071,7 @@
         r.title = meta.title || r.title;
         r.author = meta.author;
         r.lang = meta.lang;
+        r.source = meta.source;
         r.cues = meta.cues;
         r.status = "ok";
       }, function (err) {
@@ -810,7 +1109,7 @@
       chain = chain.then(function () {
         if (aborter.signal.aborted) return;
         setStatus("Rozbaľujem playlist " + p.id + "…");
-        return fetchPlaylist(p.id).then(function (pl) {
+        return fetchPlaylist(p.id, opts).then(function (pl) {
           setStatus("Playlist \"" + pl.title + "\": " + pl.videos.length + " videí.");
           pl.videos.forEach(function (v) { videos.push(v); });
         }, function (err) {
@@ -847,7 +1146,11 @@
     var err = results.filter(function (r) { return r.status === "err"; }).length;
     var wait = results.filter(function (r) { return r.status === "wait" || r.status === "run"; }).length;
     if (results.length) {
-      setStatus("Hotovo: " + ok + " úspešných, " + err + " s chybou" + (wait ? ", " + wait + " nespracovaných" : "") + ".");
+      var used = {};
+      okResults().forEach(function (r) { if (r.source) used[r.source] = 1; });
+      var zdroje = Object.keys(used);
+      setStatus("Hotovo: " + ok + " úspešných, " + err + " s chybou" + (wait ? ", " + wait + " nespracovaných" : "") + "."
+        + (zdroje.length ? " Zdroj: " + zdroje.join(", ") + "." : ""));
     }
   }
 
@@ -902,7 +1205,7 @@
   /* ----------------------------------------------- ukladanie nastaveni */
 
   var STORE = "ytprepis.v1";
-  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "customProxy"];
+  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "customProxy"];
   var CHECKS = ["optAsr", "optPlaylist", "optClean", "optHeader"];
 
   function saveSettings() {
