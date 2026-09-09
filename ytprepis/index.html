@@ -57,6 +57,7 @@
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 18px;border-radius:4px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}
   .toast.on{opacity:1}
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .card.alert{outline:2px solid var(--red)}
   .back{font-size:13px}
 </style>
 </head>
@@ -130,22 +131,13 @@
             <option value="proxy">Len YouTube cez CORS proxy</option>
           </select>
         </div>
-        <p>Ak máte vlastnú proxy, zadajte ju sem – použije sa prednostne pred verejnými.</p>
+        <p>Poznáte funkčné zrkadlo (napr. vlastnú inštanciu)? Zadajte jeho adresu – skúsi sa ako prvé.
+        Rozpozná sa samo, či ide o Invidious alebo Piped.</p>
+        <input type="text" id="customMirror" placeholder="https://moje-zrkadlo.sk">
+        <p style="margin-top:14px">Vlastná CORS proxy pred YouTube – použije sa prednostne pred verejnými:</p>
         <input type="text" id="customProxy" placeholder="https://moja-proxy.workers.dev/?url={url}">
-        <p class="hint"><code>{url}</code> sa nahradí adresou (kódovanou). Ak <code>{url}</code> nepoužijete, adresa sa pripojí na koniec.</p>
-        <p>Príklad Cloudflare Worker (zdarma, spoľahlivejší než verejné proxy):</p>
-        <pre>export default {
-  async fetch(req) {
-    const target = new URL(req.url).searchParams.get("url");
-    if (!target) return new Response("chyba url", { status: 400 });
-    const r = await fetch(target, {
-      headers: { "user-agent": "Mozilla/5.0", "accept-language": "sk,en;q=0.8" }
-    });
-    const h = new Headers(r.headers);
-    h.set("access-control-allow-origin", "*");
-    return new Response(r.body, { status: r.status, headers: h });
-  }
-}</pre>
+        <p class="hint"><code>{url}</code> sa nahradí adresou (kódovanou). Ak <code>{url}</code> nepoužijete, adresa sa pripojí na koniec.
+        Návod na vlastnú proxy je nižšie v sekcii <em>Keď nič nefunguje</em>.</p>
       </div>
     </details>
   </div>
@@ -174,6 +166,47 @@
     </div>
     <textarea id="out" placeholder="Tu sa objaví výsledný text…"></textarea>
     <p class="hint" id="outInfo"></p>
+  </div>
+
+  <div class="card" id="ownProxy">
+    <h2>Keď nič nefunguje – vlastná proxy za pár minút</h2>
+    <p class="sub">Verejné zrkadlá aj verejné CORS proxy sú dnes často preťažené, blokované YouTubom alebo spoplatnené.
+    Vlastná proxy na Cloudflare je zadarmo, nezávisí od cudzích služieb a nastavíte ju raz.</p>
+    <ol style="font-size:14px;line-height:1.7;padding-left:20px">
+      <li>Prihláste sa na <a href="https://workers.cloudflare.com/" target="_blank" rel="noopener">workers.cloudflare.com</a> (stačí bezplatný účet).</li>
+      <li>Dajte <em>Create</em> → <em>Start with Hello World</em> → <em>Deploy</em>.</li>
+      <li>Otvorte <em>Edit code</em>, obsah súboru nahraďte kódom nižšie a dajte <em>Deploy</em>.</li>
+      <li>Skopírujte adresu workera, napríklad <code>https://nieco.uzivatel.workers.dev</code>.</li>
+      <li>Do poľa <em>Vlastná CORS proxy</em> v rozšírených nastaveniach vložte <code>https://nieco.uzivatel.workers.dev/?url={url}</code>.</li>
+    </ol>
+    <div class="bar" style="margin:10px 0">
+      <button class="btn sec small" id="copyWorker">Kopírovať kód workera</button>
+      <button class="btn sec small" id="openAdvanced">Otvoriť rozšírené nastavenia</button>
+    </div>
+    <pre id="workerCode">export default {
+  async fetch(req) {
+    const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
+    if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+    const target = new URL(req.url).searchParams.get("url");
+    if (!target) return new Response("chyba: chyba parameter url", { status: 400, headers: cors });
+
+    const r = await fetch(target, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "accept-language": "sk,en;q=0.8"
+      }
+    });
+
+    const h = new Headers(cors);
+    h.set("content-type", r.headers.get("content-type") || "text/plain");
+    return new Response(r.body, { status: r.status, headers: h });
+  }
+};</pre>
+    <p class="hint">Worker len preposiela požiadavku a dopĺňa hlavičku CORS. Bezplatná úroveň Cloudflare zvláda 100 000 požiadaviek denne,
+    čo je na sťahovanie prepisov viac než dosť. Ani takáto proxy však nepomôže, ak YouTube blokuje samotné dátové centrum – vtedy pomôže
+    už len nástroj bežiaci na vašom počítači, napríklad <code>yt-dlp --write-auto-subs --skip-download</code>.</p>
   </div>
 
   <div class="card">
@@ -334,7 +367,7 @@
       if (aborter && aborter.signal.aborted) return Promise.reject(new Error("zastavené"));
       if (i >= chain.length) return Promise.reject(new Error("nepodarilo sa načítať cez proxy (" + errors.join("; ") + ")"));
       var p = chain[i++];
-      return fetchWithTimeout(p.url(target), 30000).then(function (txt) {
+      return fetchWithTimeout(p.url(target), 20000).then(function (txt) {
         if (p.unwrap) {
           var box;
           try { box = JSON.parse(txt); } catch (e) { throw new Error("neplatný obal odpovede"); }
@@ -545,6 +578,20 @@
 
   function hostLabel(h) { return String(h).replace(/^https?:\/\//, ""); }
 
+  // Vlastne zrkadlo od pouzivatela ide na zaciatok oboch zoznamov - ktore API
+  // odpovie, take zrkadlo to je.
+  function ownMirror() {
+    var own = ($("customMirror").value || "").trim().replace(/\/+$/, "");
+    if (!own) return "";
+    return /^https?:\/\//i.test(own) ? own : "https://" + own;
+  }
+
+  function mirrors(base) {
+    var own = ownMirror();
+    if (!own) return base;
+    return [own].concat(base.filter(function (h) { return h !== own; }));
+  }
+
   function absUrl(host, u) {
     if (!u) return "";
     if (/^https?:/i.test(u)) return u;
@@ -555,7 +602,11 @@
 
   function tryHosts(list, group, fn) {
     var order = [], errors = [], i = 0;
-    if (goodHost[group] && list.indexOf(goodHost[group]) !== -1) order.push(goodHost[group]);
+    var pin = ownMirror();                    // rucne zadane zrkadlo ma vzdy prednost
+    if (pin && list.indexOf(pin) !== -1) order.push(pin);
+    if (goodHost[group] && list.indexOf(goodHost[group]) !== -1 && order.indexOf(goodHost[group]) === -1) {
+      order.push(goodHost[group]);
+    }
     list.forEach(function (h) { if (order.indexOf(h) === -1 && !deadHost[h]) order.push(h); });
     if (!order.length) { deadHost = {}; order = list.slice(); }
 
@@ -578,7 +629,7 @@
   }
 
   function fetchJson(url, ms) {
-    return fetchWithTimeout(url, ms || 20000).then(function (txt) {
+    return fetchWithTimeout(url, ms || 12000).then(function (txt) {
       var data;
       try { data = JSON.parse(txt); } catch (e) { throw new Error("odpoveď nie je JSON"); }
       if (data && data.error) throw new Error(String(data.error).slice(0, 120));
@@ -654,7 +705,7 @@
 
   function loadCues(meta, track, opts) {
     meta.lang = trackLang(track, opts);
-    return fetchWithTimeout(track.baseUrl, 25000).then(function (txt) {
+    return fetchWithTimeout(track.baseUrl, 20000).then(function (txt) {
       meta.cues = fixCues(parseCaptions(txt));
       if (!meta.cues.length) throw new Error("prepis prišiel prázdny");
       return meta;
@@ -670,7 +721,7 @@
   /* ----------------------------------------------- jednotlive zdroje */
 
   function viaInvidious(videoId, opts) {
-    return tryHosts(INVIDIOUS, "inv", function (host) {
+    return tryHosts(mirrors(INVIDIOUS), "inv", function (host) {
       return fetchJson(host + "/api/v1/videos/" + videoId + "?fields=title,author,captions").then(function (d) {
         var meta = { id: videoId, title: d.title || videoId, author: d.author || "", source: hostLabel(host) };
         var tracks = toTracks(d.captions || [], function (c) {
@@ -689,7 +740,7 @@
   }
 
   function viaPiped(videoId, opts) {
-    return tryHosts(PIPED, "piped", function (host) {
+    return tryHosts(mirrors(PIPED), "piped", function (host) {
       return fetchJson(host + "/streams/" + videoId).then(function (d) {
         var meta = { id: videoId, title: d.title || videoId, author: d.uploader || "", source: hostLabel(host) };
         var tracks = toTracks(d.subtitles || [], function (s) {
@@ -794,7 +845,7 @@
   /* -------------------------------------------------------- playlisty */
 
   function playlistInvidious(listId) {
-    return tryHosts(INVIDIOUS, "inv", function (host) {
+    return tryHosts(mirrors(INVIDIOUS), "inv", function (host) {
       var videos = [], title = listId;
       function page(p) {
         return fetchJson(host + "/api/v1/playlists/" + listId + "?page=" + p).then(function (d) {
@@ -812,7 +863,7 @@
   }
 
   function playlistPiped(listId) {
-    return tryHosts(PIPED, "piped", function (host) {
+    return tryHosts(mirrors(PIPED), "piped", function (host) {
       return fetchJson(host + "/playlists/" + listId).then(function (d) {
         var videos = [];
         (d.relatedStreams || []).forEach(function (s) {
@@ -1145,6 +1196,12 @@
     var ok = okResults().length;
     var err = results.filter(function (r) { return r.status === "err"; }).length;
     var wait = results.filter(function (r) { return r.status === "wait" || r.status === "run"; }).length;
+    var zlyhaloVsetko = results.length > 0 && ok === 0 && err > 0;
+    $("ownProxy").className = zlyhaloVsetko ? "card alert" : "card";
+    if (zlyhaloVsetko) {
+      $("ownProxy").scrollIntoView({ behavior: "smooth", block: "start" });
+      toast("Nepodarilo sa načítať nič – pozrite návod na vlastnú proxy.");
+    }
     if (results.length) {
       var used = {};
       okResults().forEach(function (r) { if (r.source) used[r.source] = 1; });
@@ -1205,7 +1262,7 @@
   /* ----------------------------------------------- ukladanie nastaveni */
 
   var STORE = "ytprepis.v1";
-  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "customProxy"];
+  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "customMirror", "customProxy"];
   var CHECKS = ["optAsr", "optPlaylist", "optClean", "optHeader"];
 
   function saveSettings() {
@@ -1266,6 +1323,15 @@
   };
 
   $("copy").onclick = function () { copyText($("out").value); };
+
+  $("copyWorker").onclick = function () { copyText($("workerCode").textContent); };
+
+  $("openAdvanced").onclick = function () {
+    var d = $("customProxy").closest("details");
+    if (d) d.open = true;
+    $("customProxy").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("customProxy").focus();
+  };
 
   $("dlOne").onclick = function () {
     var o = currentOptions();
