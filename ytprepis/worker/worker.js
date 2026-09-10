@@ -97,11 +97,15 @@ function ytFetch(url, init) {
 
 // Pri 429 (priveľa požiadaviek) a 503 sa oplatí o chvíľu skúsiť znova -
 // limit býva krátkodobý.
+function timeoutSignal(ms) {
+  try { return AbortSignal.timeout(ms); } catch (e) { return undefined; }
+}
+
 async function fetchRetry(url, init, tries) {
   let last = null;
   for (let i = 0; i < (tries || 2); i++) {
     if (i) await new Promise(function (done) { setTimeout(done, 700 * i); });
-    last = await fetch(url, init);
+    last = await fetch(url, Object.assign({ signal: timeoutSignal(12000) }, init));
     if (last.status !== 429 && last.status !== 503) return last;
   }
   return last;
@@ -283,16 +287,24 @@ async function playerFromInnertube(videoId, client) {
   return pr;
 }
 
-// Cesty sa skúšajú v tomto poradí. Stránka videa dáva najúplnejšie údaje,
-// ale práve ju YouTube z dátových centier obmedzuje najviac.
+// Posledná cesta, ktorá vrátila titulky. Drží sa v pamäti bežiacej inštancie,
+// takže ďalšie videá už nezačínajú od cesty, o ktorej vieme, že nefunguje.
+let lastGood = "";
+
+// Stránka videa dáva najúplnejšie údaje a v praxi funguje najčastejšie,
+// preto je prvá; klienti prehrávača slúžia ako záloha, keď ju YouTube
+// dočasne obmedzí (HTTP 429).
 function attempts(videoId) {
-  return [
+  const all = [
+    ["stránka videa", function () { return playerFromWatchPage(videoId); }],
     ["android", function () { return playerFromInnertube(videoId, CLIENTS.android); }],
     ["ios", function () { return playerFromInnertube(videoId, CLIENTS.ios); }],
     ["tv", function () { return playerFromInnertube(videoId, CLIENTS.tv); }],
-    ["stránka videa", function () { return playerFromWatchPage(videoId); }],
     ["web", function () { return playerFromInnertube(videoId, CLIENTS.web); }]
   ];
+  if (!lastGood) return all;
+  return all.filter(function (a) { return a[0] === lastGood; })
+    .concat(all.filter(function (a) { return a[0] !== lastGood; }));
 }
 
 function statusOf(pr) {
@@ -310,7 +322,7 @@ async function fetchPlayer(videoId, tried) {
       const pr = await list[i][1]();
       const count = tracksOf(pr).length;
       tried.push({ zdroj: name, stav: count ? "titulky (" + count + ")" : (statusOf(pr) || "bez titulkov") });
-      if (count) return pr;
+      if (count) { lastGood = name; return pr; }
       if (!fallback && pr && pr.videoDetails) fallback = pr;
     } catch (e) {
       tried.push({ zdroj: name, stav: "chyba: " + ((e && e.message) || e) });
@@ -422,7 +434,10 @@ async function getDiag(params) {
   const videoId = String(params.get("v") || "").trim() || "jNQXAC9IVRw";
   if (!RE_VIDEO_ID.test(videoId)) return { error: "neplatné ID videa" };
 
+  const zapamatane = lastGood;
+  lastGood = "";                              // diagnostika ide vždy v základnom poradí
   const list = attempts(videoId), tried = [];
+  lastGood = zapamatane;
   for (let i = 0; i < list.length; i++) {
     const name = list[i][0], zaciatok = Date.now();
     try {
