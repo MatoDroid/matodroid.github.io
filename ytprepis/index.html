@@ -181,10 +181,12 @@
     </div>
     <div class="bar" style="margin:10px 0">
       <button class="btn sec small" id="testWorker">Otestovať</button>
+      <button class="btn sec small" id="diagWorker">Diagnostika</button>
       <button class="btn sec small" id="copyWorker">Kopírovať kód workera</button>
       <a class="btn sec small" href="worker/worker.js" target="_blank" rel="noopener">Otvoriť súbor</a>
       <a class="btn sec small" href="worker/" target="_blank" rel="noopener">Návod</a>
     </div>
+    <pre id="diagOut" hidden></pre>
     <ol style="font-size:14px;line-height:1.7;padding-left:20px">
       <li>Prihláste sa na <a href="https://workers.cloudflare.com/" target="_blank" rel="noopener">workers.cloudflare.com</a> (stačí bezplatný účet, kartu nepýta).</li>
       <li>Dajte <em>Create</em> → <em>Start with Hello World</em> → <em>Deploy</em>.</li>
@@ -736,7 +738,10 @@
         lang: (d.lang || "?") + (d.kind === "asr" ? " (auto)" : "") + (d.tlang ? " → " + d.tlang : "")
       };
       if (d.error) {
-        var e = new Error(d.error);
+        // Zoznam skusanych ciest pridavame len ked sa nepodarilo dostat ani k udajom
+        // o videu; pri "video nema titulky" by to bol zbytocny sum.
+        var detail = d.title ? "" : (d.tried || []).map(function (t) { return t.zdroj + ": " + t.stav; }).join("; ");
+        var e = new Error(d.error + (detail ? " [" + detail + "]" : ""));
         e.meta = meta;
         e.definitive = true;
         throw e;
@@ -1385,6 +1390,28 @@
       });
     }
   });
+
+  $("diagWorker").onclick = function () {
+    var base = workerBase();
+    var out = $("diagOut");
+    if (!base) { $("workerState").textContent = "Najprv vyplňte adresu workera."; return; }
+    var prve = parseInput($("urls").value, false).items.filter(function (i) { return i.type === "video"; })[0];
+    out.hidden = false;
+    out.textContent = "Skúšam všetky cesty…";
+    fetchJson(base + "/api/diag" + (prve ? "?v=" + prve.id : ""), 60000).then(function (d) {
+      var riadky = ["Video: " + d.video,
+        "Funkčné cesty: " + (d.funkcne && d.funkcne.length ? d.funkcne.join(", ") : "žiadna")];
+      (d.tried || []).forEach(function (t) {
+        riadky.push("  " + t.zdroj + " – " + (t.stav === "ok"
+          ? "ok, titulky: " + t.titulky + (t.jazyky && t.jazyky.length ? " (" + t.jazyky.join(", ") + ")" : "") +
+            ", stav: " + t.playability
+          : t.chyba) + "  [" + t.ms + " ms]");
+      });
+      out.textContent = riadky.join("\n");
+    }, function (e) {
+      out.textContent = "Diagnostika zlyhala: " + (e.message || e);
+    });
+  };
 
   $("copyWorker").onclick = function () {
     loadWorkerCode().then(copyText, function () {

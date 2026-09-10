@@ -15,6 +15,7 @@
  *        &asr=0                  – nepoužiť automatické titulky (predvolene 1)
  *        &tlang=en               – nechať YouTube preložiť titulky (nepovinné)
  *   GET /api/playlist?list=ID    – zoznam videí v playliste
+ *   GET /api/diag?v=ID           – vyskúša všetky cesty a povie, ktorá funguje
  *   GET /api/proxy?url=ADRESA    – obyčajné preposlanie s hlavičkou CORS
  *   GET /?url=ADRESA             – to isté, kvôli spätnej kompatibilite
  */
@@ -28,8 +29,45 @@ const CORS = {
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
-// Verejný kľúč webového klienta YouTube, ktorý používa aj samotná stránka.
+// Verejné kľúče klientov YouTube. Jednotlivé klienty majú vlastné limity,
+// preto sa skúšajú postupne: keď jeden vráti HTTP 429, iný ešte môže prejsť.
 const INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+const CLIENTS = {
+  android: {
+    key: "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w",
+    context: { client: { clientName: "ANDROID", clientVersion: "19.09.37", androidSdkVersion: 30,
+      hl: "en", gl: "US", utcOffsetMinutes: 0 } },
+    headers: {
+      "user-agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
+      "x-youtube-client-name": "3",
+      "x-youtube-client-version": "19.09.37"
+    }
+  },
+  ios: {
+    key: "AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc",
+    context: { client: { clientName: "IOS", clientVersion: "19.09.3", deviceModel: "iPhone14,3",
+      hl: "en", gl: "US", utcOffsetMinutes: 0 } },
+    headers: {
+      "user-agent": "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)",
+      "x-youtube-client-name": "5",
+      "x-youtube-client-version": "19.09.3"
+    }
+  },
+  tv: {
+    key: INNERTUBE_KEY,
+    context: {
+      client: { clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER", clientVersion: "2.0", hl: "en", gl: "US" },
+      thirdParty: { embedUrl: "https://www.youtube.com" }
+    },
+    headers: { "x-youtube-client-name": "85", "x-youtube-client-version": "2.0" }
+  },
+  web: {
+    key: INNERTUBE_KEY,
+    context: { client: { clientName: "WEB", clientVersion: "2.20240401.00.00", hl: "en", gl: "US" } },
+    headers: { "x-youtube-client-name": "1", "x-youtube-client-version": "2.20240401.00.00" }
+  }
+};
 
 const RE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const RE_LIST_ID = /^[A-Za-z0-9_-]{2,64}$/;
@@ -45,7 +83,7 @@ function json(data, status) {
 
 function ytFetch(url, init) {
   const opts = init || {};
-  return fetch(url, {
+  return fetchRetry(url, {
     method: opts.method || "GET",
     body: opts.body,
     headers: Object.assign({
@@ -54,7 +92,19 @@ function ytFetch(url, init) {
       // obíde uvítaciu stránku so súhlasom s cookies
       "cookie": "CONSENT=YES+cb; SOCS=CAISEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg"
     }, opts.headers || {})
-  });
+  }, opts.tries);
+}
+
+// Pri 429 (priveľa požiadaviek) a 503 sa oplatí o chvíľu skúsiť znova -
+// limit býva krátkodobý.
+async function fetchRetry(url, init, tries) {
+  let last = null;
+  for (let i = 0; i < (tries || 2); i++) {
+    if (i) await new Promise(function (done) { setTimeout(done, 700 * i); });
+    last = await fetch(url, init);
+    if (last.status !== 429 && last.status !== 503) return last;
+  }
+  return last;
 }
 
 const ENTITIES = {
@@ -219,34 +269,54 @@ async function playerFromWatchPage(videoId) {
   return pr;
 }
 
-// Záloha: oficiálne rozhranie prehrávača. Občas vráti titulky aj vtedy,
-// keď je stránka videa zablokovaná kontrolou robotov.
-async function playerFromInnertube(videoId) {
-  const body = {
-    videoId: videoId,
-    context: {
-      client: {
-        clientName: "ANDROID",
-        clientVersion: "19.09.37",
-        androidSdkVersion: 30,
-        hl: "en",
-        gl: "US",
-        utcOffsetMinutes: 0
-      }
-    }
-  };
-  const r = await fetch("https://www.youtube.com/youtubei/v1/player?key=" + INNERTUBE_KEY, {
+// Oficiálne rozhranie prehrávača. Má iné limity než stránka videa, takže
+// keď je jedna cesta zablokovaná, druhá ešte môže fungovať.
+async function playerFromInnertube(videoId, client) {
+  const r = await fetchRetry("https://www.youtube.com/youtubei/v1/player?key=" + client.key, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "user-agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
-      "x-youtube-client-name": "3",
-      "x-youtube-client-version": "19.09.37"
-    },
-    body: JSON.stringify(body)
+    headers: Object.assign({ "content-type": "application/json" }, client.headers),
+    body: JSON.stringify({ videoId: videoId, context: client.context })
   });
-  if (!r.ok) throw new Error("rozhranie prehrávača vrátilo HTTP " + r.status);
-  return await r.json();
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const pr = await r.json();
+  if (!pr || (!pr.videoDetails && !pr.captions)) throw new Error("odpoveď bez údajov o videu");
+  return pr;
+}
+
+// Cesty sa skúšajú v tomto poradí. Stránka videa dáva najúplnejšie údaje,
+// ale práve ju YouTube z dátových centier obmedzuje najviac.
+function attempts(videoId) {
+  return [
+    ["android", function () { return playerFromInnertube(videoId, CLIENTS.android); }],
+    ["ios", function () { return playerFromInnertube(videoId, CLIENTS.ios); }],
+    ["tv", function () { return playerFromInnertube(videoId, CLIENTS.tv); }],
+    ["stránka videa", function () { return playerFromWatchPage(videoId); }],
+    ["web", function () { return playerFromInnertube(videoId, CLIENTS.web); }]
+  ];
+}
+
+function statusOf(pr) {
+  const st = (pr && pr.playabilityStatus) || {};
+  return st.status && st.status !== "OK" ? (runsToText(st.reason) || st.status) : "";
+}
+
+// Vráti prvú odpoveď s titulkami; keď žiadna nie je, aspoň tú s údajmi o videu.
+async function fetchPlayer(videoId, tried) {
+  let fallback = null;
+  const list = attempts(videoId);
+  for (let i = 0; i < list.length; i++) {
+    const name = list[i][0];
+    try {
+      const pr = await list[i][1]();
+      const count = tracksOf(pr).length;
+      tried.push({ zdroj: name, stav: count ? "titulky (" + count + ")" : (statusOf(pr) || "bez titulkov") });
+      if (count) return pr;
+      if (!fallback && pr && pr.videoDetails) fallback = pr;
+    } catch (e) {
+      tried.push({ zdroj: name, stav: "chyba: " + ((e && e.message) || e) });
+    }
+  }
+  return fallback;
 }
 
 function tracksOf(pr) {
@@ -273,23 +343,17 @@ async function getVideo(params) {
   const allowAsr = params.get("asr") !== "0";
   const tlang = String(params.get("tlang") || "").trim();
 
-  let pr = null, problem = "";
-  try {
-    pr = await playerFromWatchPage(videoId);
-  } catch (e) {
-    problem = e.message || String(e);
-  }
-  if (!pr || !tracksOf(pr).length) {
-    try {
-      const alt = await playerFromInnertube(videoId);
-      if (tracksOf(alt).length || !pr) pr = alt;
-    } catch (e) {
-      if (!pr) return { error: problem || e.message || String(e) };
-    }
+  const tried = [];
+  const pr = await fetchPlayer(videoId, tried);
+  if (!pr) {
+    return {
+      id: videoId,
+      error: "údaje o videu sa nepodarilo získať zo žiadneho zdroja",
+      tried: tried
+    };
   }
 
   const details = pr.videoDetails || {};
-  const status = pr.playabilityStatus || {};
   const meta = {
     id: videoId,
     title: details.title || videoId,
@@ -299,9 +363,8 @@ async function getVideo(params) {
 
   const tracks = tracksOf(pr);
   if (!tracks.length) {
-    meta.error = status.status && status.status !== "OK"
-      ? (runsToText(status.reason) || status.status)
-      : "video nemá žiadne titulky";
+    meta.error = statusOf(pr) || "video nemá žiadne titulky";
+    meta.tried = tried;
     return meta;
   }
 
@@ -354,6 +417,37 @@ async function getPlaylist(params) {
   };
 }
 
+// Diagnostika: vyskúša každú cestu zvlášť a povie, ako dopadla.
+async function getDiag(params) {
+  const videoId = String(params.get("v") || "").trim() || "jNQXAC9IVRw";
+  if (!RE_VIDEO_ID.test(videoId)) return { error: "neplatné ID videa" };
+
+  const list = attempts(videoId), tried = [];
+  for (let i = 0; i < list.length; i++) {
+    const name = list[i][0], zaciatok = Date.now();
+    try {
+      const pr = await list[i][1]();
+      const tracks = tracksOf(pr);
+      tried.push({
+        zdroj: name,
+        stav: "ok",
+        ms: Date.now() - zaciatok,
+        nazov: (pr.videoDetails && pr.videoDetails.title) || "",
+        titulky: tracks.length,
+        jazyky: tracks.map(function (t) { return t.languageCode + (t.kind === "asr" ? "/auto" : ""); }),
+        playability: statusOf(pr) || "OK"
+      });
+    } catch (e) {
+      tried.push({ zdroj: name, stav: "chyba", ms: Date.now() - zaciatok, chyba: (e && e.message) || String(e) });
+    }
+  }
+  return {
+    video: videoId,
+    funkcne: tried.filter(function (t) { return t.titulky; }).map(function (t) { return t.zdroj; }),
+    tried: tried
+  };
+}
+
 async function passthrough(target) {
   if (!target) return json({ error: "chýba parameter url" }, 400);
   let parsed;
@@ -369,6 +463,24 @@ async function passthrough(target) {
 
 /* ------------------------------------------------------------ smerovanie */
 
+// Úspešné prepisy si worker odloží, aby sa pri opakovaní nechodilo znova
+// na YouTube - to je zároveň najlepšia obrana proti obmedzeniu HTTP 429.
+async function cachedJson(req, producer) {
+  const store = (typeof caches !== "undefined" && caches.default) ? caches.default : null;
+  if (store) {
+    const hit = await store.match(req);
+    if (hit) return hit;
+  }
+  const data = await producer();
+  const res = json(data);
+  if (store && !data.error) {
+    const copy = new Response(res.clone().body, res);
+    copy.headers.set("cache-control", "public, max-age=21600");
+    try { await store.put(req, copy); } catch (e) { /* cache je len bonus */ }
+  }
+  return res;
+}
+
 export default {
   async fetch(req) {
     if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -380,7 +492,8 @@ export default {
     const path = u.pathname.replace(/\/+$/, "") || "/";
 
     try {
-      if (path === "/api/video") return json(await getVideo(u.searchParams));
+      if (path === "/api/video") return await cachedJson(req, function () { return getVideo(u.searchParams); });
+      if (path === "/api/diag") return json(await getDiag(u.searchParams));
       if (path === "/api/playlist") return json(await getPlaylist(u.searchParams));
       if (path === "/api/proxy") return await passthrough(u.searchParams.get("url"));
       if (u.searchParams.get("url")) return await passthrough(u.searchParams.get("url"));
@@ -388,8 +501,8 @@ export default {
         return json({
           ok: true,
           service: "ytprepis-worker",
-          version: 1,
-          endpoints: ["/api/video?v=ID", "/api/playlist?list=ID", "/api/proxy?url=ADRESA"]
+          version: 2,
+          endpoints: ["/api/video?v=ID", "/api/playlist?list=ID", "/api/diag?v=ID", "/api/proxy?url=ADRESA"]
         });
       }
       return json({ error: "neznámy endpoint: " + path }, 404);
