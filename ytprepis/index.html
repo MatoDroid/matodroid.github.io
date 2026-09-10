@@ -125,7 +125,8 @@
         <div class="field" style="margin:10px 0">
           <label for="source">Zdroj údajov</label>
           <select id="source">
-            <option value="auto">Automaticky (zrkadlá, potom proxy)</option>
+            <option value="auto">Automaticky (worker, zrkadlá, proxy)</option>
+            <option value="worker">Len vlastný worker</option>
             <option value="invidious">Len zrkadlá Invidious</option>
             <option value="piped">Len zrkadlá Piped</option>
             <option value="proxy">Len YouTube cez CORS proxy</option>
@@ -169,44 +170,33 @@
   </div>
 
   <div class="card" id="ownProxy">
-    <h2>Keď nič nefunguje – vlastná proxy za pár minút</h2>
+    <h2>Vlastný worker – najspoľahlivejšia cesta</h2>
     <p class="sub">Verejné zrkadlá aj verejné CORS proxy sú dnes často preťažené, blokované YouTubom alebo spoplatnené.
-    Vlastná proxy na Cloudflare je zadarmo, nezávisí od cudzích služieb a nastavíte ju raz.</p>
-    <ol style="font-size:14px;line-height:1.7;padding-left:20px">
-      <li>Prihláste sa na <a href="https://workers.cloudflare.com/" target="_blank" rel="noopener">workers.cloudflare.com</a> (stačí bezplatný účet).</li>
-      <li>Dajte <em>Create</em> → <em>Start with Hello World</em> → <em>Deploy</em>.</li>
-      <li>Otvorte <em>Edit code</em>, obsah súboru nahraďte kódom nižšie a dajte <em>Deploy</em>.</li>
-      <li>Skopírujte adresu workera, napríklad <code>https://nieco.uzivatel.workers.dev</code>.</li>
-      <li>Do poľa <em>Vlastná CORS proxy</em> v rozšírených nastaveniach vložte <code>https://nieco.uzivatel.workers.dev/?url={url}</code>.</li>
-    </ol>
-    <div class="bar" style="margin:10px 0">
-      <button class="btn sec small" id="copyWorker">Kopírovať kód workera</button>
-      <button class="btn sec small" id="openAdvanced">Otvoriť rozšírené nastavenia</button>
+    Vlastný worker na Cloudflare je zadarmo, nezávisí od cudzích služieb a nastavíte ho raz. Aplikácia s ním hovorí
+    vlastným rozhraním, takže mu stačí jedna požiadavka na video.</p>
+    <div class="field" style="margin-bottom:10px">
+      <label for="workerUrl">Adresa vlastného workera</label>
+      <input type="text" id="workerUrl" placeholder="https://ytprepis-worker.vasemeno.workers.dev">
+      <small id="workerState">Keď je vyplnená, použije sa prednostne pred zrkadlami aj proxy.</small>
     </div>
-    <pre id="workerCode">export default {
-  async fetch(req) {
-    const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
-    if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-
-    const target = new URL(req.url).searchParams.get("url");
-    if (!target) return new Response("chyba: chyba parameter url", { status: 400, headers: cors });
-
-    const r = await fetch(target, {
-      headers: {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "accept-language": "sk,en;q=0.8"
-      }
-    });
-
-    const h = new Headers(cors);
-    h.set("content-type", r.headers.get("content-type") || "text/plain");
-    return new Response(r.body, { status: r.status, headers: h });
-  }
-};</pre>
-    <p class="hint">Worker len preposiela požiadavku a dopĺňa hlavičku CORS. Bezplatná úroveň Cloudflare zvláda 100 000 požiadaviek denne,
-    čo je na sťahovanie prepisov viac než dosť. Ani takáto proxy však nepomôže, ak YouTube blokuje samotné dátové centrum – vtedy pomôže
-    už len nástroj bežiaci na vašom počítači, napríklad <code>yt-dlp --write-auto-subs --skip-download</code>.</p>
+    <div class="bar" style="margin:10px 0">
+      <button class="btn sec small" id="testWorker">Otestovať</button>
+      <button class="btn sec small" id="copyWorker">Kopírovať kód workera</button>
+      <a class="btn sec small" href="worker/worker.js" target="_blank" rel="noopener">Otvoriť súbor</a>
+      <a class="btn sec small" href="worker/" target="_blank" rel="noopener">Návod</a>
+    </div>
+    <ol style="font-size:14px;line-height:1.7;padding-left:20px">
+      <li>Prihláste sa na <a href="https://workers.cloudflare.com/" target="_blank" rel="noopener">workers.cloudflare.com</a> (stačí bezplatný účet, kartu nepýta).</li>
+      <li>Dajte <em>Create</em> → <em>Start with Hello World</em> → <em>Deploy</em>.</li>
+      <li>Otvorte <em>Edit code</em>, obsah súboru nahraďte kódom workera (tlačidlo vyššie) a dajte <em>Deploy</em>.</li>
+      <li>Skopírujte adresu workera, napríklad <code>https://ytprepis-worker.vasemeno.workers.dev</code>.</li>
+      <li>Vložte ju do poľa vyššie a dajte <em>Otestovať</em>.</li>
+    </ol>
+    <details id="workerCodeBox" style="margin-top:10px"><summary>Zobraziť kód workera</summary><pre id="workerCode">Kód sa načíta zo súboru <code>worker/worker.js</code>…</pre>
+</details>
+    <p class="hint">Worker stiahne z YouTube stránku videa, vyberie z nej titulky a vráti ich ako JSON. Bezplatná úroveň Cloudflare
+    zvláda 100 000 požiadaviek denne, čo je na sťahovanie prepisov viac než dosť. Nepomôže však, ak YouTube blokuje samotné dátové
+    centrum – vtedy zostáva nástroj bežiaci na vašom počítači, napríklad <code>yt-dlp --write-auto-subs --skip-download</code>.</p>
   </div>
 
   <div class="card">
@@ -514,7 +504,7 @@
       if (!isFinite(start)) start = (parseFloat(n.getAttribute("t")) || 0) / 1000;
       var dur = parseFloat(n.getAttribute("dur"));
       if (!isFinite(dur)) dur = (parseFloat(n.getAttribute("d")) || 0) / 1000;
-      var text = decodeEntities(n.textContent || "").replace(/\s+/g, " ").trim();
+      var text = stripCueTags(n.textContent || "");
       if (text) cues.push({ start: start, dur: dur, text: text });
     });
     return cues;
@@ -632,7 +622,7 @@
     return fetchWithTimeout(url, ms || 12000).then(function (txt) {
       var data;
       try { data = JSON.parse(txt); } catch (e) { throw new Error("odpoveď nie je JSON"); }
-      if (data && data.error) throw new Error(String(data.error).slice(0, 120));
+      if (data && data.error && !data.title) throw new Error(String(data.error).slice(0, 160));
       return data;
     });
   }
@@ -653,8 +643,12 @@
     return sec;
   }
 
+  // Znacky mozu prist priamo (<i>) aj zakodovane (&lt;i&gt;), preto sa
+  // odstranuju pred aj po dekodovani entit.
   function stripCueTags(s) {
-    return decodeEntities(String(s).replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+    var t = String(s).replace(/<[^>]*>/g, " ");
+    t = decodeEntities(t).replace(/<[^>]*>/g, " ");
+    return t.replace(/\s+/g, " ").trim();
   }
 
   function parseVtt(txt) {
@@ -719,6 +713,49 @@
   }
 
   /* ----------------------------------------------- jednotlive zdroje */
+
+  function workerBase() {
+    var v = ($("workerUrl").value || "").trim().replace(/\/+$/, "");
+    if (!v) return "";
+    return /^https?:\/\//i.test(v) ? v : "https://" + v;
+  }
+
+  function viaWorker(videoId, opts) {
+    var base = workerBase();
+    if (!base) return Promise.reject(new Error("adresa workera nie je vyplnená"));
+    var url = base + "/api/video?v=" + encodeURIComponent(videoId) +
+      "&langs=" + encodeURIComponent(opts.prefs.join(",")) +
+      "&asr=" + (opts.allowAsr ? "1" : "0") +
+      (opts.tlang ? "&tlang=" + encodeURIComponent(opts.tlang) : "");
+    return fetchJson(url, 30000).then(function (d) {
+      var meta = {
+        id: videoId,
+        title: d.title || videoId,
+        author: d.author || "",
+        source: "vlastný worker",
+        lang: (d.lang || "?") + (d.kind === "asr" ? " (auto)" : "") + (d.tlang ? " → " + d.tlang : "")
+      };
+      if (d.error) {
+        var e = new Error(d.error);
+        e.meta = meta;
+        e.definitive = true;
+        throw e;
+      }
+      meta.cues = fixCues(d.cues || []);
+      if (!meta.cues.length) throw new Error("prepis prišiel prázdny");
+      return meta;
+    });
+  }
+
+  function playlistWorker(listId) {
+    var base = workerBase();
+    if (!base) return Promise.reject(new Error("adresa workera nie je vyplnená"));
+    return fetchJson(base + "/api/playlist?list=" + encodeURIComponent(listId), 30000).then(function (d) {
+      var videos = (d.videos || []).filter(function (v) { return v && v.id; });
+      if (!videos.length) throw new Error("playlist je prázdny alebo neprístupný");
+      return { title: d.title || listId, videos: videos };
+    });
+  }
 
   function viaInvidious(videoId, opts) {
     return tryHosts(mirrors(INVIDIOUS), "inv", function (host) {
@@ -801,6 +838,7 @@
   /* --------------------------------------- vyber a poradie zdrojov */
 
   var SOURCES = {
+    worker: { video: viaWorker, playlist: playlistWorker, label: "worker" },
     invidious: { video: viaInvidious, playlist: playlistInvidious, label: "Invidious" },
     piped: { video: viaPiped, playlist: playlistPiped, label: "Piped" },
     proxy: { video: viaProxy, playlist: playlistProxy, label: "proxy" }
@@ -808,9 +846,11 @@
 
   function sourceOrder(opts) {
     if (opts.source !== "auto") return [opts.source];
-    // vlastna proxy a preklad funguju len cez YouTube, preto idu prve
-    if (opts.tlang || opts.hasCustomProxy) return ["proxy", "invidious", "piped"];
-    return ["invidious", "piped", "proxy"];
+    // vlastny worker je najspolahlivejsi, preto ide vzdy prvy
+    var rest = (opts.tlang || opts.hasCustomProxy)
+      ? ["proxy", "invidious", "piped"]        // preklad a vlastna proxy funguju cez YouTube
+      : ["invidious", "piped", "proxy"];
+    return opts.hasWorker ? ["worker"].concat(rest) : rest;
   }
 
   function runSources(opts, pick, args) {
@@ -1005,6 +1045,7 @@
       tlang: ($("tlang").value || "").trim(),
       source: $("source").value,
       hasCustomProxy: !!($("customProxy").value || "").trim(),
+      hasWorker: !!workerBase(),
       allowAsr: $("optAsr").checked,
       clean: $("optClean").checked,
       header: $("optHeader").checked,
@@ -1262,7 +1303,7 @@
   /* ----------------------------------------------- ukladanie nastaveni */
 
   var STORE = "ytprepis.v1";
-  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "customMirror", "customProxy"];
+  var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "workerUrl", "customMirror", "customProxy"];
   var CHECKS = ["optAsr", "optPlaylist", "optClean", "optHeader"];
 
   function saveSettings() {
@@ -1324,13 +1365,48 @@
 
   $("copy").onclick = function () { copyText($("out").value); };
 
-  $("copyWorker").onclick = function () { copyText($("workerCode").textContent); };
+  // Kod workera sa berie priamo zo suboru v repozitari, aby sa nemohol rozist
+  // s tym, co je nasadene.
+  var workerCode = null;
 
-  $("openAdvanced").onclick = function () {
-    var d = $("customProxy").closest("details");
-    if (d) d.open = true;
-    $("customProxy").scrollIntoView({ behavior: "smooth", block: "center" });
-    $("customProxy").focus();
+  function loadWorkerCode() {
+    if (workerCode) return Promise.resolve(workerCode);
+    return fetchWithTimeout("worker/worker.js", 15000).then(function (txt) {
+      workerCode = txt;
+      $("workerCode").textContent = txt;
+      return txt;
+    });
+  }
+
+  $("workerCodeBox").addEventListener("toggle", function () {
+    if ($("workerCodeBox").open) {
+      loadWorkerCode().then(null, function () {
+        $("workerCode").textContent = "Kód sa nepodarilo načítať, otvorte súbor worker/worker.js.";
+      });
+    }
+  });
+
+  $("copyWorker").onclick = function () {
+    loadWorkerCode().then(copyText, function () {
+      toast("Kód sa nepodarilo načítať, použite tlačidlo Otvoriť súbor.");
+    });
+  };
+
+  $("testWorker").onclick = function () {
+    var base = workerBase();
+    var out = $("workerState");
+    if (!base) { out.textContent = "Najprv vyplňte adresu workera."; return; }
+    out.textContent = "Testujem…";
+    fetchJson(base + "/", 15000).then(function (d) {
+      if (d && d.service === "ytprepis-worker") {
+        out.textContent = "Worker odpovedá správne, verzia " + (d.version || "?") + ". Použije sa prednostne.";
+        saveSettings();
+      } else {
+        out.textContent = "Na tejto adrese odpovedá niečo iné než worker pre YT prepisy.";
+      }
+    }, function (e) {
+      out.textContent = "Worker neodpovedal: " + (e.message || e) + " Skontrolujte adresu a či je nasadený.";
+    });
   };
 
   $("dlOne").onclick = function () {
