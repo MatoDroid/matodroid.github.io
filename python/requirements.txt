@@ -1,0 +1,6 @@
+# Základné knižnice pre skripty v tomto priestore.
+# Pridaj si ďalšie a spusti: pip install -r python/requirements.txt
+requests
+pandas
+openpyxl
+python-dotenv
