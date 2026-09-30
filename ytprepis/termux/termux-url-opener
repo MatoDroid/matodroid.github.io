@@ -1,0 +1,53 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Spusta sa, ked v appke YouTube dáte Zdielat -> Termux.
+# Stiahne prepis cez yt-dlp, ulozi ho ako .txt a ponukne zdielanie (napr. do Claude).
+
+URL="$1"
+LANGS="${YTPREPIS_LANGS:-sk,cs,en}"        # poradie preferovanych jazykov
+OUT="${YTPREPIS_DIR:-$HOME/storage/downloads/YT-prepisy}"
+BIN="$(dirname "$(readlink -f "$0")")"
+
+say() { echo "$*"; command -v termux-toast >/dev/null && termux-toast -s "$*"; }
+
+[ -d "$HOME/storage" ] || { echo "Najprv spustite: termux-setup-storage"; sleep 5; exit 1; }
+mkdir -p "$OUT"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Z textu zdielania vytiahneme len odkaz.
+URL="$(printf '%s' "$URL" | grep -oE 'https?://[^ ]+' | head -n1)"
+[ -n "$URL" ] || { say "V zdielanom texte nie je odkaz."; sleep 3; exit 1; }
+
+PATTERNS="$(printf '%s' "$LANGS" | sed 's/[^,]*/&.*/g')"   # sk.*,cs.*,en.*
+
+fetch() {
+  yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs \
+    --sub-langs "$PATTERNS" --sub-format vtt \
+    --print-to-file "%(title)s" "$TMP/title.txt" \
+    -o "$TMP/v.%(ext)s" "$URL"
+}
+
+echo "Stahujem prepis: $URL"
+if ! fetch; then
+  echo "Skusam aktualizovat yt-dlp a zopakovat..."
+  pip install -q -U yt-dlp && fetch
+fi
+
+# Vyber prvy subor podla poradia jazykov.
+VTT=""
+for l in $(printf '%s' "$LANGS" | tr ',' ' '); do
+  VTT="$(ls "$TMP"/v.$l*.vtt 2>/dev/null | head -n1)"
+  [ -n "$VTT" ] && break
+done
+[ -n "$VTT" ] || VTT="$(ls "$TMP"/v.*.vtt 2>/dev/null | head -n1)"
+[ -n "$VTT" ] || { say "Video nema dostupne titulky."; sleep 4; exit 1; }
+
+TITLE="$(head -n1 "$TMP/title.txt" 2>/dev/null)"
+[ -n "$TITLE" ] || TITLE="prepis-$(date +%F-%H%M%S)"
+NAME="$(printf '%s' "$TITLE" | tr -d '\\/:*?"<>|' | cut -c1-80)"
+FILE="$OUT/$NAME.txt"
+
+{ printf '%s\n%s\n\n' "$TITLE" "$URL"; python "$BIN/vtt2txt.py" "$VTT"; } > "$FILE"
+
+say "Ulozene: $FILE"
+command -v termux-share >/dev/null && termux-share -a send -c text/plain "$FILE"
