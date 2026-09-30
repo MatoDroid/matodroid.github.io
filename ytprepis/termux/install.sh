@@ -5,8 +5,11 @@ set -e
 BASE="https://matodroid.github.io/ytprepis/termux"
 
 pkg update -y
-pkg install -y python termux-api
-pip install -U yt-dlp
+pkg install -y python termux-api nodejs
+# yt-dlp-ejs + JS runtime (Node >= 22): YouTube vyzaduje riesenie JS vyziev, pozri
+# https://github.com/yt-dlp/yt-dlp/wiki/EJS
+pip install -U yt-dlp yt-dlp-ejs
+node --version
 
 mkdir -p "$HOME/bin"
 curl -fsSL "$BASE/termux-url-opener" -o "$HOME/bin/termux-url-opener"

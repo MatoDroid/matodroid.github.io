@@ -29,5 +29,8 @@ Premenné prostredia (napríklad v `~/.bashrc`):
 ## Keď to nejde
 
 - „Video nemá dostupné titulky“ – autor ich vypol.
+- Varovanie o „JavaScript runtime“ / „EJS“ – yt-dlp potrebuje Node 22+ a balík `yt-dlp-ejs`
+  (inštalátor ich dá; pri starej inštalácii ho spustite znova). Viac v
+  [wiki yt-dlp](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
 - Chyba yt-dlp – skript sa sám pokúsi o `pip install -U yt-dlp`; YouTube ho
   mení často, takže aktualizácia býva riešením.

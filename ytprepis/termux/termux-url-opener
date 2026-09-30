@@ -20,8 +20,12 @@ URL="$(printf '%s' "$URL" | grep -oE 'https?://[^ ]+' | head -n1)"
 
 PATTERNS="$(printf '%s' "$LANGS" | sed 's/[^,]*/&.*/g')"   # sk.*,cs.*,en.*
 
+# JS runtime pre YouTube (EJS); Deno je predvoleny, na Termuxe pouzivame Node.
+JSRT=""
+command -v node >/dev/null && JSRT="--js-runtimes node"
+
 fetch() {
-  yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs \
+  yt-dlp $JSRT --skip-download --no-playlist --write-subs --write-auto-subs \
     --sub-langs "$PATTERNS" --sub-format vtt \
     --print-to-file "%(title)s" "$TMP/title.txt" \
     -o "$TMP/v.%(ext)s" "$URL"
@@ -30,7 +34,7 @@ fetch() {
 echo "Stahujem prepis: $URL"
 if ! fetch; then
   echo "Skusam aktualizovat yt-dlp a zopakovat..."
-  pip install -q -U yt-dlp && fetch
+  pip install -q -U yt-dlp yt-dlp-ejs && fetch
 fi
 
 # Vyber prvy subor podla poradia jazykov.
