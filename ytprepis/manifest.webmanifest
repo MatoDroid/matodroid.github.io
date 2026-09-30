@@ -1,0 +1,20 @@
+{
+  "name": "YT prepisy",
+  "short_name": "YT prepis",
+  "description": "Zdieľajte YouTube video do aplikácie a dostanete jeho prepis ako textový súbor.",
+  "lang": "sk",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f2",
+  "theme_color": "#4caf50",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

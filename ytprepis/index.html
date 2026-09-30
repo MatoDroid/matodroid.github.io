@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YT prepisy – sťahovanie titulkov z YouTube</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4caf50">
+<link rel="icon" type="image/png" href="icon-192.png">
 <meta name="description" content="Stiahnite si prepisy (titulky) YouTube videí do súboru alebo schránky. Podporuje viacero videí naraz aj celé playlisty.">
 <style>
   :root{
@@ -72,6 +75,14 @@
   </div>
 
   <div class="card">
+    <h2>Zdieľanie priamo z YouTube (Android)</h2>
+    <p class="sub">1. V Chrome otvorte túto stránku → menu ⋮ → <em>Inštalovať aplikáciu</em> (alebo <em>Pridať na plochu</em>).<br>
+    2. V appke YouTube pri videu dajte <em>Zdieľať</em> → <em>YT prepis</em>.<br>
+    3. Prepis sa načíta sám a uloží ako .txt. Tlačidlom <em>Zdieľať</em> ho potom pošlete do appky Claude.</p>
+    <p class="hint">Nastavte si najprv adresu vlastného workera nižšie, je to najspoľahlivejší zdroj titulkov.</p>
+  </div>
+
+  <div class="card">
     <h2>1. Odkazy na videá alebo playlisty</h2>
     <textarea id="urls" placeholder="Jeden odkaz na riadok, napr.:&#10;https://www.youtube.com/watch?v=dQw4w9WgXcQ&#10;https://youtu.be/jNQXAC9IVRw&#10;https://www.youtube.com/playlist?list=PL...&#10;dQw4w9WgXcQ"></textarea>
     <p class="hint">Akceptuje aj samotné ID videa (11 znakov), <code>youtu.be</code>, <code>/shorts/</code>, <code>/live/</code>, <code>/embed/</code> a odkazy na playlisty. Odkazy môžu byť oddelené aj čiarkou alebo medzerou.</p>
@@ -115,6 +126,7 @@
       <label><input type="checkbox" id="optPlaylist" checked> Rozbaliť playlisty</label>
       <label><input type="checkbox" id="optClean" checked> Odstrániť značky ako [Hudba]</label>
       <label><input type="checkbox" id="optHeader" checked> Nadpis s názvom videa</label>
+      <label><input type="checkbox" id="optAutoSave" checked> Po zdieľaní z YouTube hneď uložiť súbor</label>
     </div>
     <details>
       <summary>Rozšírené – zdroj údajov a vlastná proxy</summary>
@@ -161,7 +173,8 @@
   <div class="card">
     <h2>4. Výstup</h2>
     <div class="bar" style="margin-bottom:10px">
-      <button class="btn" id="copy">Kopírovať do schránky</button>
+      <button class="btn" id="shareBtn">Zdieľať (napr. do Claude)</button>
+      <button class="btn sec" id="copy">Kopírovať do schránky</button>
       <button class="btn sec" id="dlOne">Stiahnuť ako jeden súbor</button>
       <button class="btn sec" id="dlZip">Stiahnuť ZIP (súbor na video)</button>
     </div>
@@ -1248,6 +1261,14 @@
       $("ownProxy").scrollIntoView({ behavior: "smooth", block: "start" });
       toast("Nepodarilo sa načítať nič – pozrite návod na vlastnú proxy.");
     }
+    if (sharedRun) {
+      sharedRun = false;
+      if (ok && $("optAutoSave").checked) {
+        $("dlOne").onclick();
+        toast("Prepis je uložený. Tlačidlom Zdieľať ho pošlete do Claude.");
+      }
+      if (ok) $("shareBtn").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     if (results.length) {
       var used = {};
       okResults().forEach(function (r) { if (r.source) used[r.source] = 1; });
@@ -1309,7 +1330,7 @@
 
   var STORE = "ytprepis.v1";
   var FIELDS = ["urls", "langs", "tlang", "format", "conc", "source", "workerUrl", "customMirror", "customProxy"];
-  var CHECKS = ["optAsr", "optPlaylist", "optClean", "optHeader"];
+  var CHECKS = ["optAsr", "optPlaylist", "optClean", "optHeader", "optAutoSave"];
 
   function saveSettings() {
     try {
@@ -1369,6 +1390,26 @@
   };
 
   $("copy").onclick = function () { copyText($("out").value); };
+
+  // Natívne menu Zdieľať (Android): pošle prepis ako súbor, napr. do appky Claude.
+  $("shareBtn").onclick = function () {
+    var o = currentOptions();
+    var list = okResults();
+    var text = $("out").value;
+    if (!list.length || !text) { toast("Najprv načítajte aspoň jeden prepis."); return; }
+    var title = list.length === 1 ? list[0].title : "Prepisy z YouTube";
+    var name = (list.length === 1 ? sanitizeName(list[0].title) : "prepisy-" + stamp()) + "." + EXT[o.fmt];
+    var data = { title: title };
+    try {
+      var file = new File([blobFor(text, o.fmt)], name, { type: "text/plain" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+    } catch (e) { /* File nie je dostupny */ }
+    if (!data.files) data.text = text;
+    if (!navigator.share) { copyText(text); return; }
+    navigator.share(data).catch(function (e) {
+      if (e && e.name !== "AbortError") toast("Zdieľanie zlyhalo: " + (e.message || e));
+    });
+  };
 
   // Kod workera sa berie priamo zo suboru v repozitari, aby sa nemohol rozist
   // s tym, co je nasadene.
@@ -1469,6 +1510,28 @@
 
   loadSettings();
   renderOutput();
+
+  /* ------------------------------------- príjem zdieľania z Androidu */
+
+  var sharedRun = false;
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(function () { /* bez PWA to ide tiež */ });
+  }
+
+  (function handleShare() {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { return; }
+    var raw = [q.get("url"), q.get("text"), q.get("title")].filter(Boolean).join(" ");
+    if (!raw) return;
+    // YouTube posiela text typu "Názov videa https://youtu.be/ID?si=..." - vytiahneme len odkazy
+    var links = raw.match(/https?:\/\/[^\s]+/g) || [];
+    try { history.replaceState(null, "", location.pathname); } catch (e) { /* ignorujeme */ }
+    if (!links.length) { toast("V zdieľanom texte nie je odkaz na video."); return; }
+    $("urls").value = links.join("\n");
+    sharedRun = true;
+    $("run").onclick();
+  })();
 })();
 </script>
 </body>
