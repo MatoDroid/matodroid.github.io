@@ -18,35 +18,75 @@ trap 'rm -rf "$TMP"' EXIT
 URL="$(printf '%s' "$URL" | grep -oE 'https?://[^ ]+' | head -n1)"
 [ -n "$URL" ] || { say "V zdielanom texte nie je odkaz."; sleep 3; exit 1; }
 
-PATTERNS="$(printf '%s' "$LANGS" | sed 's/[^,]*/&.*/g')"   # sk.*,cs.*,en.*
-
 # JS runtime pre YouTube (EJS); Deno je predvoleny, na Termuxe pouzivame Node.
 JSRT=""
 command -v node >/dev/null && JSRT="--js-runtimes node"
 
-fetch() {
-  yt-dlp $JSRT --skip-download --no-playlist --write-subs --write-auto-subs \
-    --sub-langs "$PATTERNS" --sub-format vtt \
-    --print-to-file "%(title)s" "$TMP/title.txt" \
-    -o "$TMP/v.%(ext)s" "$URL"
-}
+YT() { yt-dlp $JSRT --no-playlist --sleep-requests 1 "$@"; }
 
-echo "Stahujem prepis: $URL"
-if ! fetch; then
+# 1) Jedna extrakcia: nazov a zoznam dostupnych titulkov.
+echo "Zistujem dostupne titulky: $URL"
+if ! YT --skip-download -J "$URL" > "$TMP/info.json" 2> "$TMP/err.log"; then
+  cat "$TMP/err.log"
   echo "Skusam aktualizovat yt-dlp a zopakovat..."
-  pip install -q -U yt-dlp yt-dlp-ejs && fetch
+  pip install -q -U yt-dlp yt-dlp-ejs
+  YT --skip-download -J "$URL" > "$TMP/info.json" 2> "$TMP/err.log" || { cat "$TMP/err.log"; say "yt-dlp zlyhal, pozri vypis."; sleep 6; exit 1; }
 fi
 
-# Vyber prvy subor podla poradia jazykov.
-VTT=""
-for l in $(printf '%s' "$LANGS" | tr ',' ' '); do
-  VTT="$(ls "$TMP"/v.$l*.vtt 2>/dev/null | head -n1)"
-  [ -n "$VTT" ] && break
-done
-[ -n "$VTT" ] || VTT="$(ls "$TMP"/v.*.vtt 2>/dev/null | head -n1)"
-[ -n "$VTT" ] || { say "Video nema dostupne titulky."; sleep 4; exit 1; }
+# 2) Vyber JEDNEHO jazyka (menej poziadaviek = mensia sanca na HTTP 429).
+#    Poradie: rucne titulky v preferovanom jazyku, potom povodne automaticke,
+#    potom hocijake rucne.
+python - "$LANGS" "$TMP/info.json" "$TMP/pick.txt" <<'PY'
+import json, sys
+prefs = [p.strip() for p in sys.argv[1].split(",") if p.strip()]
+d = json.load(open(sys.argv[2], encoding="utf-8"))
+man = list((d.get("subtitles") or {}).keys())
+auto = list((d.get("automatic_captions") or {}).keys())
+orig = [k for k in auto if k.endswith("-orig")]
 
-TITLE="$(head -n1 "$TMP/title.txt" 2>/dev/null)"
+def base(k): return k.split("-")[0].lower()
+
+pick = ""
+for p in prefs:                                   # rucne v preferovanom jazyku
+    m = [k for k in man if k == p] or [k for k in man if base(k) == p]
+    if m: pick = m[0]; break
+if not pick:
+    for p in prefs:                               # povodne automaticke
+        m = [k for k in orig if base(k) == p]
+        if m: pick = m[0]; break
+if not pick:
+    for p in prefs:                               # automaticke v danom jazyku
+        m = [k for k in auto if k == p]
+        if m: pick = m[0]; break
+if not pick and man: pick = man[0]
+if not pick and orig: pick = orig[0]
+open(sys.argv[3], "w", encoding="utf-8").write(pick + "\n" + (d.get("title") or "") + "\n")
+PY
+LANG_PICK="$(sed -n 1p "$TMP/pick.txt")"
+TITLE="$(sed -n 2p "$TMP/pick.txt")"
+[ -n "$LANG_PICK" ] || { say "Video nema ziadne titulky."; sleep 4; exit 1; }
+echo "Jazyk titulkov: $LANG_PICK"
+
+# 3) Stiahnutie titulkov; pri HTTP 429 pocka a skusi znova.
+VTT=""
+for try in 1 2 3; do
+  YT --skip-download --write-subs --write-auto-subs --sub-langs "$LANG_PICK" \
+     --sub-format vtt --sleep-subtitles 2 -o "$TMP/v.%(ext)s" "$URL" 2>&1 | tee "$TMP/dl.log"
+  VTT="$(ls "$TMP"/v.*.vtt 2>/dev/null | head -n1)"
+  [ -n "$VTT" ] && break
+  grep -q "429" "$TMP/dl.log" || break          # ina chyba nez limit - nema zmysel opakovat
+  [ "$try" -lt 3 ] && { say "YouTube obmedzil pocet poziadaviek (429), skusam znova o $((20 * try)) s..."; sleep $((20 * try)); }
+done
+
+if [ -z "$VTT" ]; then
+  if grep -q "429" "$TMP/dl.log"; then
+    say "YouTube docasne blokuje stahovanie (429). Skuste o niekolko minut."
+  else
+    say "Titulky sa nepodarilo stiahnut, pozri vypis."
+  fi
+  sleep 6; exit 1
+fi
+
 [ -n "$TITLE" ] || TITLE="prepis-$(date +%F-%H%M%S)"
 NAME="$(printf '%s' "$TITLE" | tr -d '\\/:*?"<>|' | cut -c1-80)"
 FILE="$OUT/$NAME.txt"
