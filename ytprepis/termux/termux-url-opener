@@ -99,7 +99,10 @@ fi
 [ -n "$TITLE" ] || TITLE="prepis-$(date +%F-%H%M%S)"
 FILE="$OUT/${SAFE}_${VIDEO_ID}.txt"
 
-{ printf '%s\n%s\n\n' "$TITLE" "$URL"; python "$BIN/vtt2txt.py" "$VTT"; } > "$FILE"
+if ! { printf '%s\n%s\n\n' "$TITLE" "$URL"; python "$BIN/vtt2txt.py" "$VTT"; } > "$FILE" || [ ! -s "$FILE" ]; then
+  say "Subor sa nepodarilo ulozit: $FILE"
+  sleep 6; exit 1
+fi
 
 say "Ulozene: $FILE"
 command -v termux-share >/dev/null && termux-share -a send -c text/plain "$FILE"
