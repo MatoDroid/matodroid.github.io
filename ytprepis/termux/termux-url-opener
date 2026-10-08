@@ -37,7 +37,7 @@ fi
 #    Poradie: rucne titulky v preferovanom jazyku, potom povodne automaticke,
 #    potom hocijake rucne.
 python - "$LANGS" "$TMP/info.json" "$TMP/pick.txt" <<'PY'
-import json, sys
+import json, re, sys, unicodedata
 prefs = [p.strip() for p in sys.argv[1].split(",") if p.strip()]
 d = json.load(open(sys.argv[2], encoding="utf-8"))
 man = list((d.get("subtitles") or {}).keys())
@@ -60,10 +60,19 @@ if not pick:
         if m: pick = m[0]; break
 if not pick and man: pick = man[0]
 if not pick and orig: pick = orig[0]
-open(sys.argv[3], "w", encoding="utf-8").write(pick + "\n" + (d.get("title") or "") + "\n")
+title = (d.get("title") or "").replace("\n", " ")
+vid = d.get("id") or ""
+# Nazov suboru: ASCII (bez diakritiky), medzery a znaky ako _, max 80 znakov.
+safe = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode()
+safe = re.sub(r"[^A-Za-z0-9]+", "_", safe).strip("_")[:80].strip("_")
+if not safe:
+    safe = "yt_" + vid
+open(sys.argv[3], "w", encoding="utf-8").write("\n".join([pick, title, vid, safe]) + "\n")
 PY
 LANG_PICK="$(sed -n 1p "$TMP/pick.txt")"
 TITLE="$(sed -n 2p "$TMP/pick.txt")"
+VIDEO_ID="$(sed -n 3p "$TMP/pick.txt")"
+SAFE="$(sed -n 4p "$TMP/pick.txt")"
 [ -n "$LANG_PICK" ] || { say "Video nema ziadne titulky."; sleep 4; exit 1; }
 echo "Jazyk titulkov: $LANG_PICK"
 
@@ -88,8 +97,7 @@ if [ -z "$VTT" ]; then
 fi
 
 [ -n "$TITLE" ] || TITLE="prepis-$(date +%F-%H%M%S)"
-NAME="$(printf '%s' "$TITLE" | tr -d '\\/:*?"<>|' | cut -c1-80)"
-FILE="$OUT/$NAME.txt"
+FILE="$OUT/${SAFE}_${VIDEO_ID}.txt"
 
 { printf '%s\n%s\n\n' "$TITLE" "$URL"; python "$BIN/vtt2txt.py" "$VTT"; } > "$FILE"
 
