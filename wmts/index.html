@@ -451,6 +451,32 @@
         container.style.zIndex = String(zIndex);
     }
 
+    // Štýl OpenFreeMap sa odkazuje na ikony, ktoré v jeho sprite nie sú
+    // (napr. "recycling"). MapLibre to hlási do konzoly pri každej takej
+    // ikone. Doplníme za ne priehľadný 1×1 pixel – ikona sa proste
+    // nevykreslí, ale konzolu to nezaplavuje. Presne tento postup
+    // odporúča aj samotná hláška ("listen for the styleimagemissing event").
+    function silenceMissingStyleImages(layer) {
+        var glMap = layer.getMaplibreMap && layer.getMaplibreMap();
+        if (!glMap || !glMap.on) { return; }
+
+        // Vrstva sa dá odobrať a znova pridať – vtedy vznikne nová MapLibre
+        // mapa, takže príznak držíme na nej, nie na Leaflet vrstve
+        if (glMap.__missingImagesHandled) { return; }
+        glMap.__missingImagesHandled = true;
+
+        glMap.on('styleimagemissing', function(e) {
+            if (!e || !e.id) { return; }
+            if (glMap.hasImage && glMap.hasImage(e.id)) { return; }
+            try {
+                // RGBA, samé nuly = úplne priehľadný pixel
+                glMap.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
+            } catch (err) {
+                console.warn('Chýbajúcu ikonu ' + e.id + ' sa nepodarilo nahradiť:', err);
+            }
+        });
+    }
+
     // Ortofotografia vrstva (OrtoV1)
     var wmtsService = "https://tiles.arcgis.com/tiles/z9muuypGqZUVpznM/arcgis/rest/services/OrtoV1/MapServer";
     var wmtsUrl = wmtsService + "/tile/{z}/{y}/{x}";
@@ -595,6 +621,7 @@
                 if (osmOverlayOpacity <= 0) { return; }
                 if (!map.hasLayer(layer)) { layer.addTo(map); }
                 styleVectorLayer(layer, osmOverlayOpacity, Z_INDEX_OSM_OVERLAY);
+                silenceMissingStyleImages(layer);
             })
             .catch(function(err) {
                 osmOverlayStylePromise = null; // aby sa dalo skúsiť znova
@@ -729,6 +756,7 @@
             // Vektorová vrstva nemá setOpacity ani zIndex option – z-poradie
             // sa jej nastavuje priamo na DOM kontajneri
             styleVectorLayer(layer, 1, Z_INDEX_BASE);
+            silenceMissingStyleImages(layer);
         } else if (layer.setZIndex) {
             layer.setZIndex(Z_INDEX_BASE);
         }
