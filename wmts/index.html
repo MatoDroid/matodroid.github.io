@@ -145,8 +145,25 @@
             font-size: inherit;
         }
 
-        /* Stavové hlásenia a indikátor načítania */
-        #map-status {
+        /* Šípky odbočenia v pruhoch – musia byť čitateľné aj nad tmavým
+           ortofotom, preto biely obrys okolo glyfu */
+        .lane-turn-arrow {
+            pointer-events: none;
+        }
+
+        .lane-turn-arrow span {
+            display: block;
+            width: 26px;
+            height: 26px;
+            line-height: 26px;
+            text-align: center;
+            font-size: 19px;
+            font-weight: bold;
+            color: #111;
+            text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+        }
+
+        /* Stavové hlásenia a indikátor načítania */        #map-status {
             position: absolute;
             bottom: 20px;
             left: 50%;
@@ -924,9 +941,68 @@
     // nového dopytu na Overpass
     var lastRoadsGeoJSON = null;
 
-    var LANE_WIDTH_PX = 4;        // hrúbka čiary na jeden jazdný pruh
-    var LANE_COLOR_ONEWAY = '#d62728';
-    var LANE_COLOR_TWOWAY = '#1f77b4';
+    // Skutočná šírka jazdného pruhu. Pruhy kreslíme v metroch, nie v
+    // pixeloch, takže pri priblížení zodpovedajú realite a pri oddialení
+    // prirodzene splynú do jednej čiary.
+    var LANE_WIDTH_M = 3.5;
+
+    var LANE_COLOR_FORWARD = '#1f77b4';   // v smere geometrie cesty
+    var LANE_COLOR_BACKWARD = '#d62728';  // proti smeru geometrie
+    var LANE_COLOR_UNKNOWN = '#8c8c8c';   // počet pruhov v OSM neuvedený
+
+    var EARTH_RADIUS_M = 6378137;
+
+    function toRad(deg) { return deg * Math.PI / 180; }
+    function toDeg(rad) { return rad * 180 / Math.PI; }
+
+    // Smerník z bodu a do bodu b (0 = sever, rastie na východ)
+    function bearingBetween(a, b) {
+        var lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+        var dLng = toRad(b.lng - a.lng);
+        var y = Math.sin(dLng) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) -
+                Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    // Priemer dvoch smerníkov cez zložky, nie aritmeticky – inak by priemer
+    // 350° a 10° vyšiel 180°, teda presne opačne
+    function averageBearing(b1, b2) {
+        var north = Math.cos(toRad(b1)) + Math.cos(toRad(b2));
+        var east = Math.sin(toRad(b1)) + Math.sin(toRad(b2));
+        return (toDeg(Math.atan2(east, north)) + 360) % 360;
+    }
+
+    // Posun bodu o vzdialenosť daným smerom
+    function destinationPoint(point, bearingDeg, distanceM) {
+        var angular = distanceM / EARTH_RADIUS_M;
+        var br = toRad(bearingDeg);
+        var lat1 = toRad(point.lat), lng1 = toRad(point.lng);
+        var lat2 = Math.asin(Math.sin(lat1) * Math.cos(angular) +
+                             Math.cos(lat1) * Math.sin(angular) * Math.cos(br));
+        var lng2 = lng1 + Math.atan2(Math.sin(br) * Math.sin(angular) * Math.cos(lat1),
+                                     Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2));
+        return L.latLng(toDeg(lat2), ((toDeg(lng2) + 540) % 360) - 180);
+    }
+
+    // Rovnobežka k línii, posunutá kolmo o offsetM (kladné = vpravo v smere
+    // geometrie). Vo vrcholoch použijeme priemer smerov susedných úsekov,
+    // aby v zákrute nevznikla medzera.
+    function offsetLine(latlngs, offsetM) {
+        if (!offsetM) { return latlngs.slice(); }
+        return latlngs.map(function(point, i) {
+            var bearing;
+            if (i === 0) {
+                bearing = bearingBetween(latlngs[0], latlngs[1]);
+            } else if (i === latlngs.length - 1) {
+                bearing = bearingBetween(latlngs[i - 1], latlngs[i]);
+            } else {
+                bearing = averageBearing(bearingBetween(latlngs[i - 1], latlngs[i]),
+                                         bearingBetween(latlngs[i], latlngs[i + 1]));
+            }
+            return destinationPoint(point, (bearing + 90) % 360, offsetM);
+        });
+    }
 
     // oneway má v OSM viacero zápisov; "-1" znamená opačný smer než geometria
     function parseOneway(tags) {
@@ -938,7 +1014,7 @@
         return 0;
     }
 
-    // Počet pruhov: lanes, inak súčet lanes:forward/backward, inak odhad
+    // Počet pruhov: lanes, inak súčet lanes:forward/backward
     function parseLaneCount(tags) {
         var total = parseFloat(tags.lanes);
         if (!isNaN(total) && total > 0) { return total; }
@@ -948,14 +1024,111 @@
         var sum = (isNaN(forward) ? 0 : forward) + (isNaN(backward) ? 0 : backward);
         if (sum > 0) { return sum; }
 
-        return null; // neuvedené – kreslíme ako jeden pruh, ale povieme to
+        return null; // neuvedené
+    }
+
+    // turn:lanes sa zapisuje po pruhoch zľava doprava v smere jazdy,
+    // oddelené zvislou čiarou: "left|through|through;right"
+    function parseTurnLanes(value, expectedCount) {
+        if (!value) { return null; }
+        var parts = String(value).split('|').map(function(part) { return part.trim(); });
+        if (expectedCount && parts.length !== expectedCount) {
+            // Nesúlad medzi lanes a turn:lanes je bežná chyba v dátach.
+            // Nevyhadzujeme to – zobrazíme, čo je, a zvyšok necháme prázdny.
+            while (parts.length < expectedCount) { parts.push(''); }
+        }
+        return parts;
+    }
+
+    // Rozloženie pruhov po stĺpcoch zľava doprava v smere GEOMETRIE cesty.
+    // Vracia pole { direction, turn } – direction 1 = v smere geometrie.
+    function buildLaneModel(tags) {
+        var oneway = parseOneway(tags);
+        var total = parseLaneCount(tags);
+
+        if (oneway !== 0) {
+            var count = total || 1;
+            var turns = parseTurnLanes(tags['turn:lanes'] || tags['turn:lanes:forward'], count);
+            var lanes = [];
+            for (var i = 0; i < count; i++) {
+                lanes.push({
+                    direction: oneway,
+                    turn: turns ? turns[i] : '',
+                    known: total !== null
+                });
+            }
+            // Pri oneway=-1 ide jazda proti geometrii, takže "zľava doprava
+            // v smere jazdy" je v rámci geometrie opačné poradie
+            if (oneway === -1) { lanes.reverse(); }
+            return lanes;
+        }
+
+        // Obojsmerná cesta
+        var fwd = parseFloat(tags['lanes:forward']);
+        var bwd = parseFloat(tags['lanes:backward']);
+        if (isNaN(fwd) || isNaN(bwd)) {
+            if (total) {
+                // Rozdelenie na polovicu; nepárny počet dáva viac pruhov
+                // smeru geometrie (napr. stúpací pruh)
+                bwd = Math.floor(total / 2);
+                fwd = total - bwd;
+            } else {
+                fwd = 1; bwd = 1;
+            }
+        }
+
+        var turnsFwd = parseTurnLanes(tags['turn:lanes:forward'], fwd);
+        var turnsBwd = parseTurnLanes(tags['turn:lanes:backward'], bwd);
+
+        var slots = [];
+        // Pri pravostrannej premávke sú protismerné pruhy naľavo. Ich
+        // turn:lanes je zapísané zľava doprava v ICH smere jazdy, čo je
+        // v rámci geometrie opačné poradie.
+        for (var b = 0; b < bwd; b++) {
+            slots.push({
+                direction: -1,
+                turn: turnsBwd ? turnsBwd[bwd - 1 - b] : '',
+                known: total !== null || !isNaN(parseFloat(tags['lanes:backward']))
+            });
+        }
+        for (var f = 0; f < fwd; f++) {
+            slots.push({
+                direction: 1,
+                turn: turnsFwd ? turnsFwd[f] : '',
+                known: total !== null || !isNaN(parseFloat(tags['lanes:forward']))
+            });
+        }
+        return slots;
+    }
+
+    // Šípky odbočenia. Glyf ukazuje hore = v smere jazdy, celá značka sa
+    // potom otočí podľa smerníka cesty.
+    var TURN_GLYPHS = {
+        'through': '\u2191',
+        'left': '\u21B0',
+        'right': '\u21B1',
+        'slight_left': '\u2196',
+        'slight_right': '\u2197',
+        'sharp_left': '\u2190',
+        'sharp_right': '\u2192',
+        'reverse': '\u2193',
+        'merge_to_left': '\u2196',
+        'merge_to_right': '\u2197',
+        'none': '\u2191'
+    };
+
+    function turnGlyph(turnValue) {
+        if (!turnValue) { return ''; }
+        // Jeden pruh môže dovoľovať viac smerov: "through;right"
+        return String(turnValue).split(';').map(function(one) {
+            return TURN_GLYPHS[one.trim()] || '';
+        }).join('');
     }
 
     // Čitateľný súhrn značiek do bubliny
     function describeLanes(tags) {
         var rows = [];
-        var name = tags.name || tags.highway || 'cesta';
-        rows.push('<strong>' + escapeXml(name) + '</strong>');
+        rows.push('<strong>' + escapeXml(tags.name || tags.highway || 'cesta') + '</strong>');
 
         var count = parseLaneCount(tags);
         rows.push('Pruhy: ' + (count !== null ? count : '<em>neuvedené</em>'));
@@ -967,10 +1140,9 @@
 
         var oneway = parseOneway(tags);
         rows.push('Smer: ' + (oneway === 0 ? 'obojsmerná'
-                            : oneway === 1 ? 'jednosmerná (v smere šípok)'
-                                           : 'jednosmerná (opačne než geometria)'));
+                            : oneway === 1 ? 'jednosmerná (v smere geometrie)'
+                                           : 'jednosmerná (proti smeru geometrie)'));
 
-        // turn:lanes sa zapisuje po pruhoch, oddelené zvislou čiarou
         ['turn:lanes', 'turn:lanes:forward', 'turn:lanes:backward'].forEach(function(key) {
             if (tags[key]) {
                 rows.push(escapeXml(key) + ': <code>' + escapeXml(tags[key]) + '</code>');
@@ -982,6 +1154,20 @@
         return rows.join('<br>');
     }
 
+    // Bod vzdialený distanceM od konca línie, aj so smerníkom v tom mieste.
+    // Šípky odbočenia patria ku koncu úseku, teda ku križovatke.
+    function pointBeforeEnd(latlngs, distanceM) {
+        var end = latlngs[latlngs.length - 1];
+        var prev = latlngs[latlngs.length - 2];
+        var segmentM = map.distance(prev, end);
+        var back = Math.min(distanceM, segmentM * 0.5);
+        var bearing = bearingBetween(prev, end);
+        return {
+            point: destinationPoint(end, (bearing + 180) % 360, back),
+            bearing: bearing
+        };
+    }
+
     function buildLanesLayer(geojson) {
         var group = L.layerGroup();
         var features = (geojson && geojson.features) || [];
@@ -989,49 +1175,75 @@
         features.forEach(function(feature) {
             if (!feature.geometry || feature.geometry.type !== 'LineString') { return; }
 
-            var tags = feature.properties || {};
-            var oneway = parseOneway(tags);
-            var count = parseLaneCount(tags);
-
             var latlngs = feature.geometry.coordinates.map(function(coord) {
                 return L.latLng(coord[1], coord[0]);
             });
             if (latlngs.length < 2) { return; }
 
-            // Hrúbka čiary = počet pruhov. Pri neuvedenom počte kreslíme
-            // tenko a prerušovane, nech je vidieť, že údaj v OSM chýba.
-            var line = L.polyline(latlngs, {
-                renderer: lanesRenderer,
-                color: oneway !== 0 ? LANE_COLOR_ONEWAY : LANE_COLOR_TWOWAY,
-                weight: (count || 1) * LANE_WIDTH_PX,
-                opacity: 0.45,
-                dashArray: count === null ? '4,6' : null,
-                lineCap: 'butt'
-            });
-            line.bindPopup(describeLanes(tags));
-            group.addLayer(line);
+            var tags = feature.properties || {};
+            var lanes = buildLaneModel(tags);
+            var popupHtml = describeLanes(tags);
+            var centerOffset = (lanes.length - 1) / 2;
 
-            // Šípky smeru len pri jednosmerných – pri obojsmerných by
-            // neniesli informáciu
-            if (oneway !== 0) {
-                var arrowPath = oneway === -1 ? latlngs.slice().reverse() : latlngs;
+            lanes.forEach(function(lane, index) {
+                var offsetM = (index - centerOffset) * LANE_WIDTH_M;
+                var laneLine = offsetLine(latlngs, offsetM);
+
+                var color = !lane.known ? LANE_COLOR_UNKNOWN
+                          : lane.direction === 1 ? LANE_COLOR_FORWARD
+                                                 : LANE_COLOR_BACKWARD;
+
+                group.addLayer(L.polyline(laneLine, {
+                    renderer: lanesRenderer,
+                    color: color,
+                    weight: 3,
+                    opacity: 0.85,
+                    // Neuvedený počet pruhov kreslíme prerušovane, nech je
+                    // vidieť, že údaj v OSM chýba
+                    dashArray: lane.known ? null : '4,6',
+                    lineCap: 'butt'
+                }).bindPopup(popupHtml));
+
+                // Smer jazdy pozdĺž pruhu
+                var arrowPath = lane.direction === -1 ? laneLine.slice().reverse() : laneLine;
                 group.addLayer(L.polylineDecorator(arrowPath, {
                     patterns: [{
-                        offset: 20,
-                        repeat: 90,
+                        offset: 15,
+                        repeat: 70,
                         symbol: L.Symbol.arrowHead({
-                            pixelSize: 9,
+                            pixelSize: 7,
                             polygon: false,
                             pathOptions: {
+                                renderer: lanesRenderer,
                                 stroke: true,
-                                color: LANE_COLOR_ONEWAY,
+                                color: color,
                                 weight: 2,
                                 opacity: 0.9
                             }
                         })
                     }]
                 }));
-            }
+
+                // Šípka odbočenia ku koncu pruhu (pri križovatke)
+                var glyph = turnGlyph(lane.turn);
+                if (glyph) {
+                    // Pruhy proti smeru geometrie majú križovatku na
+                    // opačnom konci úseku
+                    var path = lane.direction === -1 ? laneLine.slice().reverse() : laneLine;
+                    var spot = pointBeforeEnd(path, 18);
+                    group.addLayer(L.marker(spot.point, {
+                        interactive: false,
+                        keyboard: false,
+                        icon: L.divIcon({
+                            className: 'lane-turn-arrow',
+                            html: '<span style="transform: rotate(' + spot.bearing + 'deg)">' +
+                                  glyph + '</span>',
+                            iconSize: [26, 26],
+                            iconAnchor: [13, 13]
+                        })
+                    }));
+                }
+            });
         });
 
         return group;
