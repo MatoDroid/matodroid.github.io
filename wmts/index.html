@@ -287,6 +287,10 @@
             <input type="text" id="custom-layer-url" placeholder="https://.../{z}/{x}/{y}.png">
             <button id="custom-layer-apply" type="button">Použiť vlastnú mapu</button>
         </div>
+        <div class="control-row checkbox-row">
+            <input type="checkbox" id="toggle-lanes">
+            <label for="toggle-lanes">Pruhy a smer</label>
+        </div>
         <button id="reload-roads" type="button">Načítať cesty</button>
         <button id="export-geojson" type="button">Export do GeoJSON</button>
         <button id="export-gpx" type="button">Export do GPX</button>
@@ -304,6 +308,9 @@
 <script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
+<!-- Šípky smeru jazdy pozdĺž ciest. Vlastnú rotáciu značiek si knižnica
+     rieši sama (bundluje si ju), takže netreba leaflet-rotatedmarker. -->
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
 
 <script>
     // ---------------------------------------------------------------------
@@ -874,6 +881,153 @@
     // Cesty kreslíme na canvas – SVG je pri tisíckach čiar veľmi pomalé
     var roadsRenderer = L.canvas({ padding: 0.3 });
 
+    // ---------------------------------------------------------------------
+    // Vrstva "Pruhy a smer"
+    //
+    // Nie je to hotová dlaždicová služba – OSM Lane Visualizer od Mueschela
+    // je samostatná QA stránka, nie XYZ vrstva. Kreslíme si to teda sami
+    // z dát, ktoré už aj tak sťahujeme z Overpassu: značky lanes, oneway,
+    // turn:lanes a spol. prídu spolu s geometriou ciest.
+    // ---------------------------------------------------------------------
+    var lanesLayer = null;
+    var lanesRenderer = L.canvas({ padding: 0.3 });
+
+    // Posledné stiahnuté dáta – aby sa dal prepínač zapnúť/vypnúť bez
+    // nového dopytu na Overpass
+    var lastRoadsGeoJSON = null;
+
+    var LANE_WIDTH_PX = 4;        // hrúbka čiary na jeden jazdný pruh
+    var LANE_COLOR_ONEWAY = '#d62728';
+    var LANE_COLOR_TWOWAY = '#1f77b4';
+
+    // oneway má v OSM viacero zápisov; "-1" znamená opačný smer než geometria
+    function parseOneway(tags) {
+        var value = tags.oneway;
+        if (value === 'yes' || value === 'true' || value === '1') { return 1; }
+        if (value === '-1' || value === 'reverse') { return -1; }
+        // Diaľnice a ich nájazdy sú jednosmerné aj bez výslovnej značky
+        if (!value && (tags.highway === 'motorway' || tags.highway === 'motorway_link')) { return 1; }
+        return 0;
+    }
+
+    // Počet pruhov: lanes, inak súčet lanes:forward/backward, inak odhad
+    function parseLaneCount(tags) {
+        var total = parseFloat(tags.lanes);
+        if (!isNaN(total) && total > 0) { return total; }
+
+        var forward = parseFloat(tags['lanes:forward']);
+        var backward = parseFloat(tags['lanes:backward']);
+        var sum = (isNaN(forward) ? 0 : forward) + (isNaN(backward) ? 0 : backward);
+        if (sum > 0) { return sum; }
+
+        return null; // neuvedené – kreslíme ako jeden pruh, ale povieme to
+    }
+
+    // Čitateľný súhrn značiek do bubliny
+    function describeLanes(tags) {
+        var rows = [];
+        var name = tags.name || tags.highway || 'cesta';
+        rows.push('<strong>' + escapeXml(name) + '</strong>');
+
+        var count = parseLaneCount(tags);
+        rows.push('Pruhy: ' + (count !== null ? count : '<em>neuvedené</em>'));
+
+        if (tags['lanes:forward'] || tags['lanes:backward']) {
+            rows.push('V smere: ' + (tags['lanes:forward'] || '?') +
+                      ', proti smeru: ' + (tags['lanes:backward'] || '?'));
+        }
+
+        var oneway = parseOneway(tags);
+        rows.push('Smer: ' + (oneway === 0 ? 'obojsmerná'
+                            : oneway === 1 ? 'jednosmerná (v smere šípok)'
+                                           : 'jednosmerná (opačne než geometria)'));
+
+        // turn:lanes sa zapisuje po pruhoch, oddelené zvislou čiarou
+        ['turn:lanes', 'turn:lanes:forward', 'turn:lanes:backward'].forEach(function(key) {
+            if (tags[key]) {
+                rows.push(escapeXml(key) + ': <code>' + escapeXml(tags[key]) + '</code>');
+            }
+        });
+
+        if (tags.maxspeed) { rows.push('Rýchlosť: ' + escapeXml(tags.maxspeed)); }
+
+        return rows.join('<br>');
+    }
+
+    function buildLanesLayer(geojson) {
+        var group = L.layerGroup();
+        var features = (geojson && geojson.features) || [];
+
+        features.forEach(function(feature) {
+            if (!feature.geometry || feature.geometry.type !== 'LineString') { return; }
+
+            var tags = feature.properties || {};
+            var oneway = parseOneway(tags);
+            var count = parseLaneCount(tags);
+
+            var latlngs = feature.geometry.coordinates.map(function(coord) {
+                return L.latLng(coord[1], coord[0]);
+            });
+            if (latlngs.length < 2) { return; }
+
+            // Hrúbka čiary = počet pruhov. Pri neuvedenom počte kreslíme
+            // tenko a prerušovane, nech je vidieť, že údaj v OSM chýba.
+            var line = L.polyline(latlngs, {
+                renderer: lanesRenderer,
+                color: oneway !== 0 ? LANE_COLOR_ONEWAY : LANE_COLOR_TWOWAY,
+                weight: (count || 1) * LANE_WIDTH_PX,
+                opacity: 0.45,
+                dashArray: count === null ? '4,6' : null,
+                lineCap: 'butt'
+            });
+            line.bindPopup(describeLanes(tags));
+            group.addLayer(line);
+
+            // Šípky smeru len pri jednosmerných – pri obojsmerných by
+            // neniesli informáciu
+            if (oneway !== 0) {
+                var arrowPath = oneway === -1 ? latlngs.slice().reverse() : latlngs;
+                group.addLayer(L.polylineDecorator(arrowPath, {
+                    patterns: [{
+                        offset: 20,
+                        repeat: 90,
+                        symbol: L.Symbol.arrowHead({
+                            pixelSize: 9,
+                            polygon: false,
+                            pathOptions: {
+                                stroke: true,
+                                color: LANE_COLOR_ONEWAY,
+                                weight: 2,
+                                opacity: 0.9
+                            }
+                        })
+                    }]
+                }));
+            }
+        });
+
+        return group;
+    }
+
+    function refreshLanesLayer() {
+        if (lanesLayer) {
+            map.removeLayer(lanesLayer);
+            lanesLayer = null;
+        }
+
+        if (!document.getElementById('toggle-lanes').checked) { return; }
+
+        if (!lastRoadsGeoJSON) {
+            showMessage('Najprv načítaj cesty tlačidlom „Načítať cesty“.', 'info', 4000);
+            return;
+        }
+
+        lanesLayer = buildLanesLayer(lastRoadsGeoJSON);
+        lanesLayer.addTo(map);
+    }
+
+    document.getElementById('toggle-lanes').addEventListener('change', refreshLanesLayer);
+
     function cancelRoadsJob() {
         if (roadsJob) {
             roadsJob.cancelled = true;
@@ -1170,6 +1324,13 @@ ${union}
                 map.removeLayer(roadsLayer);
                 roadsLayer = null;
             }
+            // Spolu s cestami zahodíme aj pruhy – inak by nad prázdnou mapou
+            // ostali visieť šípky zo starého, už neplatného výrezu
+            lastRoadsGeoJSON = null;
+            if (lanesLayer) {
+                map.removeLayer(lanesLayer);
+                lanesLayer = null;
+            }
             showMessage("Priblíž mapu pre zobrazenie ciest", "info");
             return;
         }
@@ -1211,6 +1372,11 @@ ${union}
                         }
                     }
                 }).addTo(map);
+
+                // Vrstva pruhov pracuje s tými istými dátami – držíme si ich,
+                // aby sa dala prepínať bez nového dopytu na Overpass
+                lastRoadsGeoJSON = geojsonData;
+                refreshLanesLayer();
 
                 showLoading(false);
                 roadsJob = null;
