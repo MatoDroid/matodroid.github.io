@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  let showObj = true, showTree = true;
+  let showObj = true, showTree = true, showLamp = true; const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
   const TL = new THREE.TextureLoader();
@@ -140,6 +140,14 @@
     } catch (e) { console.warn('objekty', t.name, e.message); t.obj = false; }
     t.objBusy = false;
   }
+  async function setLamps(t, want) {
+    if (t.lmBusy) return; t.lmBusy = true;
+    try {
+      if (want && t.lm === null) { const s = await loadGLB(`tiles/${t.name}/lampy.glb`); if (s) { s.visible = showLamp; t.lm = s; scene.add(s); } else t.lm = false; }
+      else if (!want && t.lm) { disposeTree(t.lm); t.lm = null; }
+    } catch (e) { t.lm = false; }
+    t.lmBusy = false;
+  }
   async function setTrees(t, want) {
     if (t.trBusy) return; t.trBusy = true;
     try {
@@ -206,6 +214,7 @@
   $('btnHome').addEventListener('click', () => { if (walk) exitWalk(); camera.position.set(-1500, 6500, 8500); controls.target.set(600, 500, -1200); controls.update(); });
   $('btnMin').addEventListener('click', () => { const p = $('panel'); p.classList.toggle('min'); $('btnMin').textContent = p.classList.contains('min') ? '☰' : '–'; });
   $('lObj').addEventListener('change', e => { showObj = e.target.checked; tiles.forEach(t => { if (t.obj) t.obj.visible = showObj; }); });
+  $('lLamp').addEventListener('change', e => { showLamp = e.target.checked; tiles.forEach(t => { if (t.lm) t.lm.visible = showLamp; }); });
   $('lTree').addEventListener('change', e => { showTree = e.target.checked; tiles.forEach(t => { if (t.tr) t.tr.visible = showTree; }); });
   $('rng').addEventListener('input', e => { detail = parseFloat(e.target.value); $('rngv').textContent = detail.toFixed(1) + '×'; });
   const ov = $('ov');
@@ -231,6 +240,7 @@
       setLOD(t, k);
       setObjects(t, d < 900 * detail || (t.obj && d < 1300 * detail));
       setTrees(t, d < 480 * detail || (t.tr && d < 700 * detail));
+      setLamps(t, LAMP.has(t.name) && (d < 350 * detail || (t.lm && d < 520 * detail)));
       if (t.mesh) nT++; if (t.obj) nO++; if (t.tr) nTr++; if (t.lod === 0) nL0++;
     });
     $('stat').textContent = `dlaždice: ${nT}/${tiles.size} (detail 1 m: ${nL0}) · budovy: ${nO} · stromy: ${nTr}\nkamera: ${(camera.position.x).toFixed(0)}, ${(camera.position.y).toFixed(0)}, ${(camera.position.z).toFixed(0)}`;
@@ -250,7 +260,7 @@
   (async function init() {
     try {
       IDX = await (await fetch('index.json')).json(); HX = (IDX.C - 1) / 2; HY = (IDX.R - 1) / 2; ZR = IDX.ZMAX - IDX.ZMIN; T = IDX.T;
-      IDX.tiles.forEach(i => tiles.set(i.name, Object.assign({}, i, { lod: -1, heights: [null, null, null, null], mesh: null, obj: null, tr: null })));
+      IDX.tiles.forEach(i => tiles.set(i.name, Object.assign({}, i, { lod: -1, heights: [null, null, null, null], mesh: null, obj: null, tr: null, lm: null })));
       $('lmsg').textContent = 'Načítavam hrubý terén celého mesta…';
       const all = [...tiles.values()]; await Promise.all(all.map(t => setLOD(t, 3)));
       // štart: centrum mesta (dlaždica 3_6)
