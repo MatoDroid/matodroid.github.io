@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261026b';
+  const GLB_VER = '20261026c';
   let showObj = true, showTree = true, showLamp = true; const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
