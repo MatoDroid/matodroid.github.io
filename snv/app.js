@@ -22,6 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
+  const GLB_VER = '20261026b';
   let showObj = true, showTree = true, showLamp = true; const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -129,7 +130,7 @@
     root.traverse(o => { if (o.isMesh && o.geometry.attributes.color_1) { o.geometry.setAttribute('color', o.geometry.attributes.color_1); o.geometry.deleteAttribute('color_1'); } });
   }
   async function loadGLB(url) {
-    const r = await fetch(url); if (!r.ok) return null; const buf = await r.arrayBuffer();
+    const r = await fetch(url + '?v=' + GLB_VER); if (!r.ok) return null; const buf = await r.arrayBuffer();
     return new Promise((res, rej) => gl.parse(buf, '', g => { fixColors(g.scene); res(g.scene); }, rej));
   }
   async function setObjects(t, want) {
