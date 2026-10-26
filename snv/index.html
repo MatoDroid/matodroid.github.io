@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spišská Nová Ves 3D – lokálny test</title>
+<style>
+:root{--panel:#18211d;--fg:#e6ece8;--muted:#97a69e;--line:#2f3d36;--accent:#e0794a;--sky:#26384a}
+html,body{height:100%;margin:0;background:var(--sky);color:var(--fg);font:14px "Segoe UI",system-ui,sans-serif;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.panel{position:absolute;left:12px;top:12px;width:300px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;box-sizing:border-box}
+.panel.min{width:auto}.panel.min #pbody{display:none}
+h1{font-size:19px;margin:0}.phead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+h2{font:11px monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}
+button{font:500 13px inherit;padding:8px 11px;border-radius:4px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#1a0f08}
+label{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer}
+.stat{font:12px/1.5 monospace;color:var(--muted)}
+#ovwrap{position:relative;width:100%;cursor:crosshair}#ov{width:100%;display:block;border:1px solid var(--line);border-radius:3px}
+#dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border:2px solid #fff;border-radius:50%;background:var(--accent);pointer-events:none}
+#loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--panel);z-index:5}
+#badge{position:absolute;right:12px;top:12px;background:var(--accent);color:#1a0f08;font:12px monospace;padding:6px 10px;border-radius:4px;display:none}
+.hint{position:absolute;left:12px;bottom:12px;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loader"><div style="font:700 24px sans-serif">Spišská Nová Ves 3D</div><div id="lmsg" style="font:12px monospace;color:var(--muted)">Načítavam…</div></div>
+<div class="panel" id="panel">
+  <div class="phead"><h1>Spišská Nová Ves</h1><button id="btnMin" title="Skryť menu">–</button></div>
+  <div id="pbody">
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="primary" id="btnWalk">Prejsť pešo</button><button id="btnHome">Celé mesto</button></div>
+    <h2>Mapa (klik = presun)</h2>
+    <div id="ovwrap"><img id="ov" src="prehlad.png"><div id="dot"></div></div>
+    <h2>Vrstvy</h2>
+    <label><input type="checkbox" id="lObj" checked>Budovy, cesty, mosty, voda</label>
+    <label><input type="checkbox" id="lTree" checked>Stromy</label>
+    <h2>Dosah detailu</h2>
+    <label style="gap:6px">Detail <input type="range" id="rng" min="0.5" max="2.5" step="0.1" value="1" style="flex:1"><span id="rngv">1.0×</span></label>
+    <h2>Stav</h2>
+    <div class="stat" id="stat">–</div>
+  </div>
+</div>
+<div id="badge">PEŠO · Esc = späť</div>
+<div class="hint"><b>Myš:</b> ťahaj = otáčaj, koliesko = priblíž, pravé = posuň, dvojklik = postav sa tam. <b>Pešo:</b> W A S D, Shift = rýchlejšie, ťahaj = pohľad, Esc = späť.<br><span style="color:#97a69e">Dáta: ÚGKK SR (DMR 5.0, LIDAR, ortofoto), © prispievatelia OpenStreetMap.</span></div>
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/DRACOLoader.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script>document.write('<script src="app.js?v='+Date.now()+'"><\/script>')</script>
+</body>
+</html>
