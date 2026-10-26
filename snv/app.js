@@ -115,6 +115,7 @@
       if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material];
       ms.forEach(m => {
         if (/Kolajnice/i.test(m.name)) m.side = THREE.DoubleSide;
+        if (/^Znacenie/i.test(m.name)) { m.polygonOffset = true; m.polygonOffsetFactor = -3; m.polygonOffsetUnits = -3; m.side = THREE.DoubleSide; }
         m.metalness = 0; m.roughness = Math.max(m.roughness ?? 1, .7); if (/Voda/i.test(m.name)) m.roughness = .15;
         const sk = Object.keys(SPR).find(k => m.name.startsWith(k));
         if (sk && !m.userData.s) { m.userData.s = 1; m.map = mt(SPR[sk], true); m.alphaTest = .5; m.color.setRGB(1, 1, 1); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.needsUpdate = true; }
