@@ -107,6 +107,7 @@
   const dl = new THREE.DRACOLoader(); dl.setDecoderPath('lib/draco/'); dl.setDecoderConfig({ type: 'wasm' });
   const gl = new THREE.GLTFLoader(); gl.setDRACOLoader(dl);
   const DEFS = { Budova_Strecha: ['RoofNeutral', true, [1, 1, 1]], Budova_Stena: ['PaintedPlaster017', true, [1, 1, 1]], Cesta_Asfalt: ['Asphalt031', true, [.5, .5, .52]], Cesta_Makadam: ['Ground081', false, [1, 1, 1]], Chodnik: ['PavingStones138', false, [1, 1, 1]], Beton: ['Concrete034', false, [1, 1, 1]], Trat: ['Trat', false, [.9, .9, .9]] };
+  const MODELS = new Set(['03_07']);   // dlazdice s importovanymi 3D modelmi (modely.glb)
   const SPR = { Okno: 'okno.png', Dvere: 'dvere.png' };
   const mtex = new Map();
   function mt(f, srgb) { if (!mtex.has(f)) { const t = TL.load('tex/' + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxA; if (srgb) t.encoding = THREE.sRGBEncoding; mtex.set(f, t); } return mtex.get(f); }
@@ -134,7 +135,7 @@
   async function setObjects(t, want) {
     if (t.objBusy) return; t.objBusy = true;
     try {
-      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); s.visible = showObj; t.obj = s; scene.add(s); } else t.obj = false; }
+      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); } } s.visible = showObj; t.obj = s; scene.add(s); } else t.obj = false; }
       else if (!want && t.obj) { disposeTree(t.obj); t.obj = null; }
     } catch (e) { console.warn('objekty', t.name, e.message); t.obj = false; }
     t.objBusy = false;
