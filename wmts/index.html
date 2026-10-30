@@ -308,7 +308,6 @@
             <input type="checkbox" id="toggle-lanes">
             <label for="toggle-lanes">Pruhy a smer</label>
         </div>
-        <button id="reload-roads" type="button">Načítať cesty</button>
         <button id="export-geojson" type="button">Export do GeoJSON</button>
         <button id="export-gpx" type="button">Export do GPX</button>
         <button id="clear-drawings" type="button">Vymazať kresby</button>
@@ -316,13 +315,12 @@
 </div>
 
 <div id="map-status">
-    <div id="roads-loading"><span class="spinner"></span><span id="roads-loading-text">Načítavam cesty...</span></div>
+    <div id="roads-loading"><span class="spinner"></span><span>Načítavam cesty...</span></div>
     <div id="map-message"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
 <!-- Šípky smeru jazdy pozdĺž ciest. Vlastnú rotáciu značiek si knižnica
@@ -373,58 +371,6 @@
     // Predvolená farba budov v prekryvnej vrstve. Musí sedieť s hodnotou
     // value="..." pri <input type="color"> v ovládacom paneli.
     var DEFAULT_BUILDING_COLOR = "#ff7800";
-
-    // Overpass – všetky zrkadlá sa volajú NARAZ a vyhráva prvá odpoveď.
-    // Sekvenčné skúšanie znamenalo čakať celý timeout na prvom serveri
-    // (overpass-api.de má najdlhšiu frontu) a až potom skúsiť záložný.
-    // Tretie zrkadlo (private.coffee) overené priamo z konzoly v prehliadači
-    // 28.8.2026 - DNS sa preloží, server odpovedá (vtedy 502, backend mal
-    // vlastný výpadok). Je to nezávislá infraštruktúra od prvých dvoch, takže
-    // sa oplatí mať ju v rotácii pre prípad, že sa spamätá skôr než ony.
-    var OVERPASS_ENDPOINTS = [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://overpass.private.coffee/api/interpreter"
-    ];
-
-    // Timeout na jedno zrkadlo. POZOR na jeho znižovanie: pôvodná verzia
-    // tejto stránky neuvádzala [timeout:] vôbec, čím dostala serverový
-    // default 180 s, a nemala ani klientsky abort – preto sa dopyt na
-    // vyťaženom verejnom zrkadle síce vliekol, ale nakoniec prešiel.
-    // Krátky strop z pomalého načítania spraví tvrdé zlyhanie.
-    var OVERPASS_TIMEOUT_MS = 90000;
-
-    // Ak Network Information API hlási takto pomalé/šetriace pripojenie,
-    // rovno preskočíme ťažší dopyt s chodníkmi a pýtame len hlavné cesty –
-    // ušetrí to celý jeden márny pokus pred odľahčeným retry.
-    var SLOW_CONNECTION_TYPES = ["slow-2g", "2g"];
-
-    // Nad touto plochou cesty nenačítavame (Overpass by to neuniesol).
-    // Kontroluje sa plocha, ktorú reálne sťahujeme, teda AJ s rozšírením.
-    // Dopyt s chodníkmi je oveľa ťažší, preto má prísnejší limit než dopyt
-    // len na hlavné cesty, ktoré sú v teréne riedke.
-    var MAX_BBOX_AREA_KM2 = 15;
-    var MAX_BBOX_AREA_KM2_MAJOR = 60;
-
-    // Pod týmto priblížením sťahujeme len hlavné cesty. Chodníky, chodníčky,
-    // účelové a servisné cesty tvoria väčšinu dát a pri oddialení sú aj tak
-    // nečitateľné. Nastav na 0, ak chceš vždy sťahovať všetko.
-    var MINOR_ROADS_MIN_ZOOM = 16;
-
-    // Vymenované kladne, nie ako negovaný regex. Overpass má index na
-    // dvojice kľúč=hodnota, takže únia presných zhôd ide cez index, kým
-    // ["highway"!~"..."] musí regex vyhodnotiť na každej ceste v bboxe –
-    // teda viac práce pre server, ktorý je tu úzkym hrdlom.
-    var MAJOR_ROAD_TYPES = [
-        "motorway", "motorway_link", "trunk", "trunk_link",
-        "primary", "primary_link", "secondary", "secondary_link",
-        "tertiary", "tertiary_link", "residential", "living_street",
-        "unclassified", "pedestrian"
-    ];
-
-    // O koľko sa rozšíri sťahovaný bbox oproti výrezu. Pozor, pad() rozširuje
-    // na KAŽDÚ stranu, takže 0.08 znamená ~1.35× väčšiu plochu (nie 1.08×).
-    var BBOX_PADDING = 0.08;
 
     var STORAGE_KEY = "wmts.drawnItems.v1";
 
@@ -651,26 +597,11 @@
     // Stavové hlásenia a indikátor načítania
     // ---------------------------------------------------------------------
     var loadingEl = document.getElementById('roads-loading');
-    var loadingTextEl = document.getElementById('roads-loading-text');
     var messageEl = document.getElementById('map-message');
     var messageTimer = null;
-    var loadingHintTimer = null;
-
-    // Po dlhšej chvíli čakania dáme vedieť, že to nie je zamrznuté. Príčinu
-    // (pomalé pripojenie vs. preťažený Overpass server) nevieme z tohto
-    // miesta rozlíšiť, tak ju v texte netvrdíme.
-    var LOADING_HINT_DELAY_MS = 8000;
 
     function showLoading(visible) {
         loadingEl.classList.toggle('visible', !!visible);
-        clearTimeout(loadingHintTimer);
-
-        if (visible) {
-            loadingTextEl.textContent = "Načítavam cesty...";
-            loadingHintTimer = setTimeout(function() {
-                loadingTextEl.textContent = "Načítavam cesty... trvá to dlhšie, ešte chvíľu strpenia";
-            }, LOADING_HINT_DELAY_MS);
-        }
     }
 
     function showMessage(text, type, autoHideMs) {
@@ -921,7 +852,6 @@
     // Vrstvy pre cesty
     // ---------------------------------------------------------------------
     var roadsLayer;
-    var roadsJob = null;
 
     // Cesty kreslíme na canvas – SVG je pri tisíckach čiar veľmi pomalé
     var roadsRenderer = L.canvas({ padding: 0.3 });
@@ -931,14 +861,14 @@
     //
     // Nie je to hotová dlaždicová služba – OSM Lane Visualizer od Mueschela
     // je samostatná QA stránka, nie XYZ vrstva. Kreslíme si to teda sami
-    // z dát, ktoré už aj tak sťahujeme z Overpassu: značky lanes, oneway,
-    // turn:lanes a spol. prídu spolu s geometriou ciest.
+    // z uložených dát ciest: značky lanes, oneway, turn:lanes a spol. sú
+    // v nich spolu s geometriou.
     // ---------------------------------------------------------------------
     var lanesLayer = null;
     var lanesRenderer = L.canvas({ padding: 0.3 });
 
-    // Posledné stiahnuté dáta – aby sa dal prepínač zapnúť/vypnúť bez
-    // nového dopytu na Overpass
+    // Načítané dáta ciest – z nich sa pruhy stavajú pri každom zapnutí
+    // prepínača a pri posune mapy
     var lastRoadsGeoJSON = null;
 
     // Skutočná šírka jazdného pruhu. Pruhy kreslíme v metroch, nie v
@@ -1249,426 +1179,144 @@
         return group;
     }
 
-    function refreshLanesLayer() {
+    // Pruhy sa kreslia len pre to, čo je vidieť. Každý pruh je samostatná čiara
+    // a k tomu dekorátor so šípkami, ktorý sa pri každom posune mapy
+    // prepočítava – pre celé mesto naraz (tisíce ciest) by to mapu zadusilo.
+    // Doteraz počet ciest obmedzoval výrez, ktorý sa sťahoval zo servera;
+    // teraz sú všetky cesty v pamäti, takže obmedzenie robíme tu.
+    var LANES_MIN_ZOOM = 17;
+    var LANES_VIEW_PADDING = 0.3;
+    var lanesBuiltBounds = null;
+    var featureBoundsCache = new WeakMap();
+
+    function featureBounds(feature) {
+        var cached = featureBoundsCache.get(feature);
+        if (cached) { return cached; }
+
+        var bounds = L.latLngBounds();
+        feature.geometry.coordinates.forEach(function(coord) {
+            bounds.extend([coord[1], coord[0]]);
+        });
+        featureBoundsCache.set(feature, bounds);
+        return bounds;
+    }
+
+    function removeLanesLayer() {
         if (lanesLayer) {
             map.removeLayer(lanesLayer);
             lanesLayer = null;
         }
+        lanesBuiltBounds = null;
+    }
 
+    // userAction = true, keď ide o zapnutie prepínača – vtedy používateľovi
+    // vysvetlíme, prečo nič nevidí. Pri posune mapy by hláška len otravovala.
+    function refreshLanesLayer(userAction) {
+        removeLanesLayer();
+
+        if (!document.getElementById('toggle-lanes').checked || !lastRoadsGeoJSON) { return; }
+
+        if (map.getZoom() < LANES_MIN_ZOOM) {
+            if (userAction === true) {
+                showMessage('Priblíž mapu (aspoň na úroveň ' + LANES_MIN_ZOOM + ') pre zobrazenie pruhov.', 'info', 4000);
+            }
+            return;
+        }
+
+        var view = map.getBounds().pad(LANES_VIEW_PADDING);
+        var visible = lastRoadsGeoJSON.features.filter(function(feature) {
+            return view.intersects(featureBounds(feature));
+        });
+
+        lanesLayer = buildLanesLayer({ type: 'FeatureCollection', features: visible });
+        lanesLayer.addTo(map);
+        lanesBuiltBounds = view;
+    }
+
+    // Pri posune/zoome prestavujeme vrstvu len keď treba: pri oddialení pod
+    // minimálny zoom ju zhodíme, inak až keď výrez vyjde z už postavenej oblasti
+    map.on('moveend', function() {
         if (!document.getElementById('toggle-lanes').checked) { return; }
 
-        if (!lastRoadsGeoJSON) {
-            showMessage('Najprv načítaj cesty tlačidlom „Načítať cesty“.', 'info', 4000);
+        if (map.getZoom() < LANES_MIN_ZOOM) {
+            removeLanesLayer();
             return;
         }
+        if (lanesBuiltBounds && lanesBuiltBounds.contains(map.getBounds())) { return; }
+        refreshLanesLayer();
+    });
 
-        lanesLayer = buildLanesLayer(lastRoadsGeoJSON);
-        lanesLayer.addTo(map);
-    }
+    document.getElementById('toggle-lanes').addEventListener('change', function() {
+        refreshLanesLayer(true);
+    });
 
-    document.getElementById('toggle-lanes').addEventListener('change', refreshLanesLayer);
+    // ---------------------------------------------------------------------
+    // Cesty – uložená vrstva Spišskej Novej Vsi
+    //
+    // Cesty sa NESŤAHUJÚ z Overpassu pri každom otvorení stránky (verejné
+    // servery sú pomalé a nespoľahlivé), ale načítavajú sa z hotového súboru.
+    // Súbor vzniká skriptom stiahni_cesty_snv.py a obsahuje IBA Spišskú Novú
+    // Ves – inde na mape cesty nie sú. Aktualizácia: spustiť skript znova
+    // a výsledok commitnúť.
+    // ---------------------------------------------------------------------
+    var ROADS_DATA_URL = 'cesty-snv.geojson';
 
-    function cancelRoadsJob() {
-        if (roadsJob) {
-            roadsJob.cancelled = true;
-            if (roadsJob.abort) { roadsJob.abort(); }
-            roadsJob = null;
-        }
-    }
-
-    // Plocha aktuálneho výrezu v km²
-    function bboxAreaKm2(bounds) {
-        var sw = bounds.getSouthWest();
-        var ne = bounds.getNorthEast();
-        var widthKm = map.distance(sw, L.latLng(sw.lat, ne.lng)) / 1000;
-        var heightKm = map.distance(sw, L.latLng(ne.lat, sw.lng)) / 1000;
-        return widthKm * heightKm;
-    }
-
-    // "Failed to fetch" (Chrome) / "NetworkError" (Firefox) / "Load failed"
-    // (Safari) znamenajú, že spojenie neotvoril prehliadač – server o dopyte
-    // vôbec nevedel. Príčina je v prostredí, nie v Overpasse.
-    function isNetworkLevelError(reason) {
-        return /failed to fetch|networkerror|load failed|network request failed/i.test(reason);
-    }
-
-    // Network Information API – podporuje ju Chrome/Edge na Androide,
-    // Safari a Firefox ju nemajú, vtedy proste nevieme a sťahujeme normálne
-    function getConnectionInfo() {
-        return navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
-    }
-
-    function isSlowConnection() {
-        var conn = getConnectionInfo();
-        if (!conn) { return false; }
-        if (conn.saveData) { return true; }
-        return SLOW_CONNECTION_TYPES.indexOf(conn.effectiveType) !== -1;
-    }
-
-    // Keď vypršal časový limit na oboch zrkadlách, problém je takmer isto na
-    // strane Overpassu (preťaženie/výpadok) – "priblíž mapu" tu nepomôže,
-    // bbox je väčšinou už dávno pod limitom
-    function allTimedOut(err) {
-        return !!err.reasons && err.reasons.every(function(r) {
-            return /časový limit vypršal/.test(r);
-        });
-    }
-
-    // Overpass server niekedy vráti chybu (502/503/504) na stránke, ktorá
-    // nemá CORS hlavičky (bežné pri reverse proxy pred preťaženým backendom).
-    // Prehliadač to potom nahlási úplne rovnako ako "Failed to fetch" pri
-    // zablokovanej sieti – z JS sa to nedá rozlíšiť. Ak ale ČOKOĽVEK iné
-    // zrkadlo v tom istom kole vrátilo čitateľnú HTTP odpoveď, dokazuje to,
-    // že zariadenie/sieť vedeli dosiahnuť aspoň jeden Overpass server, takže
-    // "Failed to fetch" na inom zrkadle je oveľa pravdepodobnejšie to isté
-    // – server problém maskovaný chýbajúcimi CORS hlavičkami – než blokáda.
-    function hasReachableServerResponse(err) {
-        return !!err.reasons && err.reasons.some(function(r) {
-            return /HTTP \d{3}/.test(r);
-        });
-    }
-
-    // Mobilné Chrome/Safari nepodporujú rozšírenia – rada "vypni rozšírenie"
-    // je tam zavádzajúca. Príčiny blokovania sú tam iné (Private DNS,
-    // VPN/ad-block appka, filtrovanie u operátora) a menu na Androide a
-    // iOS sa líši, tak ich netreba miešať do jednej rady.
-    function getMobilePlatform() {
-        var ua = navigator.userAgent || "";
-        if (/Android/i.test(ua)) { return "android"; }
-        if (/iPhone|iPad|iPod/i.test(ua)) { return "ios"; }
-        return null;
-    }
-
-    // Najpravdepodobnejšia príčina toho, že prehliadač spojenie neotvoril
-    function diagnoseNetwork() {
-        if (navigator.onLine === false) {
-            return "Vyzerá to, že zariadenie nie je pripojené na internet.";
-        }
-        if (location.protocol === 'file:') {
-            return "Stránka je otvorená priamo zo súboru (file://), preto prehliadač " +
-                   "blokuje volania na Overpass API. Otvor ju cez webový server, " +
-                   "napríklad z adresy github.io.";
+    function showRoads(geojson) {
+        if (roadsLayer) {
+            map.removeLayer(roadsLayer);
         }
 
-        var platform = getMobilePlatform();
-        if (platform === "android") {
-            return "Spojenie zablokoval telefón alebo sieť ešte pred jeho nadviazaním. " +
-                   "Skontroluj Nastavenia → Sieť a internet → Private DNS (nastav na " +
-                   "Automaticky), vypni prípadnú VPN/ad-block appku a skús aj cez Wi-Fi " +
-                   "namiesto mobilných dát – pomôže to odlíšiť, či ide o operátora.";
-        }
-        if (platform === "ios") {
-            return "Spojenie zablokoval telefón alebo sieť ešte pred jeho nadviazaním. " +
-                   "Skontroluj v Nastaveniach profily VPN/DNS a appky na blokovanie obsahu " +
-                   "(Settings → General → VPN & Device Management), a skús aj cez Wi-Fi " +
-                   "namiesto mobilných dát – pomôže to odlíšiť, či ide o operátora.";
-        }
-        return "Spojenie zablokoval prehliadač alebo sieť – najčastejšie blokovač " +
-               "reklám, rozšírenie na ochranu súkromia, firewall alebo VPN.";
-    }
-
-    function shorten(text) {
-        var clean = String(text).replace(/\s+/g, " ").trim();
-        return clean.length > 160 ? clean.slice(0, 160) + "…" : clean;
-    }
-
-    // Krátky názov zrkadla do hlásenia (celé URL je zbytočne dlhé)
-    function endpointName(endpoint) {
-        return endpoint.split("/")[2];
-    }
-
-    // Z HTML/textovej chybovej odpovede Overpassu vytiahne užitočnú vetu
-    function describeOverpassError(body) {
-        if (!body) { return ""; }
-        var match = String(body).match(/(rate_limited|too many requests|Query timed out[^<]*|runtime error[^<]*|error[^<]{0,120})/i);
-        return match ? " – " + shorten(match[0]) : "";
-    }
-
-    // Volanie jedného Overpass zrkadla s vlastným timeoutom
-    function fetchOverpassEndpoint(endpoint, query, controller) {
-        var timedOut = false;
-        var timer = setTimeout(function() {
-            timedOut = true;
-            controller.abort();
-        }, OVERPASS_TIMEOUT_MS);
-
-        // POST namiesto GET s ?data= – dlhší dopyt sa tak nemôže naraziť na
-        // limit dĺžky URL (Apache LimitRequestLine, default ~8 kB).
-        // Content-Type MUSÍ byť uvedený: telo je "data=" + urlencode(...),
-        // teda formulárové kódovanie. Bez neho pošle prehliadač
-        // text/plain a server nemusí telo rozparsovať. Táto hodnota je
-        // zároveň CORS-safelisted, takže nepridáva preflight OPTIONS.
-        return fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: "data=" + encodeURIComponent(query),
-            signal: controller.signal
-        })
-            .then(function(response) {
-                clearTimeout(timer);
-                if (!response.ok) {
-                    // Overpass posiela dôvod (preťaženie, prekročený limit)
-                    // v tele odpovede – bez neho sa chyba nedá diagnostikovať
-                    return response.text().then(function(body) {
-                        throw new Error("HTTP " + response.status + describeOverpassError(body));
-                    }, function() {
-                        throw new Error("HTTP " + response.status);
-                    });
+        roadsLayer = L.geoJSON(geojson, {
+            // Canvas zvláda tisíce čiar oveľa rýchlejšie než SVG
+            renderer: roadsRenderer,
+            style: osmStyle,
+            onEachFeature: function(feature, layer) {
+                if (feature.properties && feature.properties.name) {
+                    layer.bindPopup(`<strong>${feature.properties.name}</strong><br>${feature.properties.highway || "unknown type"}`);
                 }
-                return response.json();
-            })
-            .then(function(data) {
-                // Pri chybe počas výpočtu vráti Overpass kód 200 a prázdny
-                // zoznam prvkov s vysvetlením v poli "remark".
-                if (data && data.remark && /error/i.test(data.remark)) {
-                    throw new Error(shorten(data.remark));
-                }
-                return { endpoint: endpoint, data: data };
-            })
-            .catch(function(err) {
-                clearTimeout(timer);
-                err.endpoint = endpoint;
-                err.timedOut = timedOut;
-                throw err;
-            });
-    }
-
-    // Všetky zrkadlá naraz – vyhráva prvá úspešná odpoveď, zvyšné sa zrušia.
-    // Chyba sa vráti až keď zlyhajú všetky.
-    function fetchOverpass(query, job) {
-        var controllers = OVERPASS_ENDPOINTS.map(function() { return new AbortController(); });
-
-        job.abort = function() {
-            controllers.forEach(function(c) { c.abort(); });
-        };
-
-        return new Promise(function(resolve, reject) {
-            var settled = false;
-            var reasons = [];
-
-            OVERPASS_ENDPOINTS.forEach(function(endpoint, i) {
-                fetchOverpassEndpoint(endpoint, query, controllers[i])
-                    .then(function(result) {
-                        if (settled) { return; }
-                        settled = true;
-
-                        // Prvý úspešný vyhral – ostatné požiadavky zrušíme
-                        controllers.forEach(function(c, j) {
-                            if (j !== i) { c.abort(); }
-                        });
-                        resolve(result);
-                    })
-                    .catch(function(err) {
-                        // Zrušené po výhre iného zrkadla alebo novším požiadavkom
-                        if (settled || job.cancelled) { return; }
-
-                        var reason = err.timedOut ? "časový limit vypršal" : err.message;
-                        console.warn("Overpass zrkadlo zlyhalo (" + endpoint + "): " + reason);
-
-                        // Zbierame dôvody zo VŠETKÝCH zrkadiel – pri poslednom
-                        // dôvode sa nedá zistiť, čo vlastne zlyhalo
-                        reasons.push(endpointName(endpoint) + ": " + reason);
-
-                        if (reasons.length === OVERPASS_ENDPOINTS.length) {
-                            settled = true;
-                            var error = new Error(reasons.join(", "));
-                            error.reasons = reasons;
-                            reject(error);
-                        }
-                    });
-            });
-        });
-    }
-
-    // Overpass vracia pri "out geom" priamo geometriu ways, takže ich vieme
-    // previesť na GeoJSON sami – je to výrazne rýchlejšie než osmtogeojson,
-    // ktorý navyše rieši relácie, aké tento dopyt nevracia.
-    function overpassToGeoJSON(data) {
-        var elements = (data && data.elements) || [];
-        var features = [];
-        var hasOther = false;
-
-        elements.forEach(function(el) {
-            if (el.type !== 'way' || !el.geometry) {
-                hasOther = true;
-                return;
             }
+        }).addTo(map);
 
-            var coordinates = [];
-            el.geometry.forEach(function(point) {
-                // Neúplná geometria na okraji bboxu obsahuje null-y
-                if (point) { coordinates.push([point.lon, point.lat]); }
-            });
-            if (coordinates.length < 2) { return; }
-
-            features.push({
-                type: 'Feature',
-                id: 'way/' + el.id,
-                properties: el.tags || {},
-                geometry: { type: 'LineString', coordinates: coordinates }
-            });
-        });
-
-        // Ak by dopyt niekedy vrátil aj iné typy, necháme to na osmtogeojson
-        if (hasOther && typeof osmtogeojson === 'function') {
-            return osmtogeojson(data);
-        }
-
-        return { type: 'FeatureCollection', features: features };
+        // Vrstva pruhov pracuje s tými istými dátami
+        lastRoadsGeoJSON = geojson;
+        refreshLanesLayer();
     }
 
-    // Dopyt pre daný výrez. Pri oddialení pýtame len hlavné cesty – drobné
-    // cesty tvoria väčšinu dát a sú hlavným dôvodom pomalých odpovedí.
-    function buildRoadsQuery(bounds, includeMinor) {
-        var bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(",");
-        var timeoutSec = Math.round(OVERPASS_TIMEOUT_MS / 1000);
-
-        // Plný dopyt je zámerne ten najjednoduchší možný – presne ten, ktorý
-        // fungoval v pôvodnej verzii stránky
-        if (includeMinor) {
-            return `
-            [out:json][timeout:${timeoutSec}];
-            way["highway"](${bbox});
-            out geom;`;
-        }
-
-        var union = MAJOR_ROAD_TYPES.map(function(type) {
-            return '  way["highway"="' + type + '"](' + bbox + ');';
-        }).join("\n");
-
-        return `
-            [out:json][timeout:${timeoutSec}];
-            (
-${union}
-            );
-            out geom;`;
-    }
-
-    // Načítanie ciest cez Overpass API. Volá sa výhradne z tlačidla
-    // "Načítať cesty" – vždy sťahuje nanovo pre aktuálny výrez.
     function loadRoads() {
-        var bbox = map.getBounds();
-        var includeMinor = map.getZoom() >= MINOR_ROADS_MIN_ZOOM && !isSlowConnection();
-
-        // Sťahujeme o niečo väčšie územie, než je vidieť, aby cesty
-        // nekončili presne na okraji obrazovky
-        var requestBounds = bbox.pad(BBOX_PADDING);
-
-        // Kontrola veľkosti – rozhoduje plocha, ktorú reálne pýtame od
-        // Overpassu, nie len viditeľný výrez
-        var areaLimit = includeMinor ? MAX_BBOX_AREA_KM2 : MAX_BBOX_AREA_KM2_MAJOR;
-        if (bboxAreaKm2(requestBounds) > areaLimit) {
-            cancelRoadsJob();
-            showLoading(false);
-            if (roadsLayer) {
-                map.removeLayer(roadsLayer);
-                roadsLayer = null;
-            }
-            // Spolu s cestami zahodíme aj pruhy – inak by nad prázdnou mapou
-            // ostali visieť šípky zo starého, už neplatného výrezu
-            lastRoadsGeoJSON = null;
-            if (lanesLayer) {
-                map.removeLayer(lanesLayer);
-                lanesLayer = null;
-            }
-            showMessage("Priblíž mapu pre zobrazenie ciest", "info");
-            return;
-        }
-
-        // Zrušenie predchádzajúceho, ešte bežiaceho požiadavku
-        cancelRoadsJob();
-
-        var job = { cancelled: false, abort: null };
-        roadsJob = job;
-
-        hideMessage();
         showLoading(true);
 
-        runRoadsQuery(requestBounds, includeMinor, job);
-    }
+        fetch(ROADS_DATA_URL)
+            .then(function(response) {
+                if (!response.ok) { throw new Error('HTTP ' + response.status); }
+                return response.json();
+            })
+            .then(function(geojson) {
+                showRoads(geojson);
 
-    // Jeden pokus o stiahnutie a vykreslenie ciest. Ak zlyhá s plným
-    // dopytom, skúsi sa raz zopakovať len s hlavnými cestami – odľahčený
-    // dopyt často prejde aj tam, kde plný nestihne časový limit.
-    function runRoadsQuery(requestBounds, includeMinor, job) {
-        fetchOverpass(buildRoadsQuery(requestBounds, includeMinor), job)
-            .then(function(result) {
-                if (job.cancelled) { return; }
-
-                var geojsonData = overpassToGeoJSON(result.data);
-
-                // Odstrániť starú vrstvu ciest
-                if (roadsLayer) {
-                    map.removeLayer(roadsLayer);
+                // Dáta z OpenStreetMap sa podľa licencie ODbL musia uvádzať
+                if (map.attributionControl) {
+                    var meta = geojson.metadata || {};
+                    map.attributionControl.addAttribution(
+                        'Cesty: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> prispievatelia' +
+                        (meta.stiahnute ? ' (stav k ' + meta.stiahnute + ')' : '')
+                    );
                 }
-
-                roadsLayer = L.geoJSON(geojsonData, {
-                    // Canvas zvláda tisíce čiar oveľa rýchlejšie než SVG
-                    renderer: roadsRenderer,
-                    style: osmStyle,
-                    onEachFeature: function(feature, layer) {
-                        if (feature.properties && feature.properties.name) {
-                            layer.bindPopup(`<strong>${feature.properties.name}</strong><br>${feature.properties.highway || "unknown type"}`);
-                        }
-                    }
-                }).addTo(map);
-
-                // Vrstva pruhov pracuje s tými istými dátami – držíme si ich,
-                // aby sa dala prepínať bez nového dopytu na Overpass
-                lastRoadsGeoJSON = geojsonData;
-                refreshLanesLayer();
 
                 showLoading(false);
-                roadsJob = null;
-
-                if (!geojsonData.features.length) {
-                    showMessage("V tomto výreze nie sú žiadne cesty.", "info", 4000);
-                } else if (!includeMinor) {
-                    showMessage("Zobrazené sú len hlavné cesty. Priblíž mapu pre chodníky a poľné cesty.", "info", 4000);
-                }
             })
             .catch(function(err) {
-                if (job.cancelled || err.name === 'AbortError') { return; }
-
-                console.error("Chyba pri načítaní ciest:", err.message);
-
-                // Druhý pokus s odľahčeným dopytom
-                if (includeMinor) {
-                    console.warn("Skúšam znova len s hlavnými cestami.");
-                    runRoadsQuery(requestBounds, false, job);
-                    return;
-                }
-
+                console.error('Chyba pri načítaní ciest:', err);
                 showLoading(false);
 
-                var hint;
-                if (allTimedOut(err) || hasReachableServerResponse(err)) {
-                    // Buď vypršal čas na oboch zrkadlách, alebo aspoň jedno
-                    // vrátilo čitateľnú HTTP chybu – v oboch prípadoch je to
-                    // problém na strane Overpassu, nie zariadenia/siete
-                    hint = "Overpass servery majú práve problémy (preťaženie alebo výpadok) – " +
-                           "nesúvisí to s tvojím pripojením. Skús to o chvíľu znova tlačidlom " +
-                           "„Načítať cesty“, prípadne over stav na overpass-api.de/api/status.";
-                } else if (isNetworkLevelError(err.message)) {
-                    // Ani jedno zrkadlo nedalo čitateľnú odpoveď – teraz je
-                    // pravdepodobnejšie, že spojenie neotvorilo zariadenie
-                    hint = diagnoseNetwork();
-                } else {
-                    hint = "Skús priblížiť mapu alebo tlačidlo „Načítať cesty“.";
-                }
-
-                showMessage("Cesty sa nepodarilo načítať. " + err.message + ". " + hint, "error");
-                roadsJob = null;
+                // Z file:// prehliadač načítanie súboru cez fetch zakáže
+                var hint = location.protocol === 'file:'
+                    ? ' Stránka je otvorená priamo zo súboru (file://), prehliadač v tom prípade dáta nenačíta – otvor ju cez webový server.'
+                    : '';
+                showMessage('Cesty sa nepodarilo načítať (' + err.message + ').' + hint, 'error');
             });
     }
 
-    // Cesty sa načítavajú VÝHRADNE na kliknutie – žiadne automatické
-    // volanie pri posune/zoome mapy ani pri štarte stránky. Verejné Overpass
-    // servery sú pomalé a nespoľahlivé, takže má zmysel ísť na ne len vtedy,
-    // keď to používateľ naozaj chce, a nie pri každom pohybe mapou.
-    document.getElementById('reload-roads').addEventListener('click', function() {
-        loadRoads();
-    });
+    loadRoads();
 
     // ---------------------------------------------------------------------
     // Vrstvy na kreslenie
