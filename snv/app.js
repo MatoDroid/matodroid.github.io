@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261030a';
+  const GLB_VER = '20261030b';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -36,7 +36,7 @@
   // ------------------------------------------------------------- terén
   async function loadHeights(t, k) {
     if (t.heights[k]) return t.heights[k];
-    const img = await loaderPNG(`tiles/${t.name}/h${k}.png`);
+    const img = await loaderPNG(`tiles/${t.name}/h${k}.png?v=${GLB_VER}`);
     const p = pixels(img), n = img.width * img.height, H = new Float32Array(n), sc = ZR / 65535;
     for (let i = 0; i < n; i++) H[i] = p[i * 4 + 2] > 128 ? ((p[i * 4] << 8) | p[i * 4 + 1]) * sc : NaN;
     t.heights[k] = { H, w: img.width, h: img.height };
