@@ -5,7 +5,7 @@
 document.getElementById('f').onsubmit = async ev => {
   ev.preventDefault(); const e = document.getElementById('e'), pw = document.getElementById('p').value; e.textContent = 'Dešifrujem…';
   try {
-    const buf = new Uint8Array(await (await fetch('app.enc')).arrayBuffer());
+    const buf = new Uint8Array(await (await fetch('app.enc', { cache: 'no-store' })).arrayBuffer());
     const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
     const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: buf.slice(0, 16), iterations: 600000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
     const html = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(16, 28) }, key, buf.slice(28)));
