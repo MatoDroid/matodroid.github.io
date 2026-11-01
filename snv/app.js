@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261101c';
+  const GLB_VER = '20261101d';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -136,7 +136,7 @@
   async function setObjects(t, want) {
     if (t.objBusy) return; t.objBusy = true;
     try {
-      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); } } s.visible = showObj; t.obj = s; scene.add(s); } else t.obj = false; }
+      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); } } s.visible = showObj; t.bridge = []; s.traverse(c => { if (c.isMesh && /^Mosty/i.test(c.name || (c.parent && c.parent.name) || '')) t.bridge.push(c); }); t.obj = s; scene.add(s); } else t.obj = false; }
       else if (!want && t.obj) { disposeTree(t.obj); t.obj = null; }
     } catch (e) { console.warn('objekty', t.name, e.message); t.obj = false; }
     t.objBusy = false;
@@ -181,11 +181,27 @@
     }
     return NaN;
   }
+  // výška dosky mosta pod bodom (lúč zhora); berie len dosku do `up` m nad nohami, aby sa pod mostom nechodilo po moste
+  const _brRay = new THREE.Raycaster(), _down = new THREE.Vector3(0, -1, 0), _brO = new THREE.Vector3();
+  function bridgeAt(x, z, feetY, up) {
+    const t = tileAt(x, z); if (!t || !t.bridge || !t.bridge.length) return NaN;
+    _brO.set(x, feetY + up, z); _brRay.set(_brO, _down); _brRay.far = up + 3;
+    const hit = _brRay.intersectObjects(t.bridge, false);
+    for (const h of hit) { if (h.face && h.face.normal.y > 0.5 || h.face && h.object.matrixWorld && h.face.normal.clone().transformDirection(h.object.matrixWorld).y > 0.5) return h.point.y; }
+    return NaN;
+  }
+  function groundAt(x, z, feetY) {
+    const g = heightAt(x, z); if (g !== g) return g;
+    const b = bridgeAt(x, z, feetY === undefined ? g : feetY, 0.7);
+    return b === b && b > g - 0.05 ? b : g;
+  }
   function pick(ev) {
     const r = canvas.getBoundingClientRect(), ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, camera); const o = rc.ray.origin, d = rc.ray.direction; let t = 0, prev = 0;
+    let bd = Infinity, bp = null; tiles.forEach(tt => { if (tt.bridge && tt.bridge.length && tt.obj && tt.obj.visible) { const hh = rc.intersectObjects(tt.bridge, false); if (hh.length && hh[0].distance < bd && hh[0].face && hh[0].face.normal.clone().transformDirection(hh[0].object.matrixWorld).y > 0.5) { bd = hh[0].distance; bp = hh[0].point; } } });
     for (let i = 0; i < 6000; i++) {
       const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t, h = heightAt(x, z);
+      if (bp && t >= bd) return { x: bp.x, z: bp.z, y: bp.y };
       if (h === h && y < h) { let a = prev, b = t; for (let k = 0; k < 20; k++) { const m = (a + b) / 2, hh = heightAt(o.x + d.x * m, o.z + d.z * m); if (hh === hh && o.y + d.y * m < hh) b = m; else a = m; } return { x: o.x + d.x * b, z: o.z + d.z * b }; }
       prev = t; t += Math.max(1.5, t * 0.004); if (t > 20000) break;
     }
@@ -193,8 +209,8 @@
   }
 
   // ------------------------------------------------------------- režimy
-  function enterWalk(x, z, yw) {
-    const y = heightAt(x, z); if (y !== y) return false;
+  function enterWalk(x, z, yw, yy) {
+    const y = yy !== undefined ? yy : heightAt(x, z); if (y !== y) return false;
     walk = true; controls.enabled = false; camera.position.set(x, y + EYE, z); yaw = yw === undefined ? yaw : yw; pitch = -0.05; applyLook();
     $('badge').style.display = 'block'; $('btnWalk').textContent = 'Naspäť do mapy'; scene.fog.near = 400; scene.fog.far = 3000; return true;
   }
@@ -208,7 +224,7 @@
     const y = heightAt(x, z); const gy = y === y ? y : 400;
     controls.target.set(x, gy, z); camera.position.set(x - dist * 0.6, gy + dist * 0.8, z + dist * 0.9); controls.update();
   }
-  canvas.addEventListener('dblclick', ev => { if (walk) return; const p = pick(ev); if (p) enterWalk(p.x, p.z); });
+  canvas.addEventListener('dblclick', ev => { if (walk) return; const p = pick(ev); if (p) enterWalk(p.x, p.z, undefined, p.y); });
   canvas.addEventListener('pointerdown', ev => { if (walk) { drag = { x: ev.clientX, y: ev.clientY }; canvas.setPointerCapture(ev.pointerId); } });
   canvas.addEventListener('pointermove', ev => { if (walk && drag) { yaw -= (ev.clientX - drag.x) * 0.004; pitch = Math.max(-1.3, Math.min(1.3, pitch - (ev.clientY - drag.y) * 0.004)); drag = { x: ev.clientX, y: ev.clientY }; applyLook(); } });
   canvas.addEventListener('pointerup', () => { drag = null; });
@@ -264,7 +280,7 @@
       const sp = (keys.ShiftLeft || keys.ShiftRight ? 12 : 3.5) * dt; let f = 0, s = 0;
       if (keys.KeyW || keys.ArrowUp) f += 1; if (keys.KeyS || keys.ArrowDown) f -= 1; if (keys.KeyD || keys.ArrowRight) s += 1; if (keys.KeyA || keys.ArrowLeft) s -= 1;
       if (f || s) { const nx = camera.position.x + (-Math.sin(yaw) * f + Math.cos(yaw) * s) * sp, nz = camera.position.z + (-Math.cos(yaw) * f - Math.sin(yaw) * s) * sp, h = heightAt(nx, nz); if (h === h) { camera.position.x = nx; camera.position.z = nz; } }
-      const gy = heightAt(camera.position.x, camera.position.z); if (gy === gy) camera.position.y += ((gy + EYE) - camera.position.y) * Math.min(1, dt * 12);
+      const gy = groundAt(camera.position.x, camera.position.z, camera.position.y - EYE); if (gy === gy) camera.position.y += ((gy + EYE) - camera.position.y) * Math.min(1, dt * 12);
     } else controls.update();
     update(now); renderer.render(scene, camera);
   }
