@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZAPPAR guma</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root { --bg:#f6f7f9; --fg:#1d232b; --muted:#5b6672; --line:#d5dae0; --acc:#1f6feb; --danger:#c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1b1f24; --fg:#e6e9ed; --muted:#9aa5b1; --line:#333a42; --acc:#58a6ff; --danger:#ff6b6b; } }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  #bar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line); }
+  #bar .grp { display:flex; gap:6px; align-items:center; }
+  button, select, input[type=file]::file-selector-button { font:inherit; padding:5px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  button:disabled { opacity:.45; cursor:default; }
+  #stat { color:var(--muted); margin-left:auto; }
+  #map { position:absolute; top:var(--bh,50px); left:0; right:0; bottom:0; }
+  #brush { position:fixed; pointer-events:none; border:2px solid var(--danger); border-radius:50%; display:none; z-index:1000; transform:translate(-50%,-50%); }
+  #ov { position:absolute; inset:0; z-index:650; pointer-events:none; }
+  #msg { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--fg); color:var(--bg); padding:8px 14px; border-radius:8px; z-index:1100; display:none; max-width:90vw; }
+  #drop { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(31,111,235,.18); font-size:22px; z-index:1200; }
+  label.chk { display:flex; gap:4px; align-items:center; }
+  @media (max-width:700px) { #stat { margin-left:0; width:100%; } }
+</style>
+</head>
+<body>
+<div id="bar">
+  <div class="grp"><input type="file" id="file" accept=".geojson,.json"></div>
+  <div class="grp">
+    <button id="tErase" class="on" title="E">Guma</button>
+    <button id="tSel" title="S">Výber</button>
+    <button id="tDraw" title="A">Kresliť</button>
+    <button id="tPan" title="P alebo drž medzerník. Pravé tlačidlo myši posúva vždy.">Posun</button>
+  </div>
+  <div class="grp" id="gErase">
+    <span id="modeTxt" title="Režim mazania sa prepína klávesom Shift"></span>
+    <label>Štetec <input type="range" id="size" min="3" max="60" value="14"> <span id="sizeV">14</span> px</label>
+  </div>
+  <div class="grp" id="gDraw" style="display:none;color:var(--muted);font-size:12px">klik = bod · dvojklik alebo Enter = dokončiť · Backspace = späť o bod · Esc = zrušiť · Ctrl = bez prichytávania</div>
+  <div class="grp">
+    <label class="chk" title="Zobraziť/skryť parcely C (modré)"><input type="checkbox" id="showC" checked> Parcely C</label>
+    <label class="chk" title="Zobraziť/skryť čiary ZAPPAR (červené)"><input type="checkbox" id="showZ" checked> ZAPPAR</label>
+  </div>
+  <div class="grp" id="gSel" style="display:none">
+    <select id="sshape" title="Tvar výberu (L)">
+      <option value="rect">Obdĺžnik</option>
+      <option value="lasso">Lasso</option>
+    </select>
+    <label class="chk" title="Vybrať aj úseky, ktoré oblasť len pretínajú"><input type="checkbox" id="touch"> aj dotyk</label>
+    <button id="merge" disabled title="M: zlúči vybrané body do ich stredu">Zlúčiť body</button>
+    <button id="del" disabled title="Delete">Zmazať výber</button>
+  </div>
+  <div class="grp">
+    <button id="undo" disabled title="Ctrl+Z">Späť</button>
+    <button id="redo" disabled title="Ctrl+Y">Znova</button>
+  </div>
+  <div class="grp">
+    <button id="save" disabled title="Ctrl+S: uloží aktuálne úpravy do súboru ..._opravene.geojson">Uložiť GeoJSON</button>
+    <button id="exp" disabled>Exportovať .osm</button>
+    <button id="josm" disabled>Poslať do JOSM</button>
+  </div>
+  <div id="stat">Načítajte súbor ZAPPAR (.geojson).</div>
+</div>
+<div id="map"></div>
+<div id="brush"></div>
+<div id="msg"></div>
+<div id="drop">Pustite súbor .geojson</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const bar = $('bar'), setBH = () => document.documentElement.style.setProperty('--bh', bar.offsetHeight + 'px');
+  setBH(); addEventListener('resize', () => { setBH(); map.invalidateSize(); });
+
+  // ---- mapa ----
+  const map = L.map('map', { zoomAnimation: false, zoomSnap: 0.5, maxZoom: 23, preferCanvas: true }).setView([48.9445, 20.5657], 18);
+  const cont = map.getContainer();
+  const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 23, attribution: '© OpenStreetMap' }).addTo(map);
+  const wms = L.tileLayer.wms('https://kataster.skgeodesy.sk/eskn/services/NR/kn_wms_norm/MapServer/WMSServer', {
+    layers: '6', format: 'image/png32', transparent: true, version: '1.3.0', maxZoom: 23, opacity: .8, attribution: 'ÚGKK SR' });
+  const wmsC = L.tileLayer.wms('https://kataster.skgeodesy.sk/eskn/services/NR/kn_wms_norm/MapServer/WMSServer', {
+    layers: '5', format: 'image/png32', transparent: true, version: '1.3.0', maxZoom: 23, opacity: .6, attribution: 'ÚGKK SR' });
+  const orto = L.tileLayer('orto/{z}/{x}/{y}.jpg', { minNativeZoom: 20, maxNativeZoom: 20, minZoom: 16, maxZoom: 23, attribution: 'Ortofoto (lokálne dlaždice HUTA/orto_mesto)' });
+  const ofm = L.tileLayer('https://ofmozaika.tiles.freemap.sk/{z}/{x}/{y}.jpg', { maxNativeZoom: 19, maxZoom: 23, attribution: 'Ortofotomozaika (Freemap Slovakia / ÚGKK SR)' });
+  L.control.layers({ 'OSM': osm, 'Ortofoto Freemap (ofmozaika, z19)': ofm, 'Ortofoto mesto (lokálne, z20)': orto },
+    { 'WMS ZAPPAR (porovnanie)': wms, 'WMS parcely C': wmsC }, { collapsed: true }).addTo(map);
+
+  // podklady sa prepínajú klávesmi 1, 2, 3 (číselný rad nad písmenami)
+  const bases = [[osm, 'OSM'], [ofm, 'Ortofoto Freemap'], [orto, 'Ortofoto mesto (lokálne)']];
+  function setBase(n) {
+    bases.forEach(([l], i) => { if (i === n - 1) { if (!map.hasLayer(l)) l.addTo(map); l.bringToBack(); } else if (map.hasLayer(l)) map.removeLayer(l); });
+    toast('Podklad ' + n + ': ' + bases[n - 1][1]);
+  }
+
+  // ---- dáta ----
+  let ways = [];                 // {pts:[[lon,lat]..], ks:[kľúče bodov], alive, bb}
+  const CELL = 0.0005;           // ~55 m
+  let grid = new Map();
+  const deg = new Map();         // kľúč bodu -> počet živých úsekov, ktoré ním prechádzajú
+  const hist = [], redoStack = [];
+  const sel = { ways: new Set(), nodes: new Set() };
+  let showC = true, showZ = true;   // zobrazenie vrstiev: parcely C a ZAPPAR (všetko ostatné sa berie ako ZAPPAR)
+  const shown = w => w.typ === 'C' ? showC : showZ;
+  let moveState = null;         // prebiehajúce presúvanie: {keys, aff, dx, dy, ll0, selWays, selNodes}
+
+  const key = p => p[0].toFixed(7) + ',' + p[1].toFixed(7);
+  const unkey = k => k.split(',').map(Number);
+  const bbox = pts => { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const [x, y] of pts) { if (x < a) a = x; if (x > c) c = x; if (y < b) b = y; if (y > d) d = y; } return [a, b, c, d]; };
+  const keys = bb => { const k = []; for (let i = Math.floor(bb[0]/CELL); i <= Math.floor(bb[2]/CELL); i++) for (let j = Math.floor(bb[1]/CELL); j <= Math.floor(bb[3]/CELL); j++) k.push(i + ',' + j); return k; };
+  const addToGrid = w => { for (const k of keys(w.bb)) { let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(w); } };
+  const mkWay = pts => ({ pts, ks: pts.map(key), alive: false, bb: bbox(pts) });
+  function setAlive(w, v) {
+    if (w.alive === v) return; w.alive = v;
+    for (const k of new Set(w.ks)) deg.set(k, (deg.get(k) || 0) + (v ? 1 : -1));
+    if (!v) sel.ways.delete(w);
+  }
+  const addWay = (pts, ops, typ) => { const w = mkWay(pts); w.typ = typ; ways.push(w); addToGrid(w); setAlive(w, true); if (ops) ops.push({ t: 'add', w }); return w; };
+  const pruneSel = () => { for (const k of [...sel.nodes]) if (!(deg.get(k) > 0)) sel.nodes.delete(k); };
+
+  let curName = 'zappar.geojson';
+  function load(gj, name) {
+    if (name) curName = name.split('/').pop();
+    ways = []; grid = new Map(); deg.clear(); hist.length = 0; redoStack.length = 0; sel.ways.clear(); sel.nodes.clear();
+    const feats = gj.type === 'FeatureCollection' ? gj.features : [gj];
+    for (const f of feats) {
+      const g = f.geometry || f, typ = (f.properties || {}).typ;
+      // čiary sa načítajú priamo, polygóny (napr. parcely C) ako uzavreté čiary po ich hraniciach
+      const parts = g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates]
+        : g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : [];
+      for (const c of parts) if (c.length > 1) addWay(c.map(p => [p[0], p[1]]), null, typ);
+    }
+    if (!ways.length) { toast('V súbore nie sú žiadne čiary (LineString).'); return; }
+    let bb = [1e9, 1e9, -1e9, -1e9]; for (const w of ways) bb = [Math.min(bb[0], w.bb[0]), Math.min(bb[1], w.bb[1]), Math.max(bb[2], w.bb[2]), Math.max(bb[3], w.bb[3])];
+    setBH(); map.invalidateSize(); map.fitBounds([[bb[1], bb[0]], [bb[3], bb[2]]]);
+    layer.draw(); updateUI(); toast('Načítané: ' + ways.length + ' úsekov' + (name ? ' (' + name + ')' : ''));
+  }
+
+  // ---- kreslenie (canvas) ----
+  const Layer = L.Layer.extend({
+    onAdd(m) {
+      this._c = L.DomUtil.create('canvas', '', m.getPanes().overlayPane); this._c.style.pointerEvents = 'none';
+      m.on('moveend zoomend resize', this._reset, this); this._reset();
+    },
+    onRemove(m) { L.DomUtil.remove(this._c); m.off('moveend zoomend resize', this._reset, this); },
+    _reset() {
+      const s = map.getSize(); if (this._c.width !== s.x || this._c.height !== s.y) { this._c.width = s.x; this._c.height = s.y; }
+      L.DomUtil.setPosition(this._c, map.containerPointToLayerPoint([0, 0])); this.draw();
+    },
+    draw() {
+      const ctx = this._c.getContext('2d'), s = map.getSize(); ctx.clearRect(0, 0, s.x, s.y);
+      const b = map.getBounds(), z = map.getZoom();
+      const x0 = b.getWest(), x1 = b.getEast(), y0 = b.getSouth(), y1 = b.getNorth();
+      const tl = map.getPixelBounds().min, crs = map.options.crs;
+      const P = (lng, lat) => { const p = crs.latLngToPoint({ lat, lng }, z); return [p.x - tl.x, p.y - tl.y]; };
+      const vis = [], dots = { j: [], e: [], i: [] };
+      const allV = z >= 20, someV = z >= 17;
+      ctx.lineJoin = 'round'; ctx.lineWidth = z >= 19 ? 2 : 1.4;
+      const pr = new Path2D(), pb = new Path2D();   // ZAPPAR červenou, parcely C modrou
+      const degPx = 360 / (256 * Math.pow(2, z)), minLon = 1.5 * degPx, minLat = minLon * 0.66;   // čiary menšie ako ~1,5 px sa nekreslia
+      for (const w of ways) {
+        if (!w.alive || !shown(w) || w.bb[2] < x0 || w.bb[0] > x1 || w.bb[3] < y0 || w.bb[1] > y1) continue;
+        if (!w.pv &&w.bb[2] - w.bb[0] < minLon && w.bb[3] - w.bb[1] < minLat) continue;
+        if (sel.ways.has(w)) vis.push(w);
+        const pts = w.pv || w.pts, n = pts.length, pth = w.typ === 'C' ? pb : pr;
+        for (let i = 0; i < n; i++) {
+          const [X, Y] = P(pts[i][0], pts[i][1]);
+          i ? pth.lineTo(X, Y) : pth.moveTo(X, Y);
+          if (someV && (allV || i === 0 || i === n - 1)) dots[deg.get(w.ks[i]) >= 2 ? 'j' : (i === 0 || i === n - 1) ? 'e' : 'i'].push([X, Y]);
+        }
+      }
+      ctx.strokeStyle = '#1e66d0'; ctx.stroke(pb); ctx.strokeStyle = '#e53935'; ctx.stroke(pr);
+      if (vis.length) {
+        ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 3.5; ctx.beginPath();
+        for (const w of vis) { const pts = w.pv || w.pts; for (let i = 0; i < pts.length; i++) { const [X, Y] = P(pts[i][0], pts[i][1]); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); } }
+        ctx.stroke();
+      }
+      const circ = (arr, r, fill, stroke) => { if (!arr.length) return; ctx.beginPath(); for (const [X, Y] of arr) { ctx.moveTo(X + r, Y); ctx.arc(X, Y, r, 0, 6.2832); }
+        ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.3; ctx.stroke(); } };
+      circ(dots.i, 1.8, '#b71c1c'); circ(dots.e, 2.8, '#b71c1c'); circ(dots.j, 3.6, '#fff', '#b71c1c');
+      if (sel.nodes.size) { const a = [];
+        for (const k of sel.nodes) { const [lng, lat] = unkey(k), mv = moveState && moveState.keys.has(k); a.push(P(lng + (mv ? moveState.dx : 0), lat + (mv ? moveState.dy : 0))); }
+        circ(a, 5, '#ff9800', '#fff'); }
+    }
+  });
+  const layer = new Layer().addTo(map);  let rafPending = false;
+  const redraw = () => { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; layer.draw(); }); };
+
+  // ---- pomocné ----
+  const mpp = lat => 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
+  const cpt = e => { const r = cont.getBoundingClientRect(); return L.point(e.clientX - r.left, e.clientY - r.top); };
+  function segDist(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+    return Math.hypot(ax + t * dx - px, ay + t * dy - py);
+  }
+  const pip = (p, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+  const ccw = (a, b, c) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+  const segX = (a, b, c, d) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+
+  // ---- guma ----
+  let tool = 'erase', spaceDown = false, erasing = false, curOps = null, last = null;
+  // Shift drží = celý úsek po priesečník, bez Shiftu = len pod štetcom
+  let shiftDown = false;
+  const brushEl = $('brush'), brushPx = () => +$('size').value, mode = () => shiftDown ? 'whole' : 'part';
+  function showMode() {
+    $('modeTxt').textContent = shiftDown ? 'Shift: celý úsek po priesečník' : 'Len pod štetcom (Shift = celý úsek)';
+    brushEl.style.borderColor = shiftDown ? '#ff9800' : ''; brushEl.style.borderStyle = shiftDown ? 'dashed' : 'solid';
+  }
+  const setShift = v => { if (v !== shiftDown) { shiftDown = v; showMode(); } };
+  addEventListener('keydown', e => { if (e.key === 'Shift') setShift(true); });
+  addEventListener('keyup', e => { if (e.key === 'Shift') setShift(false); });
+  addEventListener('blur', () => setShift(false));
+  showMode();
+
+  function eraseAt(lat, lng, rMeters) {
+    const my = 111320, mx = 111320 * Math.cos(lat * Math.PI / 180);
+    const rlon = rMeters / mx, rlat = rMeters / my;
+    const bb = [lng - rlon, lat - rlat, lng + rlon, lat + rlat], seen = new Set(), hits = [];
+    for (const k of keys(bb)) { const a = grid.get(k); if (!a) continue; for (const w of a) {
+      if (!w.alive || !shown(w) || seen.has(w)) continue; seen.add(w);
+      if (w.bb[2] < bb[0] || w.bb[0] > bb[2] || w.bb[3] < bb[1] || w.bb[1] > bb[3]) continue;
+      const hs = [];
+      for (let i = 0; i < w.pts.length - 1; i++) {
+        const a1 = w.pts[i], b1 = w.pts[i + 1];
+        if (segDist(0, 0, (a1[0] - lng) * mx, (a1[1] - lat) * my, (b1[0] - lng) * mx, (b1[1] - lat) * my) <= rMeters) hs.push(i);
+      }
+      if (hs.length) hits.push([w, hs]);
+    } }
+    if (!hits.length) return;
+    for (const [w, hs] of hits) {
+      setAlive(w, false); curOps.push({ t: 'rm', w });
+      if (mode() === 'part') {
+        const H = new Set(hs); let run = [];
+        const flush = () => { if (run.length > 1) addWay(run, curOps, w.typ); run = []; };
+        for (let i = 0; i < w.pts.length - 1; i++) { if (H.has(i)) { flush(); continue; } if (!run.length) run.push(w.pts[i]); run.push(w.pts[i + 1]); }
+        flush();
+      }
+    }
+    pruneSel(); redraw();
+  }
+  function stepTo(pt) {
+    const rad = brushPx() / 2;
+    const run = p => { const ll = map.containerPointToLatLng(p); eraseAt(ll.lat, ll.lng, rad * mpp(ll.lat)); };
+    if (last) { const d = pt.distanceTo(last), n = Math.max(1, Math.ceil(d / Math.max(2, rad / 2))); for (let i = 1; i <= n; i++) run(last.add(pt.subtract(last).multiplyBy(i / n))); } else run(pt);
+    last = pt;
+  }
+
+  // ---- výber ----
+  const ov = document.createElement('canvas'); ov.id = 'ov'; cont.appendChild(ov);
+  const fitOv = () => { const s = map.getSize(); ov.width = s.x; ov.height = s.y; };
+  map.on('resize', fitOv); fitOv();
+  let selDrag = null;   // {start, path, moved, mod}
+  const modOf = e => e.shiftKey ? 'add' : (e.ctrlKey || e.metaKey) ? 'toggle' : 'replace';
+  function drawOv() {
+    const c = ov.getContext('2d'); c.clearRect(0, 0, ov.width, ov.height); if (!selDrag || !selDrag.moved) return;
+    c.setLineDash([6, 4]); c.lineWidth = 1.6; c.strokeStyle = '#ffb300'; c.fillStyle = 'rgba(255,179,0,.12)';
+    const poly = selPoly(); c.beginPath(); poly.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill(); c.stroke();
+  }
+  function selPoly() {
+    if ($('sshape').value === 'lasso') return selDrag.path;
+    const a = selDrag.start, b = selDrag.cur; return [L.point(a.x, a.y), L.point(b.x, a.y), L.point(b.x, b.y), L.point(a.x, b.y)];
+  }
+  function applySel(ws, ns, mod) {
+    if (mod === 'replace') { sel.ways.clear(); sel.nodes.clear(); }
+    for (const w of ws) (mod === 'toggle' && sel.ways.has(w)) ? sel.ways.delete(w) : sel.ways.add(w);
+    for (const k of ns) (mod === 'toggle' && sel.nodes.has(k)) ? sel.nodes.delete(k) : sel.nodes.add(k);
+    updateUI(); redraw();
+  }
+  function selectRegion(poly, mod) {
+    const xs = poly.map(p => p.x), ys = poly.map(p => p.y);
+    const sw = map.containerPointToLatLng([Math.min(...xs), Math.max(...ys)]), ne = map.containerPointToLatLng([Math.max(...xs), Math.min(...ys)]);
+    const bb = [sw.lng, sw.lat, ne.lng, ne.lat], seen = new Set(), ws = new Set(), ns = new Set(), touch = $('touch').checked;
+    for (const k of keys(bb)) { const a = grid.get(k); if (!a) continue; for (const w of a) {
+      if (!w.alive || !shown(w) || seen.has(w)) continue; seen.add(w);
+      if (w.bb[2] < bb[0] || w.bb[0] > bb[2] || w.bb[3] < bb[1] || w.bb[1] > bb[3]) continue;
+      const P = w.pts.map(p => map.latLngToContainerPoint([p[1], p[0]])); let inside = 0;
+      P.forEach((p, i) => { if (pip(p, poly)) { ns.add(w.ks[i]); inside++; } });
+      if (inside === P.length) ws.add(w);
+      else if (touch) { let hit = inside > 0;
+        for (let i = 0; i < P.length - 1 && !hit; i++) for (let j = 0; j < poly.length; j++) if (segX(P[i], P[i + 1], poly[j], poly[(j + 1) % poly.length])) { hit = true; break; }
+        if (hit) ws.add(w); }
+    } }
+    applySel(ws, ns, mod);
+  }
+  function pickAt(pt, mod) {
+    const o = pick(pt);
+    if (o && o.node) applySel([], [o.node], mod); else if (o) applySel([o.way], [], mod); else if (mod === 'replace') applySel([], [], 'replace');
+  }
+  // ---- dvojklik do uzavretej plochy: vyberie plochu a všetky čiary, ktoré ju ohraničujú ----
+  let lastSelDown = { t: 0, p: null };
+  function faceIn(ll, c, bb) {
+    const seen = new Set(), wl = [];
+    for (const k of keys(bb)) { const a = grid.get(k); if (!a) continue; for (const w of a) if (w.alive && shown(w) && !seen.has(w)) { seen.add(w); wl.push(w); } }
+    const XY = new Map(), adj = new Map(), edges = new Map();
+    const link = (a, b) => { let s = adj.get(a); if (!s) adj.set(a, s = new Set()); s.add(b); };
+    for (const w of wl) {
+      w.pts.forEach((p, i) => XY.set(w.ks[i], [p[0] * c, p[1], p[0]]));
+      for (let i = 0; i < w.ks.length - 1; i++) { const a = w.ks[i], b = w.ks[i + 1]; if (a === b) continue;
+        const ek = a < b ? a + '|' + b : b + '|' + a; if (!edges.has(ek)) { edges.set(ek, { a, b }); link(a, b); link(b, a); } }
+    }
+    const px = ll.lng * c, py = ll.lat; let best = null, bx = Infinity, up = false;
+    for (const e of edges.values()) { const A = XY.get(e.a), B = XY.get(e.b);
+      if ((A[1] <= py) !== (B[1] <= py)) { const xi = A[0] + (py - A[1]) * (B[0] - A[0]) / (B[1] - A[1]); if (xi > px && xi < bx) { bx = xi; best = e; up = B[1] > A[1]; } } }
+    if (!best) return null;
+    const u0 = up ? best.a : best.b, v0 = up ? best.b : best.a, loop = [[u0, v0]], TP = 2 * Math.PI;
+    let cu = u0, cv = v0, closed = false;
+    for (let n = 0; n < 60000; n++) {          // obchádzanie plochy vľavo: na uzle ide hrana najbližšia v smere hodinových ručičiek od hrany späť
+      const V = XY.get(cv), U = XY.get(cu), back = Math.atan2(U[1] - V[1], U[0] - V[0]); let nw = null, nd = 9;
+      for (const w of adj.get(cv)) { const W = XY.get(w); let d = (back - Math.atan2(W[1] - V[1], W[0] - V[0])) % TP; if (d < 0) d += TP; if (w === cu || d < 1e-12) d = TP; if (d < nd) { nd = d; nw = w; } }
+      cu = cv; cv = nw; if (cu === u0 && cv === v0) { closed = true; break; } loop.push([cu, cv]);
+    }
+    if (!closed) return null;
+    let area = 0; for (const [a, b] of loop) { const A = XY.get(a), B = XY.get(b); area += A[0] * B[1] - B[0] * A[1]; }
+    if (area <= 0) return null;                // záporná orientácia = vonkajšok alebo ostrov
+    const dir = new Set(loop.map(([a, b]) => a + '>' + b)), bnd = new Set(), nodes = new Set(), poly = [];
+    let fb = [1e9, 1e9, -1e9, -1e9];
+    for (const [a, b] of loop) { const A = XY.get(a); poly.push([A[2], A[1]]);
+      fb = [Math.min(fb[0], A[2]), Math.min(fb[1], A[1]), Math.max(fb[2], A[2]), Math.max(fb[3], A[1])];
+      if (!dir.has(b + '>' + a)) { bnd.add(a < b ? a + '|' + b : b + '|' + a); nodes.add(a); nodes.add(b); } }   // hrana prejdená oboma smermi = slepý výbežok, nepatrí k obrysu
+    if (fb[0] <= bb[0] || fb[1] <= bb[1] || fb[2] >= bb[2] || fb[3] >= bb[3]) return { ok: false };   // plocha siaha až k okraju okna
+    const wsel = new Set();
+    for (const w of wl) { let tot = 0, hit = 0;
+      for (let i = 0; i < w.ks.length - 1; i++) { const a = w.ks[i], b = w.ks[i + 1]; if (a === b) continue; tot++; if (bnd.has(a < b ? a + '|' + b : b + '|' + a)) hit++; }
+      if (tot && hit === tot) { wsel.add(w); for (const k of w.ks) nodes.delete(k); } }
+    return { ok: true, ws: wsel, ns: nodes, poly, area };
+  }
+  function selectFace(pt, mod) {
+    const ll = map.containerPointToLatLng(pt), c = Math.cos(ll.lat * Math.PI / 180); let f = null;
+    for (const R of [150, 600, 3000]) {
+      const dy = R / 111320, dx = dy / c; f = faceIn(ll, c, [ll.lng - dx, ll.lat - dy, ll.lng + dx, ll.lat + dy]);
+      if (f && f.ok) break;
+    }
+    if (!f || !f.ok) { toast('Dvojklik mimo uzavretej plochy (alebo je plocha príliš veľká).'); return; }
+    applySel(f.ws, f.ns, mod);
+    const g = ov.getContext('2d'); g.clearRect(0, 0, ov.width, ov.height); g.fillStyle = 'rgba(255,179,0,.25)'; g.beginPath();
+    f.poly.forEach((p, i) => { const q = map.latLngToContainerPoint([p[1], p[0]]); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); g.closePath(); g.fill();
+    setTimeout(() => { if (!selDrag) g.clearRect(0, 0, ov.width, ov.height); }, 700);
+    toast('Plocha ' + Math.round(f.area * 111320 * 111320) + ' m² · vybraných čiar: ' + f.ws.size + (f.ns.size ? ', samostatných bodov: ' + f.ns.size : ''));
+  }
+  function pick(pt) {
+    const ll = map.containerPointToLatLng(pt), m = mpp(ll.lat), my = 111320, mx = 111320 * Math.cos(ll.lat * Math.PI / 180);
+    const r = 10 * m, bb = [ll.lng - r / mx, ll.lat - r / my, ll.lng + r / mx, ll.lat + r / my], seen = new Set();
+    let bestN = null, bestNd = 9, bestW = null, bestWd = 7;
+    for (const k of keys(bb)) { const a = grid.get(k); if (!a) continue; for (const w of a) {
+      if (!w.alive || !shown(w) || seen.has(w)) continue; seen.add(w);
+      const P = w.pts.map(p => map.latLngToContainerPoint([p[1], p[0]]));
+      P.forEach((p, i) => { const d = p.distanceTo(pt); if (d < bestNd) { bestNd = d; bestN = w.ks[i]; } });
+      for (let i = 0; i < P.length - 1; i++) { const d = segDist(pt.x, pt.y, P[i].x, P[i].y, P[i + 1].x, P[i + 1].y); if (d < bestWd) { bestWd = d; bestW = w; } }
+    } }
+    return bestN ? { node: bestN } : bestW ? { way: bestW } : null;
+  }
+
+  // ---- presúvanie bodov a čiar (ako v JOSM) ----
+  function startMove(obj, startPt) {
+    if (obj.node) { if (!sel.nodes.has(obj.node)) { sel.ways.clear(); sel.nodes.clear(); sel.nodes.add(obj.node); } }
+    else if (!sel.ways.has(obj.way)) { sel.ways.clear(); sel.nodes.clear(); sel.ways.add(obj.way); }
+    const keys = new Set(sel.nodes); for (const w of sel.ways) for (const k of w.ks) keys.add(k);
+    const aff = []; for (const w of ways) if (w.alive && w.ks.some(k => keys.has(k))) aff.push(w);
+    moveState = { keys, aff, dx: 0, dy: 0, ll0: map.containerPointToLatLng(startPt), selWays: new Set(sel.ways), selNodes: new Set(sel.nodes) };
+    updateUI(); redraw();
+  }
+  function updateMove(pt) {
+    const m = moveState, ll = map.containerPointToLatLng(pt); m.dx = ll.lng - m.ll0.lng; m.dy = ll.lat - m.ll0.lat;
+    for (const w of m.aff) w.pv = w.pts.map((p, i) => m.keys.has(w.ks[i]) ? [p[0] + m.dx, p[1] + m.dy] : p);
+    redraw();
+  }
+  function cancelMove() { if (!moveState) return; for (const w of moveState.aff) delete w.pv; moveState = null; redraw(); }
+  function commitMove() {
+    const m = moveState; moveState = null; if (!m) return;
+    if (!m.dx && !m.dy) { for (const w of m.aff) delete w.pv; redraw(); return; }
+    const ops = [], newWay = new Map(), keyMap = new Map(), r = v => +v.toFixed(7);
+    for (const w of m.aff) {
+      const np = (w.pv || w.pts).map(p => [r(p[0]), r(p[1])]); delete w.pv;
+      w.ks.forEach((k, i) => { if (m.keys.has(k)) keyMap.set(k, key(np[i])); });
+      setAlive(w, false); ops.push({ t: 'rm', w }); newWay.set(w, addWay(np, ops, w.typ));
+    }
+    sel.ways.clear(); sel.nodes.clear();
+    for (const w of m.selWays) { const nw = newWay.get(w); if (nw) sel.ways.add(nw); }
+    for (const k of m.selNodes) sel.nodes.add(keyMap.get(k) || k);
+    commit(ops);
+  }
+  function commit(ops) { if (!ops.length) return; hist.push(ops); redoStack.length = 0; pruneSel(); updateUI(); redraw(); }
+  function deleteSel() {
+    if (!sel.ways.size && !sel.nodes.size) return;
+    const ops = [], W = new Set(sel.ways), S = new Set(sel.nodes);
+    // 1) bod, v ktorom sa stretávajú koncami práve dve čiary (napr. po zlúčení): čiary sa spoja do jednej bez tohto bodu
+    if (S.size) {
+      const idx = new Map();
+      for (const w of ways) { if (!w.alive || W.has(w)) continue; for (const k of new Set(w.ks)) if (S.has(k)) { let a = idx.get(k); if (!a) idx.set(k, a = []); a.push(w); } }
+      const endOnly = (w, k) => w.ks.filter(x => x === k).length === 1 && (w.ks[0] === k || w.ks[w.ks.length - 1] === k);
+      for (const [k, L] of idx) {
+        if (L.length !== 2 || !L.every(w => w.alive && endOnly(w, k))) continue;
+        const [A, B] = L, ap = A.ks[A.ks.length - 1] === k ? A.pts : [...A.pts].reverse(), bp = B.ks[0] === k ? B.pts : [...B.pts].reverse();
+        const np = ap.slice(0, -1).concat(bp.slice(1));
+        setAlive(A, false); ops.push({ t: 'rm', w: A }); setAlive(B, false); ops.push({ t: 'rm', w: B });
+        if (np.length > 1) addWay(np, ops, A.typ);
+        S.delete(k);
+      }
+    }
+    // 2) ostatné: vybrané čiary sa zmažú, vybrané body sa odstránia z čiar (čiara sa vyrovná medzi susednými bodmi)
+    const m = ways.length;
+    for (let i = 0; i < m; i++) { const w = ways[i]; if (!w.alive) continue;
+      if (W.has(w)) { setAlive(w, false); ops.push({ t: 'rm', w }); continue; }
+      if (S.size && w.ks.some(k => S.has(k))) {
+        const closed = w.ks.length > 3 && w.ks[0] === w.ks[w.ks.length - 1];
+        let np = w.pts.filter((p, j) => !S.has(w.ks[j]));
+        if (closed && np.length > 2 && key(np[0]) !== key(np[np.length - 1])) np.push([np[0][0], np[0][1]]);   // uzavretá čiara ostane uzavretá
+        setAlive(w, false); ops.push({ t: 'rm', w });
+        if (np.length > 1) addWay(np, ops, w.typ);
+      } }
+    sel.ways.clear(); sel.nodes.clear(); commit(ops);
+  }
+  function mergeSel() {
+    const S = new Set(sel.nodes); if (S.size < 2) { toast('Vyberte aspoň 2 body.'); return; }
+    let sx = 0, sy = 0; for (const k of S) { const [x, y] = unkey(k); sx += x; sy += y; }
+    const c = [+(sx / S.size).toFixed(7), +(sy / S.size).toFixed(7)], ck = key(c), ops = [], n0 = ways.length;
+    for (let i = 0; i < n0; i++) { const w = ways[i]; if (!w.alive || !w.ks.some(k => S.has(k))) continue;
+      const np = [], nk = [];
+      for (let j = 0; j < w.pts.length; j++) { const hit = S.has(w.ks[j]), pk = hit ? ck : w.ks[j]; if (nk.length && nk[nk.length - 1] === pk) continue; np.push(hit ? c : w.pts[j]); nk.push(pk); }
+      setAlive(w, false); ops.push({ t: 'rm', w }); if (np.length > 1) addWay(np, ops, w.typ);
+    }
+    sel.ways.clear(); sel.nodes.clear(); sel.nodes.add(ck); commit(ops); toast('Zlúčených bodov: ' + S.size + ' → 1');
+  }
+  $('merge').onclick = mergeSel; $('del').onclick = deleteSel;
+
+  // ---- kreslenie nových čiar ----
+  let drawState = null, hover = null, lastDown = { t: 0, p: null };
+  // prichytenie na existujúci bod (do 9 px) alebo na čiaru (do 7 px); Ctrl = bez prichytávania
+  function snapAt(pt, noSnap) {
+    const ll = map.containerPointToLatLng(pt);
+    if (noSnap) return { lng: ll.lng, lat: ll.lat, type: 'free' };
+    const m = mpp(ll.lat), my = 111320, mx = 111320 * Math.cos(ll.lat * Math.PI / 180), r = 10 * m;
+    const bb = [ll.lng - r / mx, ll.lat - r / my, ll.lng + r / mx, ll.lat + r / my], seen = new Set();
+    let bn = null, bnd = 9, bw = null, bwd = 7;
+    for (const k of keys(bb)) { const a = grid.get(k); if (!a) continue; for (const w of a) {
+      if (!w.alive || !shown(w) || seen.has(w)) continue; seen.add(w);
+      const P = w.pts.map(p => map.latLngToContainerPoint([p[1], p[0]]));
+      P.forEach((p, i) => { const d = p.distanceTo(pt); if (d < bnd) { bnd = d; bn = w.pts[i]; } });
+      for (let i = 0; i < P.length - 1; i++) {
+        const a1 = P[i], b1 = P[i + 1], dx = b1.x - a1.x, dy = b1.y - a1.y, l2 = dx * dx + dy * dy; if (!l2) continue;
+        let t = ((pt.x - a1.x) * dx + (pt.y - a1.y) * dy) / l2; t = Math.max(0, Math.min(1, t));
+        const px = a1.x + t * dx, py = a1.y + t * dy, d = Math.hypot(px - pt.x, py - pt.y);
+        if (d < bwd) { bwd = d; bw = { w, i, t, ll: map.containerPointToLatLng([px, py]) }; }
+      }
+    } }
+    if (bn) return { lng: bn[0], lat: bn[1], type: 'node' };
+    if (bw) return { lng: bw.ll.lng, lat: bw.ll.lat, type: 'way', way: bw.w, seg: bw.i, t: bw.t };
+    return { lng: ll.lng, lat: ll.lat, type: 'free' };
+  }
+  function drawDrawOv() {
+    const c = ov.getContext('2d'); c.clearRect(0, 0, ov.width, ov.height); if (tool !== 'draw') return;
+    const P = p => map.latLngToContainerPoint([p.lat, p.lng]);
+    c.setLineDash([]); c.lineWidth = 2; c.strokeStyle = '#1e88e5'; c.fillStyle = '#1e88e5';
+    if (drawState && drawState.pts.length) {
+      c.beginPath(); drawState.pts.forEach((p, i) => { const q = P(p); i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.stroke();
+      for (const p of drawState.pts) { const q = P(p); c.beginPath(); c.arc(q.x, q.y, 4, 0, 6.2832); c.fill(); }
+      if (hover) { const a = P(drawState.pts[drawState.pts.length - 1]), h = P(hover.snap); c.setLineDash([6, 4]); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(h.x, h.y); c.stroke(); c.setLineDash([]); }
+    }
+    if (hover) { const q = P(hover.snap), free = hover.snap.type === 'free'; c.beginPath(); c.arc(q.x, q.y, free ? 4 : 7, 0, 6.2832); c.strokeStyle = free ? '#1e88e5' : '#ff9800'; c.lineWidth = 2; c.stroke(); }
+  }
+  map.on('move zoomend resize', () => { if (tool === 'draw') drawDrawOv(); });
+  function addDrawPoint(pt, noSnap) {
+    const s = snapAt(pt, noSnap), q = { lng: +s.lng.toFixed(7), lat: +s.lat.toFixed(7), snap: s };
+    if (!drawState) drawState = { pts: [] };
+    const lp = drawState.pts[drawState.pts.length - 1];
+    if (lp && key([lp.lng, lp.lat]) === key([q.lng, q.lat])) return;
+    drawState.pts.push(q); drawDrawOv(); updateUI();
+  }
+  function cancelDraw() { drawState = null; hover = null; drawDrawOv(); updateUI(); }
+  function finishDraw() {
+    const d = drawState; drawState = null; drawDrawOv(); updateUI();
+    if (!d || d.pts.length < 2) return;
+    const arr = d.pts.map(p => ({ q: [p.lng, p.lat], s: p.snap })), P = arr.map(e => e.q), ops = [], byWay = new Map(), newIns = [];
+    const addIns = (w, i, t, q) => { let a = byWay.get(w); if (!a) byWay.set(w, a = []); if (!a.some(x => key(x.q) === key(q))) a.push({ i, t, q }); };
+    // 1) bod kliknutý na čiaru: vloží sa aj do tejto čiary, aby boli napojené
+    for (const e of arr) if (e.s.type === 'way' && e.s.way.alive && !e.s.way.ks.includes(key(e.q))) addIns(e.s.way, e.s.seg, e.s.t, e.q);
+    // 2) priesečníky novej čiary s existujúcimi čiarami a so sebou samou: v mieste kríženia vznikne spoločný bod
+    const mx = Math.cos(P[0][1] * Math.PI / 180), cross = (ax, ay, bx, by) => ax * by - ay * bx;
+    const inter = (a, b, c, e) => {   // priesečník úsečiek a-b a c-e: {t, u} alebo null
+      const rx = (b[0] - a[0]) * mx, ry = b[1] - a[1], sx = (e[0] - c[0]) * mx, sy = e[1] - c[1], den = cross(rx, ry, sx, sy);
+      if (Math.abs(den) < 1e-18) return null;
+      const qx = (c[0] - a[0]) * mx, qy = c[1] - a[1], t = cross(qx, qy, sx, sy) / den, u = cross(qx, qy, rx, ry) / den;
+      return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? { t, u } : null;
+    };
+    const at = (a, b, t) => [+(a[0] + t * (b[0] - a[0])).toFixed(7), +(a[1] + t * (b[1] - a[1])).toFixed(7)];
+    const nk = P.map(key), pushNew = (j, t, q) => { const k = key(q); if (nk.includes(k) || newIns.some(x => key(x.q) === k)) return false; newIns.push({ i: j, t, q }); return true; };
+    const cand = new Set(); for (const k of keys(bbox(P))) { const a = grid.get(k); if (a) for (const w of a) if (w.alive) cand.add(w); }
+    let nInter = 0;
+    for (let j = 0; j < P.length - 1; j++) {
+      const a = P[j], b = P[j + 1], x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+      for (const w of cand) {
+        if (w.bb[2] < x0 || w.bb[0] > x1 || w.bb[3] < y0 || w.bb[1] > y1) continue;
+        for (let i = 0; i < w.pts.length - 1; i++) { const h = inter(a, b, w.pts[i], w.pts[i + 1]); if (!h) continue;
+          const q = at(a, b, h.t); if (!w.ks.includes(key(q))) addIns(w, i, h.u, q); if (pushNew(j, h.t, q)) nInter++; }
+      }
+      for (let k = j + 2; k < P.length - 1; k++) { const h = inter(a, b, P[k], P[k + 1]); if (!h) continue;   // samopriesečník novej čiary
+        const q = at(a, b, h.t); if (pushNew(j, h.t, q)) { newIns.push({ i: k, t: h.u, q }); nInter++; } }
+    }
+    for (const [w, ins] of byWay) {
+      ins.sort((a, b) => a.i - b.i || a.t - b.t); const np = [];
+      for (let i = 0; i < w.pts.length; i++) { np.push(w.pts[i]); for (const x of ins) if (x.i === i) np.push(x.q); }
+      setAlive(w, false); ops.push({ t: 'rm', w }); addWay(np, ops, w.typ);
+    }
+    newIns.sort((a, b) => a.i - b.i || a.t - b.t); const np = [];
+    for (let j = 0; j < P.length; j++) { np.push(P[j]); for (const x of newIns) if (x.i === j) np.push(x.q); }
+    addWay(np, ops); commit(ops); toast('Nová čiara: ' + np.length + ' bodov' + (nInter ? ', priesečníkov: ' + nInter : ''));
+  }
+
+  // ---- ukazovateľ ----
+  let panning = null;
+  const cap = e => { try { cont.setPointerCapture(e.pointerId); } catch (_) {} };
+  cont.addEventListener('contextmenu', e => e.preventDefault());
+  cont.addEventListener('pointerdown', e => {
+    if (e.button === 2) {       // pravé tlačidlo = posun mapy v každom nástroji
+      panning = { x: e.clientX, y: e.clientY }; cap(e); cont.style.cursor = 'grabbing'; e.preventDefault(); return;
+    }
+    if (e.button !== 0 || spaceDown || tool === 'pan' || (!ways.length && tool !== 'draw')) return;
+    setShift(e.shiftKey);
+    if (tool === 'draw') { const p = cpt(e), now = Date.now();
+      if (drawState && lastDown.p && now - lastDown.t < 350 && p.distanceTo(lastDown.p) < 6) { lastDown = { t: 0, p: null }; finishDraw(); e.preventDefault(); return; }   // dvojklik = dokončiť
+      lastDown = { t: now, p }; addDrawPoint(p, e.ctrlKey || e.metaKey); e.preventDefault(); return; }
+    if (tool === 'erase') { erasing = true; curOps = []; last = null; cap(e); stepTo(cpt(e)); e.preventDefault(); }
+    else if (tool === 'sel') { const p = cpt(e), mod = modOf(e), now = Date.now();
+      if (lastSelDown.p && now - lastSelDown.t < 350 && p.distanceTo(lastSelDown.p) < 6) { lastSelDown = { t: 0, p: null }; selectFace(p, mod); e.preventDefault(); return; }   // dvojklik = celá plocha
+      lastSelDown = { t: now, p };
+      selDrag = { start: p, cur: p, path: [p], moved: false, mod, obj: mod === 'replace' ? pick(p) : null }; cap(e); e.preventDefault(); }
+  });
+  cont.addEventListener('pointermove', e => {
+    setShift(e.shiftKey);
+    brushEl.style.left = e.clientX + 'px'; brushEl.style.top = e.clientY + 'px';
+    if (panning) { map.panBy([panning.x - e.clientX, panning.y - e.clientY], { animate: false }); panning = { x: e.clientX, y: e.clientY }; return; }
+    if (erasing) stepTo(cpt(e));
+    else if (selDrag) { const p = cpt(e); selDrag.cur = p;
+      if (!selDrag.moved && p.distanceTo(selDrag.start) > 4) { selDrag.moved = true; if (selDrag.obj) startMove(selDrag.obj, selDrag.start); }
+      if (moveState) updateMove(p);
+      else { if (selDrag.path[selDrag.path.length - 1].distanceTo(p) > 3) selDrag.path.push(p); drawOv(); } }
+    else if (tool === 'draw' && !spaceDown) { hover = { snap: snapAt(cpt(e), e.ctrlKey || e.metaKey) }; drawDrawOv(); }
+    else if (tool === 'sel' && !spaceDown && e.buttons === 0) cont.style.cursor = pick(cpt(e)) ? 'move' : 'default';
+  });
+  const endPtr = e => {
+    if (panning && (e.button === 2 || e.type === 'pointercancel')) { panning = null; applyDrag(); return; }    if (erasing) { erasing = false; if (curOps.length) { hist.push(curOps); redoStack.length = 0; } curOps = null; last = null; updateUI(); }
+    if (selDrag) { const d = selDrag; selDrag = null;
+      if (moveState) commitMove();
+      else if (d.moved) { d.cur = cpt(e); selDrag = d; const poly = selPoly(); selDrag = null; if (poly.length > 2) selectRegion(poly, d.mod); } else pickAt(d.start, d.mod);
+      ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); }
+  };
+  cont.addEventListener('pointerup', endPtr); cont.addEventListener('pointercancel', endPtr);
+
+  function applyOps(ops, undo) {
+    for (const o of (undo ? [...ops].reverse() : ops)) setAlive(o.w, undo ? o.t === 'rm' : o.t === 'add');
+    pruneSel(); layer.draw(); updateUI();
+  }
+  const undo = () => { const o = hist.pop(); if (!o) return; applyOps(o, true); redoStack.push(o); updateUI(); };
+  const redo = () => { const o = redoStack.pop(); if (!o) return; applyOps(o, false); hist.push(o); updateUI(); };
+  $('undo').onclick = undo; $('redo').onclick = redo;
+
+  // ---- nástroje ----
+  function setTool(t) {
+    if (tool === 'draw' && t !== 'draw') cancelDraw();
+    tool = t; for (const [id, n] of [['tErase', 'erase'], ['tSel', 'sel'], ['tDraw', 'draw'], ['tPan', 'pan']]) $(id).classList.toggle('on', t === n);
+    $('gErase').style.display = t === 'erase' ? '' : 'none'; $('gSel').style.display = t === 'sel' ? '' : 'none'; $('gDraw').style.display = t === 'draw' ? '' : 'none';
+    setBH(); map.invalidateSize(); applyDrag(); drawDrawOv();
+  }
+  function applyDrag() {
+    const pan = tool === 'pan' || spaceDown;
+    pan ? map.dragging.enable() : map.dragging.disable();
+    brushEl.style.display = (tool === 'erase' && !spaceDown) ? 'block' : 'none';
+    cont.style.cursor = pan ? '' : (tool === 'erase' || tool === 'draw') ? 'crosshair' : 'default';
+  }
+  $('tErase').onclick = () => setTool('erase'); $('tSel').onclick = () => setTool('sel'); $('tPan').onclick = () => setTool('pan'); $('tDraw').onclick = () => setTool('draw');
+  function sizeUI() { const s = brushPx(); $('sizeV').textContent = s; brushEl.style.width = brushEl.style.height = s + 'px'; }
+  $('size').oninput = sizeUI; sizeUI(); setTool('erase');
+  cont.addEventListener('pointerleave', () => { if (!erasing) brushEl.style.display = 'none'; });
+  cont.addEventListener('pointerenter', () => { if (tool === 'erase' && !spaceDown) brushEl.style.display = 'block'; });
+  addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const k = e.key.toLowerCase();
+    if (e.code === 'Space') { if (!spaceDown) { spaceDown = true; applyDrag(); } e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && k === 'z') { e.shiftKey ? redo() : undo(); e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && k === 'y') { redo(); e.preventDefault(); }
+    else if (e.ctrlKey || e.metaKey || e.altKey) return;
+    else if (tool === 'draw' && drawState && k === 'enter') { finishDraw(); e.preventDefault(); }
+    else if (tool === 'draw' && drawState && k === 'escape') { cancelDraw(); }
+    else if (tool === 'draw' && drawState && k === 'backspace') { drawState.pts.pop(); if (!drawState.pts.length) drawState = null; drawDrawOv(); updateUI(); e.preventDefault(); }
+    else if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') setBase(+e.code.slice(-1));
+    else if (k === 'e') setTool('erase'); else if (k === 's') setTool('sel'); else if (k === 'p') setTool('pan'); else if (k === 'a') setTool('draw');
+    else if (k === 'l') { $('sshape').value = $('sshape').value === 'lasso' ? 'rect' : 'lasso'; setTool('sel'); }
+    else if (k === 'm') mergeSel();
+    else if (k === 'delete' || k === 'backspace') { deleteSel(); e.preventDefault(); }
+    else if (k === 'escape') { if (moveState) { cancelMove(); selDrag = null; ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); } else { sel.ways.clear(); sel.nodes.clear(); } updateUI(); redraw(); }
+    else if (k === '[') { $('size').value = Math.max(3, brushPx() - 3); sizeUI(); }
+    else if (k === ']') { $('size').value = Math.min(60, brushPx() + 3); sizeUI(); }
+  });
+  addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; applyDrag(); } });
+
+  // ---- UI stav ----
+  const countRemoved = () => { let n = 0; for (const h of hist) for (const o of h) if (o.t === 'rm') n++; return n; };
+  function updateUI() {
+    const alive = ways.reduce((n, w) => n + (w.alive ? 1 : 0), 0);
+    let t = ways.length ? alive + ' úsekov (zmazaných ' + countRemoved() + ')' : 'Načítajte súbor ZAPPAR (.geojson).';
+    if (drawState) t += ' · kreslenie: ' + drawState.pts.length + ' bodov';
+    if (sel.ways.size || sel.nodes.size) t += ' · výber: ' + sel.ways.size + ' úsekov, ' + sel.nodes.size + ' bodov';
+    $('stat').textContent = t;
+    $('undo').disabled = !hist.length; $('redo').disabled = !redoStack.length; $('exp').disabled = $('josm').disabled = $('save').disabled = !alive;
+    $('merge').disabled = sel.nodes.size < 2; $('del').disabled = !sel.ways.size && !sel.nodes.size;
+  }
+  let toastT; function toast(t) { const m = $('msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => m.style.display = 'none', 4500); }
+
+  $('showC').onchange = e => { showC = e.target.checked; layer.draw(); };
+  $('showZ').onchange = e => { showZ = e.target.checked; layer.draw(); };
+
+  // ---- načítanie súboru ----
+  async function readFile(f) { try { load(JSON.parse(await f.text()), f.name); } catch (e) { toast('Súbor sa nepodarilo načítať: ' + e.message); } }
+  $('file').onchange = e => e.target.files[0] && readFile(e.target.files[0]);
+  addEventListener('dragover', e => { e.preventDefault(); $('drop').style.display = 'flex'; });
+  addEventListener('dragleave', e => { if (!e.relatedTarget) $('drop').style.display = 'none'; });
+  addEventListener('drop', e => { e.preventDefault(); $('drop').style.display = 'none'; const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+  (async () => {
+    if (location.protocol === 'file:') { toast('Automatické načítanie C+ZAPPAR funguje len cez spusti_gumu.bat (server). Teraz vyberte súbor ručne.'); return; }
+    if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {   // verejný web: dáta sú šifrované heslom (AES-GCM v prehliadači)
+      try {
+        const buf = new Uint8Array(await (await fetch('C_ZAPPAR_spisska_nova_ves.geojson.enc')).arrayBuffer());
+        for (let i = 0; i < 3; i++) {
+          const pw = prompt('Heslo k dátam C+ZAPPAR (Zrušiť = načítať súbor ručne):'); if (pw === null) return;
+          try {
+            const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+            const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: buf.slice(0, 16), iterations: 600000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+            const txt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(16, 28) }, key, buf.slice(28));
+            load(JSON.parse(new TextDecoder().decode(txt)), 'C_ZAPPAR_spisska_nova_ves.geojson'); return;
+          } catch (_) { toast('Nesprávne heslo.'); }
+        }
+      } catch (_) { toast('Šifrované dáta sa nepodarilo stiahnuť. Vyberte súbor ručne.'); }
+      return;
+    }
+    const p = new URLSearchParams(location.search).get('data');
+    for (const u of p ? [p] : ['C_ZAPPAR_spisska_nova_ves_opravene.geojson', 'C_ZAPPAR_spisska_nova_ves.geojson', 'zappar_mesto_v2.geojson', 'zappar_radnicne_namestie_v2.geojson']) {
+      try { const r = await fetch(u); if (r.ok) { load(await r.json(), u); return; } } catch (_) {}
+    }
+  })();
+
+  // ---- export ----
+  function buildOsm() {
+    const nodes = new Map(); let nid = 0, wid = 0; const ws = [], out = [];
+    for (const w of ways) { if (!w.alive) continue;
+      const ids = w.ks.map(k => { let id = nodes.get(k); if (!id) nodes.set(k, id = --nid); return id; });
+      ws.push('<way id="' + (--wid) + '" visible="true">' + ids.map(i => '<nd ref="' + i + '"/>').join('') + '<tag k="fixme" v="' + (w.typ === 'C' ? 'hranica parcely C (INSPIRE)' : 'ZAPPAR vektorizacia z WMS, priblizne') + '"/></way>'); }
+    out.push('<?xml version="1.0" encoding="UTF-8"?><osm version="0.6" generator="zappar_guma">');
+    for (const [k, id] of nodes) { const [x, y] = k.split(','); out.push('<node id="' + id + '" visible="true" lat="' + y + '" lon="' + x + '"/>'); }
+    out.push(ws.join(''), '</osm>'); return out.join('');
+  }
+  $('exp').onclick = () => {
+    const blob = new Blob([buildOsm()], { type: 'application/xml' }), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'zappar_po_cisteni.osm'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+  // uloženie aktuálnych úprav: cez server do priečinka gumy (…_opravene.geojson), inak ako stiahnutý súbor
+  function buildGeoJson() {
+    const features = [];
+    for (const w of ways) if (w.alive) features.push({ type: 'Feature', properties: { typ: w.typ || 'ZAPPAR' }, geometry: { type: 'LineString', coordinates: w.pts.map(p => [+p[0].toFixed(7), +p[1].toFixed(7)]) } });
+    return JSON.stringify({ type: 'FeatureCollection', features });
+  }
+  async function saveGeo() {
+    if (!ways.some(w => w.alive)) return;
+    const name = curName.endsWith('_opravene.geojson') ? curName : curName.replace(/\.(geo)?json$/i, '') + '_opravene.geojson', body = buildGeoJson();
+    if (location.protocol !== 'file:') {
+      try { const r = await fetch('save?name=' + encodeURIComponent(name), { method: 'POST', body }); const j = await r.json();
+        if (r.ok && j.ok) { toast('Uložené: ' + j.path + ' (' + (body.length / 1e6).toFixed(1) + ' MB)'); return; } } catch (_) {}
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'application/geo+json' })); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000); toast('Stiahnuté ako ' + name + ' (server na ukladanie nie je dostupný).');
+  }
+  $('save').onclick = saveGeo;
+  window.__guma = { map, sel, ways: () => ways, selectFace, saveGeo };   // pre ladenie
+  addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveGeo(); } });
+  $('josm').onclick = async () => {
+    const xml = buildOsm();
+    if (xml.length > 1500000) { toast('Dáta sú veľké (' + (xml.length / 1e6).toFixed(1) + ' MB) na odoslanie do JOSM. Použite Exportovať .osm.'); return; }
+    try {
+      await fetch('http://127.0.0.1:8111/load_data?new_layer=true&layer_name=' + encodeURIComponent('ZAPPAR po čistení') + '&data=' + encodeURIComponent(xml), { mode: 'no-cors' });
+      toast('Odoslané do JOSM (skontrolujte, či je zapnutý Remote Control).');
+    } catch (e) { toast('JOSM sa nepodarilo osloviť: ' + e.message); }
+  };
+})();
+</script>
+</body>
+</html>
