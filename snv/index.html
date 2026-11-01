@@ -20,7 +20,10 @@ label{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer}
 #dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border:2px solid #fff;border-radius:50%;background:var(--accent);pointer-events:none}
 #loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--panel);z-index:5}
 #badge{position:absolute;right:12px;top:12px;background:var(--accent);color:#1a0f08;font:12px monospace;padding:6px 10px;border-radius:4px;display:none}
-.hint{position:absolute;left:12px;bottom:12px;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.5}
+.hint{position:absolute;left:12px;bottom:12px;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-size:12px;line-height:1.5}
+.hint summary{cursor:pointer;list-style:none;font-weight:600;user-select:none}
+.hint summary::-webkit-details-marker{display:none}
+.hint[open] summary{margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -44,7 +47,7 @@ label{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer}
   </div>
 </div>
 <div id="badge">PEŠO · Esc = späť</div>
-<div class="hint"><b>Myš:</b> ťahaj = otáčaj, koliesko = priblíž, pravé = posuň, dvojklik = postav sa tam. <b>Pešo:</b> W A S D, Shift = rýchlejšie, ťahaj = pohľad, Esc = späť.<br><span style="color:#97a69e">Dáta: ÚGKK SR (DMR 5.0, LIDAR, ortofoto), © prispievatelia OpenStreetMap, Pasport svetelných miest (mesto Spišská Nová Ves).</span></div>
+<details class="hint"><summary>ⓘ Ovládanie a zdroje dát</summary><b>Myš:</b> ťahaj = otáčaj, koliesko = priblíž, pravé = posuň, dvojklik = postav sa tam. <b>Pešo:</b> W A S D, Shift = rýchlejšie, ťahaj = pohľad, Esc = späť.<br><span style="color:#97a69e">Dáta: ÚGKK SR (DMR 5.0, LIDAR, ortofoto), © prispievatelia OpenStreetMap, Pasport svetelných miest (mesto Spišská Nová Ves).</span></details>
 <script src="lib/three.min.js"></script>
 <script src="lib/OrbitControls.js"></script>
 <script src="lib/DRACOLoader.js"></script>
