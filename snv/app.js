@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261102b';
+  const GLB_VER = '20261102c';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -108,7 +108,7 @@
   const dl = new THREE.DRACOLoader(); dl.setDecoderPath('lib/draco/'); dl.setDecoderConfig({ type: 'wasm' });
   const gl = new THREE.GLTFLoader(); gl.setDRACOLoader(dl);
   const DEFS = { Budova_Strecha: ['RoofNeutral', true, [1, 1, 1]], Budova_Stena: ['PaintedPlaster017', true, [1, 1, 1]], Cesta_Asfalt: ['Asphalt031', true, [.5, .5, .52]], Cesta_Makadam: ['Ground081', false, [1, 1, 1]], Chodnik: ['PavingStones138', false, [1, 1, 1]], Beton: ['Concrete034', false, [1, 1, 1]], Trat: ['Trat', false, [.9, .9, .9]] };
-  const MODELS = new Set(['03_07']);   // dlazdice s importovanymi 3D modelmi (modely.glb)
+  const MODELS = new Set(['03_06', '03_07']);   // dlazdice s importovanymi 3D modelmi (modely.glb)
   const SPR = { Okno: 'okno.png', Dvere: 'dvere.png' };
   const mtex = new Map();
   function mt(f, srgb) { if (!mtex.has(f)) { const t = TL.load('tex/' + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxA; if (srgb) t.encoding = THREE.sRGBEncoding; mtex.set(f, t); } return mtex.get(f); }
