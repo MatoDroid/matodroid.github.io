@@ -47,6 +47,20 @@ label{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer}
   </div>
 </div>
 <div id="badge">PEŠO · Esc = späť</div>
+<button id="btnEdit" style="display:none;position:absolute;right:12px;bottom:12px;background:var(--panel);color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">✎ Úprava budov</button>
+<div id="edit" style="display:none;position:absolute;right:12px;bottom:48px;width:340px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12px;line-height:1.6">
+<b>Zarovnanie 3D modelov</b><br>
+<select id="edSel" style="width:62%"></select> <button id="edGo">Choď tam</button><br>
+<label>Krok <select id="edStep"><option>0.1</option><option selected>0.25</option><option>0.5</option><option>1</option><option>2</option><option>5</option></select> (° alebo m)</label>
+<label style="margin-left:8px"><input type="checkbox" id="edOut" checked> OSM obrys</label>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:6px 0;text-align:center">
+<button data-k="ang" data-s="1">⟲ proti hod.</button><button data-k="f" data-s="1">↑ dopredu</button><button data-k="ang" data-s="-1">⟳ po hod.</button>
+<button data-k="r" data-s="-1">← vľavo</button><button data-k="z" data-s="1">▲ hore</button><button data-k="r" data-s="1">vpravo →</button>
+<span></span><button data-k="f" data-s="-1">↓ dozadu</button><button data-k="z" data-s="-1">▼ dole</button></div>
+<div id="edVal" style="font:11px monospace;color:var(--muted)"></div>
+<button id="edReset">Vynulovať model</button> <button id="edCopy">Kopírovať hodnoty</button>
+<textarea id="edTxt" readonly style="display:none;width:100%;height:50px;margin-top:4px;font:11px monospace"></textarea>
+<div style="color:var(--muted);margin-top:4px">Smery „dopredu/vľavo“ sú podľa pohľadu kamery. Zmeny sa ukladajú v prehliadači; po dokončení pošli skopírované hodnoty.</div></div>
 <details class="hint"><summary>ⓘ Ovládanie a zdroje dát</summary><b>Myš:</b> ťahaj = otáčaj, koliesko = priblíž, pravé = posuň, dvojklik = postav sa tam. <b>Pešo:</b> W A S D, Shift = rýchlejšie, ťahaj = pohľad, Esc = späť.<br><span style="color:#97a69e">Dáta: ÚGKK SR (DMR 5.0, LIDAR, ortofoto), © prispievatelia OpenStreetMap, Pasport svetelných miest (mesto Spišská Nová Ves).</span></details>
 <script src="lib/three.min.js"></script>
 <script src="lib/OrbitControls.js"></script>

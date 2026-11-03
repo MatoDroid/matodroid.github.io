@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261102f';
+  const GLB_VER = '20261103a';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -133,10 +133,77 @@
     const r = await fetch(url + '?v=' + GLB_VER); if (!r.ok) return null; const buf = await r.arrayBuffer();
     return new Promise((res, rej) => gl.parse(buf, '', g => { fixColors(g.scene); res(g.scene); }, rej));
   }
+
+  // ------------------------------------------------------------- editor zarovnania importovanych modelov
+  const MINFO = {}, MOBJ = {}, ADJ = {};   // info z modely_info.json, uzly modelov, korekcie {ang (° proti smeru hod. ručičiek), dx (m východ), dy (m sever), dz (m hore)}
+  let ADJ_SAVED = {};
+  try { ADJ_SAVED = JSON.parse(localStorage.getItem('modelAdj') || 'null') || {}; } catch (e) { }
+  function applyAdj(n) {
+    const o = MOBJ[n], a = ADJ[n] || { ang: 0, dx: 0, dy: 0, dz: 0 }, i = MINFO[n]; if (!o || !i) return;
+    o.pos.position.set(i.c0[0] + a.dx, a.dz, -i.c0[1] - a.dy); o.pos.rotation.y = a.ang * Math.PI / 180;
+  }
+  function wrapModels(root) {
+    for (const ch of [...root.children]) {
+      if (!/^M_/.test(ch.name || '')) continue; const n = ch.name.replace(/^M_/, ''); const i = MINFO[n]; if (!i) continue;
+      const g = new THREE.Group(); g.name = 'W_' + n; root.add(g); g.add(ch); ch.position.set(-i.c0[0], 0, i.c0[1]);
+      MOBJ[n] = { pos: g, node: ch }; applyAdj(n);
+    }
+  }
+  const zeroAdj = () => ({ ang: 0, dx: 0, dy: 0, dz: 0 });
+  const adjSet = (n, k, v) => { (ADJ[n] = ADJ[n] || zeroAdj())[k] = v; applyAdj(n); try { localStorage.setItem('modelAdj', JSON.stringify(ADJ)); } catch (e) { } };
+  let outLine = null;
+  function showOutline(n) {
+    if (outLine) { scene.remove(outLine); outLine.geometry.dispose(); outLine = null; }
+    const i = MINFO[n]; if (!i || !i.outline.length || !$('edit').style.display.includes('block') || !$('edOut').checked) return;
+    const g = new THREE.BufferGeometry().setFromPoints(i.outline.map(p => new THREE.Vector3(p[0], (i.zbase || 0) + 0.5, -p[1])));
+    outLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xff2020, depthTest: false })); outLine.renderOrder = 999; scene.add(outLine);
+  }
+  function edRefresh() {
+    const n = $('edSel').value, a = ADJ[n] || zeroAdj(), i = MINFO[n]; if (!i) return;
+    $('edVal').textContent = `natočenie ${((((i.ang || 0) + a.ang) % 360 + 360) % 360).toFixed(2)}° (korekcia ${a.ang >= 0 ? '+' : ''}${a.ang.toFixed(2)}°) · posun východ ${a.dx.toFixed(2)} m, sever ${a.dy.toFixed(2)} m, výška ${a.dz.toFixed(2)} m`;
+    showOutline(n);
+  }
+  function edStep(k, sgn) {
+    const n = $('edSel').value, st = parseFloat($('edStep').value), a = ADJ[n] || zeroAdj();
+    if (k === 'ang') adjSet(n, 'ang', a.ang + sgn * st);
+    else if (k === 'z') adjSet(n, 'dz', a.dz + sgn * st);
+    else {   // posun voci smeru pohladu kamery: f = dopredu, r = doprava
+      const d = new THREE.Vector3().subVectors(controls.target, camera.position); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, -1); d.normalize();
+      const v = k === 'f' ? [d.x, -d.z] : [-d.z, -d.x];   // (východ, sever)
+      adjSet(n, 'dx', a.dx + sgn * st * v[0]); adjSet(n, 'dy', ADJ[n].dy + sgn * st * v[1]);
+    }
+    edRefresh();
+  }
+  async function edInit() {
+    try { const r = await fetch('modely_info.json?v=' + GLB_VER); Object.assign(MINFO, await r.json()); } catch (e) { return; }
+    let base = {}; try { const r = await fetch('modely_korekcie.json?v=' + GLB_VER); if (r.ok) base = await r.json(); } catch (e) { }
+    for (const n in MINFO) { ADJ[n] = Object.assign(zeroAdj(), base[n] || {}, ADJ_SAVED[n] || {}); applyAdj(n); }
+    const sel = $('edSel'); sel.innerHTML = Object.keys(MINFO).map(n => `<option>${n}</option>`).join('');
+    sel.onchange = edRefresh; $('edOut').onchange = edRefresh;
+    $('edGo').onclick = () => {
+      const i = MINFO[sel.value], y = (typeof heightAt === 'function' ? heightAt(i.c0[0], -i.c0[1]) : 0) || i.zbase || 0;
+      controls.target.set(i.c0[0], y, -i.c0[1]); camera.position.set(i.c0[0] - 30, y + 70, -i.c0[1] + 70); controls.update(); edRefresh();
+    };
+    document.querySelectorAll('#edit [data-k]').forEach(b => {   // pri držaní tlačidla sa opakuje
+      let tm = null; const fire = () => edStep(b.dataset.k, +b.dataset.s);
+      const stop = () => { clearInterval(tm); tm = null; };
+      b.addEventListener('pointerdown', e => { e.preventDefault(); fire(); tm = setInterval(fire, 120); });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+    });
+    $('edReset').onclick = () => { const n = sel.value; ADJ[n] = zeroAdj(); adjSet(n, 'ang', 0); edRefresh(); };
+    $('edCopy').onclick = async () => {
+      const o = {}; for (const n in ADJ) { const a = ADJ[n]; if (a.ang || a.dx || a.dy || a.dz) o[n] = { ang: +a.ang.toFixed(3), dx: +a.dx.toFixed(3), dy: +a.dy.toFixed(3), dz: +a.dz.toFixed(3) }; }
+      const txt = JSON.stringify(o); $('edTxt').value = txt; $('edTxt').style.display = 'block'; $('edTxt').select();
+      try { await navigator.clipboard.writeText(txt); $('edCopy').textContent = 'Skopírované ✓'; setTimeout(() => $('edCopy').textContent = 'Kopírovať hodnoty', 2000); } catch (e) { }
+    };
+    $('btnEdit').onclick = () => { const e = $('edit'); e.style.display = e.style.display === 'block' ? 'none' : 'block'; edRefresh(); };
+    $('btnEdit').style.display = 'block';
+  }
+  edInit();
   async function setObjects(t, want) {
     if (t.objBusy) return; t.objBusy = true;
     try {
-      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); } } s.visible = showObj; t.bridge = []; s.traverse(c => { if (c.isMesh && /^Mosty/i.test(c.name || (c.parent && c.parent.name) || '')) t.bridge.push(c); }); t.obj = s; scene.add(s); } else t.obj = false; }
+      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); wrapModels(m, t.name); } } s.visible = showObj; t.bridge = []; s.traverse(c => { if (c.isMesh && /^Mosty/i.test(c.name || (c.parent && c.parent.name) || '')) t.bridge.push(c); }); t.obj = s; scene.add(s); } else t.obj = false; }
       else if (!want && t.obj) { disposeTree(t.obj); t.obj = null; }
     } catch (e) { console.warn('objekty', t.name, e.message); t.obj = false; }
     t.objBusy = false;
