@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261103f';
+  const GLB_VER = '20261104a';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -139,8 +139,9 @@
   let ADJ_SAVED = {};
   try { ADJ_SAVED = JSON.parse(localStorage.getItem('modelAdj') || 'null') || {}; } catch (e) { }
   function applyAdj(n) {
-    const o = MOBJ[n], a = ADJ[n] || { ang: 0, dx: 0, dy: 0, dz: 0 }, i = MINFO[n]; if (!o || !i) return;
-    o.pos.position.set(i.c0[0] + a.dx, a.dz, -i.c0[1] - a.dy); o.pos.rotation.y = a.ang * Math.PI / 180;
+    const o = MOBJ[n], a = ADJ[n] || { ang: 0, dx: 0, dy: 0, dz: 0, s: 1 }, i = MINFO[n]; if (!o || !i) return;
+    const k = a.s || 1;
+    o.pos.position.set(i.c0[0] + a.dx, a.dz + (1 - k) * (i.zbase || 0), -i.c0[1] - a.dy); o.pos.rotation.y = a.ang * Math.PI / 180; o.pos.scale.setScalar(k);   // mierka okolo stredu pôdorysu a úrovne zeme
   }
   function wrapModels(root) {
     for (const ch of [...root.children]) {
@@ -149,7 +150,7 @@
       MOBJ[n] = { pos: g, node: ch }; applyAdj(n);
     }
   }
-  const zeroAdj = () => ({ ang: 0, dx: 0, dy: 0, dz: 0 });
+  const zeroAdj = () => ({ ang: 0, dx: 0, dy: 0, dz: 0, s: 1 });
   const adjSet = (n, k, v) => { (ADJ[n] = ADJ[n] || zeroAdj())[k] = v; applyAdj(n); try { localStorage.setItem('modelAdj', JSON.stringify(ADJ)); } catch (e) { } };
   let outLine = null;
   function showOutline(n) {
@@ -160,12 +161,14 @@
   }
   function edRefresh() {
     const n = $('edSel').value, a = ADJ[n] || zeroAdj(), i = MINFO[n]; if (!i) return;
-    $('edVal').textContent = `natočenie ${((((i.ang || 0) + a.ang) % 360 + 360) % 360).toFixed(2)}° (korekcia ${a.ang >= 0 ? '+' : ''}${a.ang.toFixed(2)}°) · posun východ ${a.dx.toFixed(2)} m, sever ${a.dy.toFixed(2)} m, výška ${a.dz.toFixed(2)} m`;
+    $('edVal').textContent = `natočenie ${((((i.ang || 0) + a.ang) % 360 + 360) % 360).toFixed(2)}° (korekcia ${a.ang >= 0 ? '+' : ''}${a.ang.toFixed(2)}°) · posun východ ${a.dx.toFixed(2)} m, sever ${a.dy.toFixed(2)} m, výška ${a.dz.toFixed(2)} m · mierka ${(a.s * 100).toFixed(1)} %`;
+    $('edScale').value = (a.s * 100).toFixed(1);
     showOutline(n);
   }
   function edStep(k, sgn) {
     const n = $('edSel').value, st = parseFloat($('edStep').value), a = ADJ[n] || zeroAdj();
-    if (k === 'ang') adjSet(n, 'ang', a.ang + sgn * st);
+    if (k === 's') adjSet(n, 's', Math.max(0.2, a.s * (1 + sgn * st / 100)));
+    else if (k === 'ang') adjSet(n, 'ang', a.ang + sgn * st);
     else if (k === 'z') adjSet(n, 'dz', a.dz + sgn * st);
     else {   // posun voci smeru pohladu kamery: f = dopredu, r = doprava
       const d = new THREE.Vector3().subVectors(controls.target, camera.position); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, -1); d.normalize();
@@ -190,9 +193,10 @@
       b.addEventListener('pointerdown', e => { e.preventDefault(); fire(); tm = setInterval(fire, 120); });
       ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
     });
+    $('edScale').onchange = () => { const v = parseFloat($('edScale').value); if (v >= 20 && v <= 500) { adjSet(sel.value, 's', v / 100); edRefresh(); } };
     $('edReset').onclick = () => { const n = sel.value; ADJ[n] = zeroAdj(); adjSet(n, 'ang', 0); edRefresh(); };
     $('edCopy').onclick = async () => {
-      const o = {}; for (const n in ADJ) { const a = ADJ[n]; if (a.ang || a.dx || a.dy || a.dz) o[n] = { ang: +a.ang.toFixed(3), dx: +a.dx.toFixed(3), dy: +a.dy.toFixed(3), dz: +a.dz.toFixed(3) }; }
+      const o = {}; for (const n in ADJ) { const a = ADJ[n]; if (a.ang || a.dx || a.dy || a.dz || a.s !== 1) o[n] = { ang: +a.ang.toFixed(3), dx: +a.dx.toFixed(3), dy: +a.dy.toFixed(3), dz: +a.dz.toFixed(3), s: +a.s.toFixed(4) }; }
       const txt = JSON.stringify(o); $('edTxt').value = txt; $('edTxt').style.display = 'block'; $('edTxt').select();
       try { await navigator.clipboard.writeText(txt); $('edCopy').textContent = 'Skopírované ✓'; setTimeout(() => $('edCopy').textContent = 'Kopírovať hodnoty', 2000); } catch (e) { }
     };
