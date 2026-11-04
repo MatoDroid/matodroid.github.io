@@ -2,6 +2,7 @@
 <style>body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#f4f4f4}form{background:#fff;padding:24px;border-radius:10px;box-shadow:0 2px 12px #0002;display:flex;gap:8px;flex-direction:column;min-width:260px}input,button{font:inherit;padding:8px}#e{color:#c00;min-height:1.2em;font-size:14px}</style></head>
 <body><form id="f"><b>Zadajte heslo</b><input id="p" type="password" autocomplete="current-password" autofocus><button>Otvoriť</button><div id="e"></div></form>
 <script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 document.getElementById('f').onsubmit = async ev => {
   ev.preventDefault(); const e = document.getElementById('e'), pw = document.getElementById('p').value; e.textContent = 'Dešifrujem…';
   try {
