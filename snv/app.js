@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261105c';
+  const GLB_VER = '20261105d';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -151,6 +151,7 @@
     }
   }
   const zeroAdj = () => ({ ang: 0, dx: 0, dy: 0, dz: 0, s: 1 });
+  let BASEADJ = {};   // trvalé korekcie z modely_korekcie.json = východiskový stav modelov
   const adjSet = (n, k, v) => { (ADJ[n] = ADJ[n] || zeroAdj())[k] = v; applyAdj(n); try { localStorage.setItem('modelAdj', JSON.stringify(ADJ)); } catch (e) { } };
   let outLine = null;
   function showOutline(n) {
@@ -180,6 +181,7 @@
   async function edInit() {
     try { const r = await fetch('modely_info.json?v=' + GLB_VER); Object.assign(MINFO, await r.json()); } catch (e) { return; }
     let base = {}; try { const r = await fetch('modely_korekcie.json?v=' + GLB_VER); if (r.ok) base = await r.json(); } catch (e) { }
+    BASEADJ = base;
     for (const n in MINFO) { ADJ[n] = Object.assign(zeroAdj(), base[n] || {}, ADJ_SAVED[n] || {}); applyAdj(n); }
     const sel = $('edSel'); sel.innerHTML = Object.keys(MINFO).map(n => `<option>${n}</option>`).join('');
     sel.onchange = edRefresh; $('edOut').onchange = edRefresh;
@@ -194,7 +196,7 @@
       ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
     });
     $('edScale').onchange = () => { const v = parseFloat($('edScale').value); if (v >= 20 && v <= 500) { adjSet(sel.value, 's', v / 100); edRefresh(); } };
-    $('edReset').onclick = () => { const n = sel.value; ADJ[n] = zeroAdj(); adjSet(n, 'ang', 0); edRefresh(); };
+    $('edReset').onclick = () => { const n = sel.value; const b = Object.assign(zeroAdj(), BASEADJ[n] || {}); ADJ[n] = b; adjSet(n, 'ang', b.ang); edRefresh(); };
     $('edCopy').onclick = async () => {
       const o = {}; for (const n in ADJ) { const a = ADJ[n]; if (a.ang || a.dx || a.dy || a.dz || a.s !== 1) o[n] = { ang: +a.ang.toFixed(3), dx: +a.dx.toFixed(3), dy: +a.dy.toFixed(3), dz: +a.dz.toFixed(3), s: +a.s.toFixed(4) }; }
       const txt = JSON.stringify(o); $('edTxt').value = txt; $('edTxt').style.display = 'block'; $('edTxt').select();
