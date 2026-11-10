@@ -1,6 +1,6 @@
 // Service worker pre /guma: aplikácia + mapové dlaždice sa držia v cache, takže stránka sa otvorí a dá používať aj bez signálu.
-// Zabalenie (zabal.mjs) nahradí 1794340768217 časom zostavenia. Dáta (GitHub API) rieši aplikácia sama (IndexedDB), preto ich sem nepúšťame.
-const BUILD = '__BUILD__', SHELL_CACHE = 'guma-shell-' + BUILD, TILE_CACHE = 'guma-tiles';
+// Zabalenie (zabal.mjs) nahradí 1794346316429 časom zostavenia. Dáta (GitHub API) rieši aplikácia sama (IndexedDB), preto ich sem nepúšťame.
+const BUILD = '1794346316429', SHELL_CACHE = 'guma-shell-' + BUILD, TILE_CACHE = 'guma-tiles';
 const SHELL = ['./', 'index.html', 'app.enc', 'C_ZAPPAR_spisska_nova_ves.geojson.enc',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
 const TILE_HOSTS = ['tile.openstreetmap.org', 'ofmozaika.tiles.freemap.sk', 'tiles.arcgis.com', 'kataster.skgeodesy.sk'];
