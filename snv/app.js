@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261105d';
+  const GLB_VER = '20261113a';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -107,8 +107,7 @@
   // ------------------------------------------------------------- objekty (GLB)
   const dl = new THREE.DRACOLoader(); dl.setDecoderPath('lib/draco/'); dl.setDecoderConfig({ type: 'wasm' });
   const gl = new THREE.GLTFLoader(); gl.setDRACOLoader(dl);
-  const DEFS = { Budova_Strecha: ['RoofNeutral', true, [1, 1, 1]], Budova_Stena: ['PaintedPlaster017', true, [1, 1, 1]], Cesta_Asfalt: ['Asphalt031', true, [.5, .5, .52]], Cesta_Makadam: ['Ground081', false, [1, 1, 1]], Chodnik: ['PavingStones138', false, [1, 1, 1]], Beton: ['Concrete034', false, [1, 1, 1]], Trat: ['Trat', false, [.9, .9, .9]] };
-  const MODELS = new Set(['02_04', '03_05', '03_06', '03_07']);   // dlazdice s importovanymi 3D modelmi (modely.glb)
+  const DEFS = { Budova_Strecha: ['RoofNeutral', true, [1, 1, 1]], Budova_Stena: ['PaintedPlaster017', true, [1, 1, 1]], Budova_Panel: ['Panel', true, [1, 1, 1]], Budova_Hala: ['Hala', true, [1, 1, 1]], Cesta_Asfalt: ['Asphalt031', true, [.5, .5, .52]], Cesta_Makadam: ['Ground081', false, [1, 1, 1]], Chodnik: ['PavingStones138', false, [1, 1, 1]], Beton: ['Concrete034', false, [1, 1, 1]], Trat: ['Trat', false, [.9, .9, .9]] };
   const SPR = { Okno: 'okno.png', Dvere: 'dvere.png' };
   const mtex = new Map();
   function mt(f, srgb) { if (!mtex.has(f)) { const t = TL.load('tex/' + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxA; if (srgb) t.encoding = THREE.sRGBEncoding; mtex.set(f, t); } return mtex.get(f); }
@@ -209,10 +208,23 @@
   async function setObjects(t, want) {
     if (t.objBusy) return; t.objBusy = true;
     try {
-      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); if (MODELS.has(t.name)) { const m = await loadGLB(`tiles/${t.name}/modely.glb`); if (m) { styleMaterials(m); s.add(m); wrapModels(m, t.name); } } s.visible = showObj; t.bridge = []; s.traverse(c => { if (c.isMesh && /^Mosty/i.test(c.name || (c.parent && c.parent.name) || '')) t.bridge.push(c); }); t.obj = s; scene.add(s); } else t.obj = false; }
+      if (want && t.obj === null) { const s = await loadGLB(`tiles/${t.name}/objekty.glb`); if (s) { styleMaterials(s); s.visible = showObj; t.bridge = []; s.traverse(c => { if (c.isMesh && /^Mosty/i.test(c.name || (c.parent && c.parent.name) || '')) t.bridge.push(c); }); t.obj = s; scene.add(s); } else t.obj = false; }
       else if (!want && t.obj) { disposeTree(t.obj); t.obj = null; }
     } catch (e) { console.warn('objekty', t.name, e.message); t.obj = false; }
     t.objBusy = false;
+  }
+  // importované 3D modely: každý samostatne (modely/<nazov>.glb), načítava sa podľa vzdialenosti kamery
+  const MLOAD = {};   // nazov -> null | 'busy' | Object3D | false
+  async function setModel(n, want) {
+    const st = MLOAD[n];
+    if (want && st === undefined) {
+      MLOAD[n] = 'busy';
+      try { const m = await loadGLB(`modely/${n}.glb`); if (m) { styleMaterials(m); wrapModels(m); m.visible = showObj; scene.add(m); MLOAD[n] = m; } else MLOAD[n] = false; }
+      catch (e) { console.warn('model', n, e.message); MLOAD[n] = false; }
+    } else if (!want && st && st !== 'busy') { disposeTree(st); delete MOBJ[n]; delete MLOAD[n]; }
+  }
+  function updateModels(cx, cz) {
+    for (const n in MINFO) { const c = MINFO[n].c0, d = Math.hypot(c[0] - cx, -c[1] - cz); setModel(n, d < 900 * detail || (MLOAD[n] && d < 1300 * detail)); }
   }
   async function setStops(t, want) {
     if (t.stBusy) return; t.stBusy = true;
@@ -311,7 +323,7 @@
   });
   $('btnHome').addEventListener('click', () => { if (walk) exitWalk(); camera.position.set(-1500, 6500, 8500); controls.target.set(600, 500, -1200); controls.update(); });
   $('btnMin').addEventListener('click', () => { const p = $('panel'); p.classList.toggle('min'); $('btnMin').textContent = p.classList.contains('min') ? '☰' : '–'; });
-  $('lObj').addEventListener('change', e => { showObj = e.target.checked; tiles.forEach(t => { if (t.obj) t.obj.visible = showObj; }); });
+  $('lObj').addEventListener('change', e => { showObj = e.target.checked; tiles.forEach(t => { if (t.obj) t.obj.visible = showObj; }); for (const n in MLOAD) if (MLOAD[n] && MLOAD[n].isObject3D) MLOAD[n].visible = showObj; });
   $('lStop').addEventListener('change', e => { showStop = e.target.checked; tiles.forEach(t => { if (t.st) t.st.visible = showStop; }); });
   $('lLamp').addEventListener('change', e => { showLamp = e.target.checked; tiles.forEach(t => { if (t.lm) t.lm.visible = showLamp; }); });
   $('lTree').addEventListener('change', e => { showTree = e.target.checked; tiles.forEach(t => { if (t.tr) t.tr.visible = showTree; }); });
@@ -343,6 +355,7 @@
       setLamps(t, LAMP.has(t.name) && (d < 350 * detail || (t.lm && d < 520 * detail)));
       if (t.mesh) nT++; if (t.obj) nO++; if (t.tr) nTr++; if (t.lod === 0) nL0++;
     });
+    updateModels(cx, cz);
     $('stat').textContent = `dlaždice: ${nT}/${tiles.size} (detail 1 m: ${nL0}) · budovy: ${nO} · stromy: ${nTr}\nkamera: ${(camera.position.x).toFixed(0)}, ${(camera.position.y).toFixed(0)}, ${(camera.position.z).toFixed(0)}`;
     const dot = $('dot'), r = ov.getBoundingClientRect(); dot.style.left = ((camera.position.x + HX) / 6 / ov.naturalWidth * 100) + '%'; dot.style.top = ((camera.position.z + HY) / 6 / ov.naturalHeight * 100) + '%';
   }
