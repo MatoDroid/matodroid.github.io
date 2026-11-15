@@ -22,7 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
-  const GLB_VER = '20261113b';
+  const GLB_VER = '20261115a';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
   const texCache = new Map();
@@ -343,11 +343,12 @@
   function update(now) {
     if (now - lastUpd < 400) return; lastUpd = now;
     const cx = camera.position.x, cz = camera.position.z, gy = camera.position.y; let nT = 0, nO = 0, nTr = 0, nL0 = 0;
-    const alt = Math.max(0, gy - 300) * 0.5;      // vysoko = menej detailu
+    const gh = heightAt(cx, cz), vert = Math.max(0, gy - (Number.isFinite(gh) ? gh : 0));   // výška kamery nad terénom
     tiles.forEach(t => {
-      const d = rectDist(t, cx, cz) + alt * 0.0;
+      const d = rectDist(t, cx, cz);
       const D = LODD.map(v => v * detail);
-      const k = d < D[0] ? 0 : d < D[1] ? 1 : d < D[2] ? 2 : 3;
+      const d3 = Math.hypot(d, vert);   // pri lete vysoko netreba detail 1 m (šetrí pamäť grafiky)
+      const k = d3 < D[0] ? 0 : d3 < D[1] ? 1 : d3 < D[2] ? 2 : 3;
       setLOD(t, k);
       setObjects(t, d < 900 * detail || (t.obj && d < 1300 * detail));
       setTrees(t, d < 480 * detail || (t.tr && d < 700 * detail));
