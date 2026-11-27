@@ -333,7 +333,7 @@
   canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
   // dotykové ovládanie mapy: 1 prst = posun, 2 prsty = priblíženie (štipnutie) + otáčanie/náklon (ťahaním oboch prstov)
   controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
-  controls.screenSpacePanning = false;
+  controls.screenSpacePanning = false; controls.touchRotateSign = -1;   // otáčanie 2 prstami opačne (podľa používateľa)
   // joystick pre chôdzu na dotykových zariadeniach
   const joy = $('joy'), knob = $('knob'); let jv = { x: 0, y: 0 }, jid = null;
   function joyMove(ev) { const r = joy.getBoundingClientRect(), R = r.width / 2; let dx = ev.clientX - r.left - R, dy = ev.clientY - r.top - R; const m = Math.hypot(dx, dy); if (m > R) { dx *= R / m; dy *= R / m; } jv = { x: dx / R, y: dy / R }; knob.style.transform = `translate(${dx}px,${dy}px)`; }
