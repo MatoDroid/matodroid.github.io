@@ -22,6 +22,7 @@
   const LODD = [450, 1800, 5000, 1e9];
   let detail = 1, walk = false, yaw = 0, pitch = 0, keys = {}, drag = null;
   const EYE = 1.7;
+  const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
   const GLB_VER = '20261127c';
   let showObj = true, showTree = true, showLamp = true, showStop = true; const STOP = new Set(); fetch('zastavky.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => STOP.add(n))).catch(() => {}); const LAMP = new Set(); fetch('lampy.json?v=' + Date.now()).then(r => r.json()).then(a => a.forEach(n => LAMP.add(n))).catch(() => {});
   const loaderPNG = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(url)); i.src = url; });
@@ -297,11 +298,11 @@
   function enterWalk(x, z, yw, yy) {
     const y = yy !== undefined ? yy : heightAt(x, z); if (y !== y) return false;
     walk = true; controls.enabled = false; camera.position.set(x, y + EYE, z); yaw = yw === undefined ? yaw : yw; pitch = -0.05; applyLook();
-    $('badge').style.display = 'block'; $('btnWalk').textContent = 'Naspäť do mapy'; scene.fog.near = 400; scene.fog.far = 3000; return true;
+    $('badge').style.display = 'block'; if (TOUCH) $('joy').style.display = 'block'; $('btnWalk').textContent = 'Naspäť do mapy'; scene.fog.near = 400; scene.fog.far = 3000; return true;
   }
   function exitWalk() {
     if (!walk) return; walk = false; controls.enabled = true; const p = camera.position.clone();
-    camera.position.set(p.x - 150, p.y + 120, p.z + 200); controls.target.set(p.x, p.y - EYE, p.z); controls.update(); $('badge').style.display = 'none'; $('btnWalk').textContent = 'Prejsť pešo'; scene.fog.near = 1500; scene.fog.far = 9000;
+    camera.position.set(p.x - 150, p.y + 120, p.z + 200); controls.target.set(p.x, p.y - EYE, p.z); controls.update(); $('badge').style.display = 'none'; $('joy').style.display = 'none'; $('btnWalk').textContent = 'Prejsť pešo'; scene.fog.near = 1500; scene.fog.far = 9000;
   }
   function applyLook() { camera.rotation.order = 'YXZ'; camera.rotation.set(pitch, yaw, 0); }
   function flyTo(x, z, dist) {
@@ -310,9 +311,38 @@
     controls.target.set(x, gy, z); camera.position.set(x - dist * 0.6, gy + dist * 0.8, z + dist * 0.9); controls.update();
   }
   canvas.addEventListener('dblclick', ev => { if (walk) return; const p = pick(ev); if (p) enterWalk(p.x, p.z, undefined, p.y); });
-  canvas.addEventListener('pointerdown', ev => { if (walk) { drag = { x: ev.clientX, y: ev.clientY }; canvas.setPointerCapture(ev.pointerId); } });
-  canvas.addEventListener('pointermove', ev => { if (walk && drag) { yaw -= (ev.clientX - drag.x) * 0.004; pitch = Math.max(-1.3, Math.min(1.3, pitch - (ev.clientY - drag.y) * 0.004)); drag = { x: ev.clientX, y: ev.clientY }; applyLook(); } });
-  canvas.addEventListener('pointerup', () => { drag = null; });
+  canvas.addEventListener('pointerdown', ev => {
+    if (walk && !drag) { drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY }; try { canvas.setPointerCapture(ev.pointerId); } catch (e) { } }
+    if (ev.pointerType === 'touch') tap = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false };
+  });
+  canvas.addEventListener('pointermove', ev => {
+    if (tap && tap.id === ev.pointerId && Math.hypot(ev.clientX - tap.x, ev.clientY - tap.y) > 12) tap.moved = true;
+    if (walk && drag && drag.id === ev.pointerId) { const k = ev.pointerType === 'touch' ? 0.005 : 0.004; yaw -= (ev.clientX - drag.x) * k; pitch = Math.max(-1.3, Math.min(1.3, pitch - (ev.clientY - drag.y) * k)); drag.x = ev.clientX; drag.y = ev.clientY; applyLook(); }
+  });
+  // dvojité ťuknutie prstom: v mape = postav sa tam, pešo = presuň sa tam (smer pohľadu ostáva)
+  let tap = null, lastTap = null;
+  function endPointer(ev) {
+    if (drag && drag.id === ev.pointerId) drag = null;
+    if (!tap || tap.id !== ev.pointerId) return;
+    const now = performance.now(), t = tap; tap = null;
+    if (t.moved || now - t.t > 300) { lastTap = null; return; }
+    if (lastTap && now - lastTap.t < 350 && Math.hypot(t.x - lastTap.x, t.y - lastTap.y) < 40) {
+      lastTap = null; const p = pick({ clientX: t.x, clientY: t.y }); if (p) enterWalk(p.x, p.z, undefined, p.y);
+    } else lastTap = { x: t.x, y: t.y, t: now };
+  }
+  canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
+  // dotykové ovládanie mapy: 1 prst = posun, 2 prsty = priblíženie (štipnutie) + otáčanie/náklon (ťahaním oboch prstov)
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.screenSpacePanning = false;
+  // joystick pre chôdzu na dotykových zariadeniach
+  const joy = $('joy'), knob = $('knob'); let jv = { x: 0, y: 0 }, jid = null;
+  function joyMove(ev) { const r = joy.getBoundingClientRect(), R = r.width / 2; let dx = ev.clientX - r.left - R, dy = ev.clientY - r.top - R; const m = Math.hypot(dx, dy); if (m > R) { dx *= R / m; dy *= R / m; } jv = { x: dx / R, y: dy / R }; knob.style.transform = `translate(${dx}px,${dy}px)`; }
+  function joyEnd(ev) { if (ev.pointerId !== jid) return; jid = null; jv = { x: 0, y: 0 }; knob.style.transform = ''; }
+  joy.addEventListener('pointerdown', ev => { ev.preventDefault(); jid = ev.pointerId; try { joy.setPointerCapture(jid); } catch (e) { } joyMove(ev); });
+  joy.addEventListener('pointermove', ev => { if (ev.pointerId === jid) joyMove(ev); });
+  ['pointerup', 'pointercancel'].forEach(e => joy.addEventListener(e, joyEnd));
+  $('badge').addEventListener('click', exitWalk);
+  if (TOUCH) { $('badge').textContent = 'PEŠO · ✕ späť do mapy'; if (innerWidth < 700) { $('panel').classList.add('min'); $('btnMin').textContent = '☰'; } }
   addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Escape') exitWalk(); });
   addEventListener('keyup', e => { keys[e.code] = false; });
   $('btnWalk').addEventListener('click', () => {
@@ -364,8 +394,9 @@
   function loop(now) {
     requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (walk) {
-      const sp = (keys.ShiftLeft || keys.ShiftRight ? 12 : 3.5) * dt; let f = 0, s = 0;
+      let sp = (keys.ShiftLeft || keys.ShiftRight ? 12 : 3.5) * dt; let f = 0, s = 0;
       if (keys.KeyW || keys.ArrowUp) f += 1; if (keys.KeyS || keys.ArrowDown) f -= 1; if (keys.KeyD || keys.ArrowRight) s += 1; if (keys.KeyA || keys.ArrowLeft) s -= 1;
+      if (jid !== null) { const m = Math.hypot(jv.x, jv.y); if (m > 0.15) { f = -jv.y; s = jv.x; sp = (3.5 + 8.5 * Math.max(0, (m - 0.75) / 0.25)) * dt; } }   // joystick: okraj = beh
       if (f || s) { const nx = camera.position.x + (-Math.sin(yaw) * f + Math.cos(yaw) * s) * sp, nz = camera.position.z + (-Math.cos(yaw) * f - Math.sin(yaw) * s) * sp, h = heightAt(nx, nz); if (h === h) { camera.position.x = nx; camera.position.z = nz; } }
       const gy = groundAt(camera.position.x, camera.position.z, camera.position.y - EYE); if (gy === gy) camera.position.y += ((gy + EYE) - camera.position.y) * Math.min(1, dt * 12);
     } else controls.update();
